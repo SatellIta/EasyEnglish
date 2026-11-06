@@ -51,6 +51,7 @@ pnpm typecheck    # 仅类型检查
 - 前端：Vue 3、TypeScript、Vite、Vue Router、Pinia、marked + DOMPurify
 - 后端：Hono、better-sqlite3（SQLite + FTS5 全文检索）
 - AI：OpenAI 兼容 Chat Completions（流式 NDJSON）
+- UI：新拟物派（Neumorphism / Soft UI），纯 CSS 设计变量，无组件库
 
 项目刻意保持轻量：没有 ORM、没有 UI 组件库、没有数据库服务。
 

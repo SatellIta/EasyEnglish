@@ -139,7 +139,6 @@ onBeforeUnmount(() => {
   <div class="page">
     <header class="page-head">
       <div>
-        <p class="eyebrow">Spaced repetition</p>
         <h1>复习</h1>
         <p>先看英文，主动回忆。记得就跳过，不记得再展开答案。</p>
       </div>
@@ -286,17 +285,17 @@ onBeforeUnmount(() => {
   padding: 28px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 22px;
 }
 .setup-card h2 {
   margin: 0;
-  font-family: var(--font-serif);
   font-size: 20px;
+  font-weight: 600;
 }
 .type-filters {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
+  gap: 12px;
 }
 .filter-chip {
   display: flex;
@@ -304,35 +303,44 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   gap: 10px;
   padding: 14px 16px;
-  border: 1px solid var(--border);
-  border-radius: 13px;
-  background: var(--surface-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
   color: var(--ink-soft);
-  transition: 0.15s;
+  box-shadow: var(--shadow-raised-sm);
+  transition: box-shadow var(--transition), color var(--transition);
+}
+.filter-chip:hover {
+  box-shadow: var(--shadow-hover-sm);
+}
+.filter-chip:active {
+  box-shadow: var(--shadow-pressed);
 }
 .filter-chip strong {
-  font-family: var(--font-serif);
   font-size: 19px;
+  font-weight: 600;
+  color: var(--ink);
 }
 .filter-chip.active {
-  border-color: var(--primary);
-  background: var(--primary-soft);
-  color: var(--primary-strong);
+  box-shadow: var(--shadow-pressed);
+  color: var(--accent-strong);
+}
+.filter-chip.active strong {
+  color: var(--accent-strong);
 }
 .setup-summary {
   display: flex;
   gap: 34px;
-  padding: 16px 0;
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
+  padding: 4px 0;
 }
 .setup-summary div {
   display: flex;
   flex-direction: column;
 }
 .setup-summary strong {
-  font-family: var(--font-serif);
   font-size: 24px;
+  font-weight: 600;
+  color: var(--ink);
 }
 .setup-summary span {
   font-size: 12px;
@@ -342,20 +350,21 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 14px;
-  margin-bottom: 16px;
+  margin-bottom: 18px;
 }
 .progress-track {
   flex: 1;
-  height: 6px;
-  border-radius: 999px;
-  background: var(--bg-soft);
+  height: 10px;
+  border-radius: 12px;
+  background: var(--bg);
+  box-shadow: var(--shadow-inset-sm);
   overflow: hidden;
 }
 .progress-fill {
   height: 100%;
-  border-radius: 999px;
-  background: var(--primary);
-  transition: width 0.3s ease;
+  border-radius: 12px;
+  background: var(--accent);
+  transition: width var(--transition);
 }
 .review-card {
   max-width: 760px;
@@ -364,7 +373,7 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 22px;
+  gap: 24px;
   text-align: center;
 }
 .review-meta {
@@ -374,11 +383,11 @@ onBeforeUnmount(() => {
 }
 .review-text {
   margin: 0;
-  font-family: var(--font-serif);
   font-size: clamp(32px, 6vw, 52px);
   font-weight: 600;
   line-height: 1.2;
   letter-spacing: -0.02em;
+  color: var(--ink);
   overflow-wrap: anywhere;
 }
 .review-text.sentence {
@@ -393,7 +402,7 @@ onBeforeUnmount(() => {
 }
 .recall-actions {
   display: flex;
-  gap: 12px;
+  gap: 14px;
   flex-wrap: wrap;
   justify-content: center;
 }
@@ -401,28 +410,30 @@ onBeforeUnmount(() => {
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 20px;
   text-align: left;
-  padding-top: 20px;
-  border-top: 1px solid var(--border);
+  padding-top: 8px;
 }
 .reveal-block h3 {
-  margin: 0 0 5px;
-  font-size: 12px;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
   color: var(--muted);
 }
 .reveal-block p {
   margin: 0;
   font-size: 15px;
   line-height: 1.7;
+  color: var(--ink-soft);
 }
 .reveal-block ul {
   margin: 0;
   padding-left: 1.2em;
   font-size: 14.5px;
   line-height: 1.7;
+  color: var(--ink-soft);
 }
 .reveal-block li + li {
   margin-top: 4px;
@@ -430,21 +441,21 @@ onBeforeUnmount(() => {
 .reveal-tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
 }
 .review-stats {
   display: flex;
   justify-content: center;
-  gap: 18px;
-  margin-top: 18px;
+  gap: 20px;
+  margin-top: 20px;
   font-size: 13px;
   font-weight: 600;
 }
 .review-stats .ok {
-  color: var(--primary);
+  color: var(--success);
 }
 .review-stats .bad {
-  color: var(--accent);
+  color: var(--warning);
 }
 .done-card {
   max-width: 520px;
@@ -454,28 +465,30 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 .done-mark {
-  width: 62px;
-  height: 62px;
-  border-radius: 50%;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius);
   display: grid;
   place-items: center;
-  background: var(--primary-soft);
-  color: var(--primary-strong);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  box-shadow: var(--shadow-inset-sm);
 }
 .done-card h2 {
   margin: 6px 0 0;
-  font-family: var(--font-serif);
+  font-size: 24px;
+  font-weight: 600;
 }
 .done-card p {
   margin: 0;
 }
 .done-actions {
   display: flex;
-  gap: 10px;
-  margin-top: 14px;
+  gap: 12px;
+  margin-top: 16px;
   flex-wrap: wrap;
   justify-content: center;
 }

@@ -87,7 +87,6 @@ onMounted(load)
   <div class="page">
     <header class="page-head">
       <div>
-        <p class="eyebrow">Your collection</p>
         <h1>词库</h1>
         <p>共 {{ total }} 条记录 · 单词、短语和句子都可以放在这里。</p>
       </div>
@@ -101,7 +100,12 @@ onMounted(load)
     <section class="toolbar card">
       <div class="search-box">
         <Icon name="search" :size="17" />
-        <input v-model="q" class="search-input" placeholder="搜索英文、中文释义或笔记…" />
+        <input
+          v-model="q"
+          class="search-input"
+          aria-label="搜索词条"
+          placeholder="搜索英文、中文释义或笔记…"
+        />
       </div>
       <div class="type-tabs">
         <button
@@ -114,7 +118,7 @@ onMounted(load)
           {{ filter.label }}
         </button>
       </div>
-      <button class="icon-btn" title="刷新" @click="load">
+      <button class="icon-btn" title="刷新" aria-label="刷新词条列表" @click="load">
         <Icon name="refresh" :size="17" />
       </button>
     </section>
@@ -150,10 +154,10 @@ onMounted(load)
           </div>
         </div>
         <div class="lib-actions">
-          <button class="icon-btn" title="编辑" @click="openEdit(entry)">
+          <button class="icon-btn" title="编辑" aria-label="编辑词条" @click="openEdit(entry)">
             <Icon name="edit" :size="17" />
           </button>
-          <button class="icon-btn danger" title="删除" @click="remove(entry)">
+          <button class="icon-btn danger" title="删除" aria-label="删除词条" @click="remove(entry)">
             <Icon name="trash" :size="17" />
           </button>
         </div>
@@ -173,9 +177,9 @@ onMounted(load)
 .toolbar {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
-  margin-bottom: 16px;
+  gap: 14px;
+  padding: 14px 16px;
+  margin-bottom: 20px;
   flex-wrap: wrap;
 }
 .search-box {
@@ -183,16 +187,19 @@ onMounted(load)
   min-width: 220px;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--surface-2);
+  gap: 10px;
+  padding: 11px 14px;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--bg);
   color: var(--muted);
+  box-shadow: var(--shadow-inset);
+  transition: box-shadow var(--transition);
 }
 .search-box:focus-within {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px var(--primary-soft);
+  box-shadow: var(--shadow-inset-focus);
+  outline: 2px solid rgba(109, 93, 252, 0.4);
+  outline-offset: 3px;
 }
 .search-input {
   flex: 1;
@@ -200,40 +207,56 @@ onMounted(load)
   border: 0;
   outline: none;
   background: transparent;
+  color: var(--ink);
+}
+.search-input::placeholder {
+  color: var(--muted);
 }
 .type-tabs {
   display: flex;
-  gap: 2px;
-  padding: 3px;
-  border-radius: 10px;
-  background: var(--surface-2);
+  gap: 6px;
+  padding: 5px;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  box-shadow: var(--shadow-inset-sm);
 }
 .type-tab {
   border: 0;
   background: transparent;
-  border-radius: 8px;
-  padding: 6px 12px;
+  border-radius: 12px;
+  padding: 7px 13px;
   font-size: 13px;
   color: var(--muted);
   font-weight: 500;
+  box-shadow: none;
+  transition: box-shadow var(--transition), color var(--transition);
+}
+.type-tab:hover {
+  color: var(--ink);
 }
 .type-tab.active {
-  background: var(--surface);
-  color: var(--primary-strong);
-  box-shadow: 0 1px 3px rgba(32, 36, 31, 0.12);
+  background: var(--bg);
+  color: var(--accent-strong);
+  box-shadow: var(--shadow-raised-sm);
   font-weight: 600;
+}
+.type-tab:active {
+  box-shadow: var(--shadow-pressed);
+}
+.type-tab.active:hover {
+  box-shadow: var(--shadow-hover-sm);
 }
 .lib-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 16px;
 }
 .lib-row {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  padding: 18px 20px;
+  padding: 20px 22px;
 }
 .lib-main {
   min-width: 0;
@@ -243,25 +266,28 @@ onMounted(load)
 }
 .lib-title h3 {
   margin: 0;
-  font-family: var(--font-serif);
+  flex: 1 1 0;
+  min-width: 0;
   font-size: 19px;
+  font-weight: 600;
   line-height: 1.35;
+  color: var(--ink);
   overflow-wrap: anywhere;
 }
 .lib-meaning {
-  margin: 7px 0 0;
+  margin: 8px 0 0;
   font-size: 14px;
   color: var(--ink-soft);
 }
 .lib-explain {
-  margin: 5px 0 0;
+  margin: 6px 0 0;
   font-size: 13px;
   color: var(--muted);
   line-height: 1.65;
   overflow-wrap: anywhere;
 }
 .lib-meta {
-  margin-top: 10px;
+  margin-top: 12px;
   gap: 8px;
 }
 .review-info {
@@ -271,11 +297,10 @@ onMounted(load)
 }
 .lib-actions {
   display: flex;
-  gap: 2px;
+  gap: 6px;
   flex: 0 0 auto;
 }
 .icon-btn.danger:hover {
-  background: var(--danger-soft);
   color: var(--danger);
 }
 </style>

@@ -49,6 +49,7 @@ watch(
           class="nav-item"
           :class="{ active: route.path.startsWith(item.to) }"
           :title="item.label"
+          :aria-label="item.label"
         >
           <Icon :name="item.icon" :size="19" />
           <span class="nav-label">{{ item.label }}</span>

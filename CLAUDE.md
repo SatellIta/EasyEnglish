@@ -65,10 +65,11 @@ OpenAI-compatible providers only (OpenAI, DeepSeek, Qwen, Ollama, etc.). Config 
 - Review keyboard shortcuts (1/J remember, 2/K forget, Space/Enter continue) live in `ReviewPage.vue`.
 - The chat composer guards IME composition before sending on Enter.
 - Styling is plain CSS with tokens at the top of `src/styles/main.css`. No component library; avoid adding one.
-- **UI style constraint pending**: the user will provide a long frontend style prompt. It belongs in `docs/UI_STYLE.md`; apply it by updating tokens/global CSS rather than scattering hard-coded colors.
+- UI style is **Neumorphism / Soft UI** and is binding: see `docs/UI_STYLE.md`. Key rules: `#e0e5ec` background, same-color surfaces, dual shadows (white top-left, `#b8bcc2` bottom-right), no borders / gradients / pure white or black backgrounds / translate on buttons, hover shrinks shadows, active becomes inset, inputs are inset and focus reduces the inset, 12–24px radii, 300ms ease-in-out. Use system sans fonts — avoid Inter/Roboto/Geist and serif headings.
+- Apply visual changes through tokens and global classes, not hard-coded colors in pages.
 
 ## Current state
 
 - Working: entries CRUD + search, Ebbinghaus review, AI chat streaming, daily summary, settings, responsive desktop/mobile layout.
 - Verified by manual API smoke tests and Playwright screenshots; no automated tests yet.
-- `docs/ARCHITECTURE.md` has endpoint/data-model detail; `docs/UI_STYLE.md` is the pending visual contract.
+- `docs/ARCHITECTURE.md` has endpoint/data-model detail; `docs/UI_STYLE.md` is the binding visual contract (Neumorphism).

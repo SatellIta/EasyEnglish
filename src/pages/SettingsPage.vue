@@ -105,7 +105,6 @@ onMounted(load)
   <div class="page settings-page">
     <header class="page-head">
       <div>
-        <p class="eyebrow">Settings</p>
         <h1>设置</h1>
         <p>接入任意 OpenAI 兼容接口，数据全部保存在本机。</p>
       </div>
@@ -237,11 +236,11 @@ onMounted(load)
 }
 .settings-card,
 .info-card {
-  padding: 24px 26px;
+  padding: 26px 28px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  margin-bottom: 16px;
+  gap: 20px;
+  margin-bottom: 20px;
 }
 .card-title {
   display: flex;
@@ -251,44 +250,48 @@ onMounted(load)
 }
 .card-title h2 {
   margin: 0;
-  font-family: var(--font-serif);
   font-size: 19px;
+  font-weight: 600;
 }
 .card-title p {
-  margin: 3px 0 0;
+  margin: 4px 0 0;
 }
 .status-pill {
   flex: 0 0 auto;
-  padding: 3px 10px;
-  border-radius: 999px;
+  padding: 4px 11px;
+  border-radius: 12px;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
 }
 .status-pill.ok {
-  background: var(--primary-soft);
-  color: var(--primary-strong);
+  background: var(--success-soft);
+  color: var(--success);
 }
 .status-pill.warn {
-  background: var(--accent-soft);
-  color: #8a4f16;
+  background: var(--warning-soft);
+  color: var(--warning);
 }
 .presets {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 10px;
 }
 .preset {
-  padding: 7px 12px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--surface-2);
+  padding: 8px 14px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
   color: var(--ink-soft);
   font-size: 12.5px;
+  box-shadow: var(--shadow-raised-sm);
+  transition: box-shadow var(--transition), color var(--transition);
 }
 .preset:hover {
-  border-color: var(--primary);
-  background: var(--primary-soft);
-  color: var(--primary-strong);
+  box-shadow: var(--shadow-hover-sm);
+  color: var(--accent-strong);
+}
+.preset:active {
+  box-shadow: var(--shadow-pressed);
 }
 .check-row {
   display: flex;
@@ -301,7 +304,7 @@ onMounted(load)
 .actions {
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
+  gap: 12px;
   flex-wrap: wrap;
 }
 .info-list {
@@ -310,29 +313,26 @@ onMounted(load)
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 14px;
 }
 .info-list li {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 16px;
-  padding-bottom: 10px;
-  border-bottom: 1px dashed var(--border);
   font-size: 13px;
-}
-.info-list li:last-child {
-  border-bottom: 0;
-  padding-bottom: 0;
 }
 .info-list span {
   color: var(--muted);
 }
 .info-list code {
-  background: var(--bg-soft);
-  padding: 2px 7px;
-  border-radius: 6px;
+  background: var(--bg);
+  padding: 3px 9px;
+  border-radius: 12px;
+  box-shadow: var(--shadow-inset-sm);
+  font-family: var(--font-mono);
   font-size: 12px;
+  color: var(--ink);
   overflow-wrap: anywhere;
   text-align: right;
 }

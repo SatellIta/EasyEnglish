@@ -188,35 +188,42 @@ async function submit() {
 .entry-form {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 18px;
 }
 .type-picker {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
+  gap: 10px;
 }
 .type-option {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
   align-items: flex-start;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 11px;
-  background: var(--surface-2);
+  padding: 12px 14px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
   color: var(--ink-soft);
   text-align: left;
+  box-shadow: var(--shadow-raised-sm);
+  transition: box-shadow var(--transition), color var(--transition);
 }
 .type-option small {
   color: var(--muted);
   font-size: 11px;
 }
+.type-option:hover {
+  box-shadow: var(--shadow-hover-sm);
+}
+.type-option:active {
+  box-shadow: var(--shadow-pressed);
+}
 .type-option.active {
-  border-color: var(--primary);
-  background: var(--primary-soft);
-  color: var(--primary-strong);
+  box-shadow: var(--shadow-pressed);
+  color: var(--accent-strong);
 }
 .type-option.active small {
-  color: var(--primary);
+  color: var(--accent-strong);
 }
 </style>

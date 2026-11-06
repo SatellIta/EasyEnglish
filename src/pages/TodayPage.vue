@@ -120,7 +120,7 @@ watch(
   <div class="page">
     <header class="page-head">
       <div>
-        <p class="eyebrow">{{ dateLabel }}</p>
+        <p class="today-date">{{ dateLabel }}</p>
         <h1>今天学点什么？</h1>
         <p>把遇到的词句记下来，剩下的交给遗忘曲线和 AI。</p>
       </div>
@@ -143,10 +143,10 @@ watch(
         </p>
       </div>
       <div class="hero-actions">
-        <RouterLink to="/review" class="btn btn-light">
+        <RouterLink to="/review" class="btn btn-primary">
           <Icon name="review" :size="16" /> 开始复习
         </RouterLink>
-        <RouterLink to="/chat" class="btn btn-hero-ghost">
+        <RouterLink to="/chat" class="btn">
           <Icon name="chat" :size="16" /> 问 AI
         </RouterLink>
       </div>
@@ -261,58 +261,58 @@ watch(
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
+  gap: 24px;
   flex-wrap: wrap;
-  padding: 24px 28px;
-  margin-bottom: 14px;
+  padding: 28px 30px;
+  margin-bottom: 16px;
   border-radius: var(--radius-lg);
-  background: linear-gradient(135deg, #2f6b56, #47846d);
-  color: #fff;
-  box-shadow: 0 18px 40px -24px rgba(47, 107, 86, 0.8);
+  background: var(--bg);
+  color: var(--ink);
+  box-shadow: var(--shadow-raised-lg);
 }
 .hero-kicker {
-  margin: 0 0 6px;
+  margin: 0 0 7px;
   font-size: 12px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  opacity: 0.75;
+  font-weight: 600;
+  color: var(--accent-strong);
 }
 .hero h2 {
   margin: 0 0 6px;
-  font-family: var(--font-serif);
   font-size: clamp(22px, 3vw, 28px);
+  font-weight: 600;
   letter-spacing: -0.01em;
 }
 .hero p {
   margin: 0;
-  opacity: 0.82;
+  color: var(--muted);
   font-size: 13px;
 }
 .hero-actions {
   display: flex;
-  gap: 10px;
+  gap: 12px;
   flex-wrap: wrap;
 }
 .stat-grid {
-  margin-bottom: 18px;
+  margin-bottom: 20px;
 }
 .stat {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 15px 17px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 16px;
+  gap: 3px;
+  padding: 18px;
+  border-radius: var(--radius);
+  background: var(--bg);
+  box-shadow: var(--shadow-raised);
 }
 .stat-icon {
-  color: var(--primary);
+  color: var(--accent);
   margin-bottom: 4px;
 }
 .stat strong {
-  font-family: var(--font-serif);
   font-size: 26px;
+  font-weight: 600;
   line-height: 1.15;
+  color: var(--ink);
 }
 .stat > span:last-child {
   font-size: 12px;
@@ -321,23 +321,23 @@ watch(
 .today-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
-  gap: 16px;
+  gap: 24px;
   align-items: start;
 }
 .panel {
-  padding: 20px 22px;
+  padding: 24px;
 }
 .panel-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 14px;
+  margin-bottom: 16px;
 }
 .panel-head h2 {
   margin: 0;
-  font-family: var(--font-serif);
   font-size: 18px;
+  font-weight: 600;
 }
 .entry-list {
   list-style: none;
@@ -345,28 +345,24 @@ watch(
   padding: 0;
   display: flex;
   flex-direction: column;
+  gap: 16px;
 }
 .entry-row {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 0;
-  border-top: 1px solid var(--border);
-}
-.entry-row:first-child {
-  border-top: 0;
-  padding-top: 0;
 }
 .entry-main {
   min-width: 0;
 }
 .entry-text {
   font-weight: 600;
+  color: var(--ink);
   overflow-wrap: anywhere;
 }
 .entry-meaning {
-  margin: 4px 0 0;
+  margin: 5px 0 0;
   color: var(--muted);
   font-size: 13px;
   overflow-wrap: anywhere;
@@ -377,17 +373,15 @@ watch(
   color: var(--muted);
 }
 .suggested {
-  margin-top: 18px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border);
+  margin-top: 22px;
 }
 .suggested ul {
   list-style: none;
-  margin: 10px 0 0;
+  margin: 12px 0 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 .suggested li {
   display: flex;
@@ -397,11 +391,16 @@ watch(
   font-size: 13px;
 }
 .summary-time {
-  margin: 16px 0 0;
+  margin: 18px 0 0;
 }
 @media (max-width: 860px) {
   .today-grid {
     grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 560px) {
+  .hero {
+    padding: 22px 20px;
   }
 }
 </style>
