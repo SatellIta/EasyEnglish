@@ -81,9 +81,13 @@ CREATE INDEX IF NOT EXISTS idx_review_logs_time ON review_logs(reviewed_at);
 CREATE TABLE IF NOT EXISTS chat_sessions (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   title TEXT,
+  -- 场景练习会话绑定的场景；普通对话为 NULL
+  scene_id INTEGER,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
+
+CREATE INDEX IF NOT EXISTS idx_chat_sessions_scene ON chat_sessions(scene_id);
 
 CREATE TABLE IF NOT EXISTS chat_messages (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

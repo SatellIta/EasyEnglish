@@ -97,11 +97,20 @@ API 的 `Entry` DTO 同步增加 `errorRate`、`errorSamples`、`sourceSessionId
 
 - 版本 2：`server/migrations/002_scenes.sql`（场景表与 `review_enabled`）
 - 版本 3：`server/migrations/003_learning_signals.sql`（错误档案、错误率、去重、溯源）
+- 版本 4：`server/migrations/004_scene_chat.sql`（对话绑定场景）
 
 全新数据库由 `server/schema.sql` 一次建好全部结构；旧库会依次执行缺少的迁移。场景导入、Markdown 导入和总结入库都走 `entry-store`，因此 `normalized_text`、`error_rate` 默认值会自动维护。
 
-## 9. 暂不包含
+## 9. 场景化对话
 
-- 场景化对话 / 总结智能归并到场景
+- `chat_sessions.scene_id` 记录会话绑定的场景；普通对话为 NULL。
+- `POST /api/chat/sessions` 接受 `{ sceneId }`，默认标题为「场景名 · 场景练习」。
+- 场景会话的聊天记忆会优先注入该场景的词句（最多 12 条），并在系统提示词中加入场景说明、小节和角色练习规则。
+- 场景词句在学习者记忆中标记为「本场景」；AI 每轮只推进 1-2 个问题，优先自然带出 2-3 个场景词。
+- 入口：词库 → 场景详情 →「和 AI 练习」。
+
+## 10. 暂不包含
+
+- 总结智能归并到场景
 - 个性化例句
 - 发音跟读

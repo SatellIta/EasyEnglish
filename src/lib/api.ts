@@ -194,10 +194,10 @@ export const api = {
 
   chat: {
     sessions: () => request<{ items: ChatSession[] }>('/chat/sessions'),
-    createSession: (title?: string) =>
+    createSession: (input: { title?: string; sceneId?: number } = {}) =>
       request<ChatSession>('/chat/sessions', {
         method: 'POST',
-        body: JSON.stringify(title ? { title } : {}),
+        body: JSON.stringify(input),
       }),
     messages: (id: number) =>
       request<{ items: ChatMessage[] }>(`/chat/sessions/${id}/messages`),

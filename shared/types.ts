@@ -277,6 +277,9 @@ export interface AiBehaviorSettings {
 export interface ChatSession {
   id: number
   title: string | null
+  /** 绑定的场景；场景练习会话有值 */
+  sceneId: number | null
+  sceneName: string | null
   createdAt: string
   updatedAt: string
   messageCount: number

@@ -12,13 +12,14 @@ db.pragma('synchronous = NORMAL')
 db.pragma('foreign_keys = ON')
 db.pragma('busy_timeout = 5000')
 
-const SCHEMA_VERSION = 3
+const SCHEMA_VERSION = 4
 const schema = readFileSync(new URL('./schema.sql', import.meta.url), 'utf8')
 const migration2 = readFileSync(new URL('./migrations/002_scenes.sql', import.meta.url), 'utf8')
 const migration3 = readFileSync(
   new URL('./migrations/003_learning_signals.sql', import.meta.url),
   'utf8',
 )
+const migration4 = readFileSync(new URL('./migrations/004_scene_chat.sql', import.meta.url), 'utf8')
 
 let currentVersion = db.pragma('user_version', { simple: true }) as number
 
@@ -94,5 +95,16 @@ if (currentVersion < 3) {
     }
 
     db.pragma(`user_version = ${SCHEMA_VERSION}`)
+  })()
+}
+
+if (currentVersion < 4) {
+  db.transaction(() => {
+    const columns = db.pragma('table_info(chat_sessions)') as Array<{ name: string }>
+    if (!columns.some((column) => column.name === 'scene_id')) {
+      db.exec('ALTER TABLE chat_sessions ADD COLUMN scene_id INTEGER')
+    }
+    db.exec(migration4)
+    db.pragma('user_version = 4')
   })()
 }

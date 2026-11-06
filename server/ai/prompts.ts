@@ -1,6 +1,13 @@
 import type { ChatMessage, Entry, LearnerError } from '../../shared/types'
 import { ENTRY_TYPE_LABELS } from '../../shared/types'
 
+export interface ScenePromptContext {
+  id: number
+  name: string
+  description: string | null
+  sections: string[]
+}
+
 function truncate(text: string, max: number): string {
   const clean = text.replace(/\s+/g, ' ').trim()
   return clean.length > max ? `${clean.slice(0, max)}…` : clean
@@ -29,7 +36,11 @@ export function formatLearnerErrors(errors: LearnerError[]): string {
     .join('\n')
 }
 
-export function formatMemory(entries: Entry[], charBudget = 2400): string {
+export function formatMemory(
+  entries: Entry[],
+  charBudget = 2400,
+  sceneId?: number | null,
+): string {
   if (!entries.length) {
     return '（用户还没有记录词句。可以在合适的时候提醒 TA 把遇到的单词、短语或句子加入词库。）'
   }
@@ -38,6 +49,9 @@ export function formatMemory(entries: Entry[], charBudget = 2400): string {
   let used = 0
   for (const entry of entries) {
     const parts = [`[${ENTRY_TYPE_LABELS[entry.type]}] ${entry.text}`]
+    if (sceneId && entry.sceneRefs.some((ref) => ref.sceneId === sceneId)) {
+      parts.push('本场景')
+    }
     if (entry.meaning) parts.push(truncate(entry.meaning, 80))
     if (entry.explanation) parts.push(truncate(entry.explanation, 100))
     if (entry.errorRate >= 0.05) {
@@ -62,16 +76,34 @@ export function formatMemory(entries: Entry[], charBudget = 2400): string {
 export function buildSystemPrompt(
   memory: Entry[],
   today: string,
-  options: { errors?: LearnerError[]; memoryCharBudget?: number } = {},
+  options: {
+    errors?: LearnerError[]
+    memoryCharBudget?: number
+    scene?: ScenePromptContext | null
+  } = {},
 ): string {
   const errors = options.errors ?? []
+  const scene = options.scene ?? null
+  const sceneSection = scene
+    ? `
+## 场景练习：${scene.name}
+${scene.description ? `场景说明：${scene.description}` : ''}
+${scene.sections.length ? `场景小节：${scene.sections.join(' / ')}` : ''}
+标记为「本场景」的词句是本轮优先使用的素材。请扮演场景中的对话角色，用英文推进一段真实对话：
+- 每轮只推进 1-2 个问题，等学习者回应，不要一次写完整段对话。
+- 优先自然带出 2-3 个本场景词句，尤其是到期或错误率高的词；不要罗列词表。
+- 学习者卡住时给一句简短中文提示，再回到英文。
+- 除非学习者明确要求讲解，否则以对话练习为主，不要把场景变成词表讲解。
+`
+    : ''
+
   return `你是 EasyEnglish，一位耐心、准确、注重实际运用的英语学习助手，服务对象是以中文为母语的学习者。
 
 ## 你的任务
 - 回答学习者关于英语单词、短语、句子、语法、发音、写作和表达的问题。
 - 帮助学习者把零散的知识整理成可复习的卡片。
 - 主动利用下方「学习者记忆」中已记录的内容做联想和复现，帮助对抗遗忘。
-
+${sceneSection}
 ## 回答规则
 1. 默认用中文解释，目标语言保持英文。除非用户明确要求，否则不要整段翻译。
 2. 使用 Markdown。回答要紧凑：先给结论，再给必要细节，不写空洞的鼓励语。
@@ -85,7 +117,7 @@ export function buildSystemPrompt(
 
 ## 学习者记忆
 以下是学习者已经记录、正在按遗忘曲线复习的词句。错误率越高，说明这个词越容易错或忘：
-${formatMemory(memory, options.memoryCharBudget)}
+${formatMemory(memory, options.memoryCharBudget, scene?.id)}
 
 ## 学习者反复出现的错误
 以下是学习者近期反复出现的错误模式。只在相关时使用：

@@ -118,6 +118,8 @@ export function mapChatSession(row: any): ChatSession {
   return {
     id: row.id,
     title: row.title ?? null,
+    sceneId: row.scene_id ?? null,
+    sceneName: row.scene_name ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     messageCount: Number(row.message_count ?? 0),

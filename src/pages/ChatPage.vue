@@ -40,6 +40,10 @@ const activeTitle = computed(() => {
   return session?.title || '新对话'
 })
 
+const activeSession = computed(
+  () => sessions.value.find((item) => item.id === activeSessionId.value) ?? null,
+)
+
 const composerPlaceholder = computed(() =>
   streaming.value ? 'AI 正在回答…' : '问一个英语问题，或把不认识的句子贴进来…',
 )
@@ -230,7 +234,10 @@ onMounted(async () => {
         </button>
         <div class="chat-title-copy">
           <h1>{{ activeTitle }}</h1>
-          <p class="muted small">
+          <p v-if="activeSession?.sceneId" class="muted small">
+            场景练习 · {{ activeSession.sceneName }} · AI 会围绕场景词句推进英文对话
+          </p>
+          <p v-else class="muted small">
             {{ store.totalEntries }} 条词句记忆 · AI 会参考你学过的内容
           </p>
         </div>
@@ -265,7 +272,10 @@ onMounted(async () => {
             :class="{ active: session.id === activeSessionId }"
           >
             <button class="session-button" @click="selectSession(session.id)">
-              <span class="session-title">{{ session.title || '新对话' }}</span>
+              <span class="session-title">
+                <span class="session-title-text">{{ session.title || '新对话' }}</span>
+                <span v-if="session.sceneId" class="tag scene-session-tag">场景</span>
+              </span>
               <span v-if="session.preview" class="session-preview">
                 {{ truncate(session.preview, 42) }}
               </span>
@@ -292,11 +302,20 @@ onMounted(async () => {
 
           <div v-else-if="!messages.length" class="chat-welcome">
             <div class="welcome-mark"><Icon name="sparkles" :size="26" /></div>
-            <h2>开箱即用的英语助手</h2>
-            <p>
-              可以问词义、辨析、语法和地道表达。AI 会参考你记录过的
-              {{ store.totalEntries }} 条词句，在学习时帮你联想复习。
-            </p>
+            <template v-if="activeSession?.sceneId">
+              <h2>场景练习：{{ activeSession.sceneName }}</h2>
+              <p>
+                AI 会围绕「{{ activeSession.sceneName }}」里的词句，用英文推进一段对话。
+                先回应它的问题；卡住时可以问中文。
+              </p>
+            </template>
+            <template v-else>
+              <h2>开箱即用的英语助手</h2>
+              <p>
+                可以问词义、辨析、语法和地道表达。AI 会参考你记录过的
+                {{ store.totalEntries }} 条词句，在学习时帮你联想复习。
+              </p>
+            </template>
             <div class="suggestions">
               <button
                 v-for="suggestion in suggestions"
@@ -453,11 +472,24 @@ onMounted(async () => {
   text-align: left;
 }
 .session-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-weight: 600;
   font-size: 13px;
   overflow: hidden;
+}
+.session-title-text {
+  min-width: 0;
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.scene-session-tag {
+  flex: 0 0 auto;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
 }
 .session-preview,
 .session-meta {

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import type {
   Entry,
   EntryType,
@@ -21,6 +22,7 @@ const emit = defineEmits<{
   remove: [entry: Entry]
   changed: []
 }>()
+const router = useRouter()
 
 const scenes = ref<SceneSummary[]>([])
 const activeScene = ref<SceneDetail | null>(null)
@@ -35,6 +37,7 @@ const sceneFormOpen = ref(false)
 const editingScene = ref<SceneSummary | null>(null)
 const pickerOpen = ref(false)
 const entryFormOpen = ref(false)
+const startingChat = ref(false)
 
 const typeFilters: Array<{ value: EntryType | 'all'; label: string }> = [
   { value: 'all', label: '全部' },
@@ -121,6 +124,24 @@ const groups = computed<SectionGroup[]>(() => {
 function typeCount(type: EntryType): number {
   if (!activeScene.value) return 0
   return activeScene.value.scene.counts[type]
+}
+
+async function startSceneChat() {
+  const detail = activeScene.value
+  if (!detail || startingChat.value) return
+  startingChat.value = true
+  error.value = ''
+  try {
+    const session = await api.chat.createSession({
+      sceneId: detail.scene.id,
+      title: `${detail.scene.name} · 场景练习`,
+    })
+    router.push(`/chat/${session.id}`)
+  } catch (caught) {
+    error.value = errorMessage(caught)
+  } finally {
+    startingChat.value = false
+  }
 }
 
 async function loadSceneList() {
@@ -316,6 +337,14 @@ onMounted(bootstrap)
           <Icon name="chevron-left" :size="15" /> 返回场景
         </button>
         <div class="detail-actions">
+          <button
+            class="btn btn-soft btn-sm"
+            :disabled="startingChat"
+            @click="startSceneChat"
+          >
+            <Icon :name="startingChat ? 'refresh' : 'chat'" :size="15" />
+            {{ startingChat ? '创建中…' : '和 AI 练习' }}
+          </button>
           <button class="btn btn-ghost btn-sm" @click="pickerOpen = true">
             <Icon name="layers" :size="15" /> 从词库添加
           </button>

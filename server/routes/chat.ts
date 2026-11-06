@@ -4,7 +4,7 @@ import { z } from 'zod'
 import type { Entry } from '../../shared/types'
 import { getAiConfig, isConfigured } from '../ai/config'
 import { streamChat, type ChatTurn } from '../ai/client'
-import { buildSystemPrompt } from '../ai/prompts'
+import { buildSystemPrompt, type ScenePromptContext } from '../ai/prompts'
 import { db } from '../db'
 import { getAiBehaviorSettings } from '../lib/ai-behavior'
 import { topActiveErrors } from '../lib/errors'
@@ -16,19 +16,51 @@ const app = new Hono()
 
 const streamInput = z.object({
   sessionId: z.number().int().positive().optional(),
+  sceneId: z.number().int().positive().optional(),
   message: z.string().trim().min(1, '消息不能为空').max(8000),
 })
 
 function getSession(id: number): any | undefined {
-  return db.prepare('SELECT * FROM chat_sessions WHERE id = ?').get(id)
+  return db
+    .prepare(
+      `SELECT s.*, sc.name AS scene_name
+       FROM chat_sessions s
+       LEFT JOIN scenes sc ON sc.id = s.scene_id
+       WHERE s.id = ?`,
+    )
+    .get(id)
 }
 
-function createSession(title: string | null): number {
+function createSession(title: string | null, sceneId: number | null = null): number {
   const now = nowIso()
   const info = db
-    .prepare('INSERT INTO chat_sessions (title, created_at, updated_at) VALUES (?, ?, ?)')
-    .run(title, now, now)
+    .prepare(
+      'INSERT INTO chat_sessions (title, scene_id, created_at, updated_at) VALUES (?, ?, ?, ?)',
+    )
+    .run(title, sceneId, now, now)
   return Number(info.lastInsertRowid)
+}
+
+function getSceneContext(sceneId: number): ScenePromptContext | null {
+  const scene = db
+    .prepare('SELECT id, name, description FROM scenes WHERE id = ?')
+    .get(sceneId) as { id: number; name: string; description: string | null } | undefined
+  if (!scene) return null
+
+  const sections = db
+    .prepare(
+      `SELECT DISTINCT section FROM scene_entries
+       WHERE scene_id = ? AND section IS NOT NULL AND trim(section) <> ''
+       ORDER BY section`,
+    )
+    .all(sceneId) as Array<{ section: string }>
+
+  return {
+    id: scene.id,
+    name: scene.name,
+    description: scene.description ?? null,
+    sections: sections.map((row) => row.section),
+  }
 }
 
 function insertMessage(sessionId: number, role: 'user' | 'assistant', content: string): number {
@@ -44,7 +76,11 @@ function insertMessage(sessionId: number, role: 'user' | 'assistant', content: s
  * 组合记忆：到期词 + 高错误率词 + 与当前问题相关的词 + 今天新增 + 最近记录。
  * 按优先级填充，并由设置里的 memoryLimit 控制总量。
  */
-function memoryFor(query: string, limit: number): Entry[] {
+function memoryFor(
+  query: string,
+  limit: number,
+  sceneId: number | null = null,
+): Entry[] {
   const { start, end } = dayRange()
   const seen = new Set<number>()
   const result: Entry[] = []
@@ -59,12 +95,27 @@ function memoryFor(query: string, limit: number): Entry[] {
     }
   }
 
+  // 0. 场景练习：优先注入本场景词句，让对话围绕场景展开。
+  if (sceneId) {
+    push(
+      db
+        .prepare(
+          `${ENTRY_SELECT}
+           WHERE e.id IN (SELECT entry_id FROM scene_entries WHERE scene_id = ?)
+           ORDER BY e.error_rate DESC, e.created_at DESC
+           LIMIT ?`,
+        )
+        .all(sceneId, Math.min(12, limit)),
+    )
+  }
+
   // 1. 现在到期、且错误率高的词：最需要在本轮被自然复现。
   push(
     db
       .prepare(
         `${ENTRY_SELECT}
-         WHERE r.next_review_at IS NOT NULL
+         WHERE e.review_enabled = 1
+           AND r.next_review_at IS NOT NULL
            AND r.next_review_at <= ?
          ORDER BY e.error_rate DESC, r.next_review_at ASC
          LIMIT ?`,
@@ -77,7 +128,7 @@ function memoryFor(query: string, limit: number): Entry[] {
     db
       .prepare(
         `${ENTRY_SELECT}
-         WHERE e.error_rate >= 0.35
+         WHERE e.review_enabled = 1 AND e.error_rate >= 0.35
          ORDER BY e.error_rate DESC, r.last_reviewed_at DESC
          LIMIT ?`,
       )
@@ -126,13 +177,22 @@ function memoryFor(query: string, limit: number): Entry[] {
 function buildTurns(sessionId: number, userMessage: string): ChatTurn[] {
   const { date } = dayRange()
   const behavior = getAiBehaviorSettings()
+  const session = getSession(sessionId)
+  const sceneId = session?.scene_id ?? null
+  const scene = sceneId ? getSceneContext(sceneId) : null
+
   const turns: ChatTurn[] = [
     {
       role: 'system',
-      content: buildSystemPrompt(memoryFor(userMessage, behavior.memoryLimit), date, {
-        errors: topActiveErrors(8),
-        memoryCharBudget: behavior.memoryCharBudget,
-      }),
+      content: buildSystemPrompt(
+        memoryFor(userMessage, behavior.memoryLimit, sceneId),
+        date,
+        {
+          errors: topActiveErrors(8),
+          memoryCharBudget: behavior.memoryCharBudget,
+          scene,
+        },
+      ),
     },
   ]
 
@@ -152,10 +212,11 @@ function buildTurns(sessionId: number, userMessage: string): ChatTurn[] {
 app.get('/api/chat/sessions', (c) => {
   const rows = db
     .prepare(
-      `SELECT s.*,
+      `SELECT s.*, sc.name AS scene_name,
         (SELECT COUNT(*) FROM chat_messages m WHERE m.session_id = s.id) AS message_count,
         (SELECT m.content FROM chat_messages m WHERE m.session_id = s.id AND m.role = 'user' ORDER BY m.id DESC LIMIT 1) AS preview
        FROM chat_sessions s
+       LEFT JOIN scenes sc ON sc.id = s.scene_id
        ORDER BY s.updated_at DESC
        LIMIT 100`,
     )
@@ -167,21 +228,26 @@ app.get('/api/chat/sessions', (c) => {
 app.post('/api/chat/sessions', async (c) => {
   const body = await c.req.json().catch(() => ({}))
   const input = z
-    .object({ title: z.string().trim().max(120).optional() })
+    .object({
+      title: z.string().trim().max(120).optional(),
+      sceneId: z.number().int().positive().optional(),
+    })
     .parse(body)
-  const id = createSession(input.title || '新对话')
+
+  let sceneId = input.sceneId ?? null
+  let sceneName: string | null = null
+  if (sceneId) {
+    const scene = db.prepare('SELECT id, name FROM scenes WHERE id = ?').get(sceneId) as
+      | { id: number; name: string }
+      | undefined
+    if (!scene) return c.json({ error: '场景不存在' }, 404)
+    sceneName = scene.name
+  }
+
+  const title = input.title || (sceneName ? `${sceneName} · 场景练习` : '新对话')
+  const id = createSession(title, sceneId)
   const session = getSession(id)
-  return c.json(
-    {
-      id,
-      title: session.title,
-      createdAt: session.created_at,
-      updatedAt: session.updated_at,
-      messageCount: 0,
-      preview: null,
-    },
-    201,
-  )
+  return c.json(mapChatSession(session), 201)
 })
 
 app.patch('/api/chat/sessions/:id', async (c) => {
@@ -239,7 +305,11 @@ app.post('/api/chat/stream', async (c) => {
   if (sessionId) {
     if (!getSession(sessionId)) return c.json({ error: '对话不存在' }, 404)
   } else {
-    sessionId = createSession(input.message.slice(0, 40))
+    if (input.sceneId) {
+      const scene = db.prepare('SELECT id FROM scenes WHERE id = ?').get(input.sceneId)
+      if (!scene) return c.json({ error: '场景不存在' }, 404)
+    }
+    sessionId = createSession(input.message.slice(0, 40), input.sceneId ?? null)
   }
 
   const session = getSession(sessionId)
