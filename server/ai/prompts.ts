@@ -208,3 +208,47 @@ ${conversation}
 
 请整理今天的学习内容，并按要求输出 JSON。`
 }
+
+export const EXAMPLE_SYSTEM_PROMPT = `你是英语例句生成助手。根据给定词条和学习者的场景、易错点，生成自然、地道、难度适中的英文例句，每句附中文翻译。
+
+只输出一个 JSON 对象，不要使用 Markdown 代码块，不要输出任何额外解释。结构必须严格为：
+{
+  "examples": [
+    { "en": "英文例句", "zh": "中文翻译" }
+  ]
+}
+
+要求：
+- 生成 2-3 句，覆盖不同语境，句子长短适中。
+- 如果提供了学习者场景，优先让例句与这些场景相关。
+- 不要重复已有例句；不要编造不存在的搭配或词义。
+- 不要输出解释、标题或多余字段。`
+
+export function buildExampleUserPrompt(input: {
+  entry: Entry
+  sceneNames: string[]
+  errors: LearnerError[]
+}): string {
+  const { entry, sceneNames, errors } = input
+  const entryParts = [`[${ENTRY_TYPE_LABELS[entry.type]}] ${entry.text}`]
+  if (entry.meaning) entryParts.push(truncate(entry.meaning, 120))
+  if (entry.explanation) entryParts.push(truncate(entry.explanation, 160))
+
+  const existing = entry.examples.length
+    ? entry.examples.map((example) => `- ${truncate(example, 160)}`).join('\n')
+    : '（暂无）'
+
+  return `## 词条
+${entryParts.join('｜')}
+
+## 学习者场景
+${sceneNames.length ? sceneNames.map((name) => `- ${name}`).join('\n') : '（暂无）'}
+
+## 学习者近期反复出现的错误
+${formatLearnerErrors(errors)}
+
+## 已有例句（不要重复）
+${existing}
+
+请生成 2-3 个新的个性化例句，并按要求输出 JSON。`
+}

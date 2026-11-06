@@ -25,6 +25,8 @@ const forgot = ref(0)
 const loading = ref(false)
 const error = ref('')
 const retryMinutes = ref(10)
+const generatingExamples = ref(false)
+const exampleNotice = ref('')
 
 const allTypes: EntryType[] = ['word', 'phrase', 'sentence']
 const current = computed(() => queue.value[index.value] ?? null)
@@ -56,6 +58,7 @@ async function start() {
     remembered.value = 0
     forgot.value = 0
     revealed.value = false
+    exampleNotice.value = ''
     if (!queue.value.length) {
       error.value = '当前筛选下没有到期的复习内容。可以先去词库添加，或者稍后再来。'
       return
@@ -92,8 +95,29 @@ async function rate(rating: 'remembered' | 'forgot') {
   }
 }
 
+async function generateExamples() {
+  const entry = current.value
+  if (!entry || generatingExamples.value) return
+
+  generatingExamples.value = true
+  error.value = ''
+  exampleNotice.value = ''
+  try {
+    const result = await api.entries.generateExamples(entry.id, 3)
+    if (current.value && result.entry) Object.assign(current.value, result.entry)
+    exampleNotice.value = result.added
+      ? `已添加 ${result.added} 条个性化例句。`
+      : result.message || '没有生成新的例句。'
+  } catch (caught) {
+    error.value = errorMessage(caught)
+  } finally {
+    generatingExamples.value = false
+  }
+}
+
 function advance() {
   revealed.value = false
+  exampleNotice.value = ''
   if (index.value + 1 >= queue.value.length) {
     phase.value = 'done'
   } else {
@@ -106,6 +130,7 @@ function exit() {
   queue.value = []
   index.value = 0
   revealed.value = false
+  exampleNotice.value = ''
   store.refreshStats().catch(() => {})
 }
 
@@ -252,13 +277,25 @@ onBeforeUnmount(() => {
               <h3>解释与用法</h3>
               <p class="pre-wrap">{{ current.explanation }}</p>
             </div>
-            <div v-if="current.examples.length" class="reveal-block">
-              <h3>例句</h3>
-              <ul>
+            <div class="reveal-block">
+              <div class="row between wrap example-head">
+                <h3>例句</h3>
+                <button
+                  class="btn btn-ghost btn-sm"
+                  :disabled="generatingExamples"
+                  @click="generateExamples"
+                >
+                  <Icon :name="generatingExamples ? 'refresh' : 'sparkles'" :size="14" />
+                  {{ generatingExamples ? '生成中…' : 'AI 个性化例句' }}
+                </button>
+              </div>
+              <ul v-if="current.examples.length">
                 <li v-for="(example, exampleIndex) in current.examples" :key="exampleIndex">
                   {{ example }}
                 </li>
               </ul>
+              <p v-else class="hint">还没有例句，可以让 AI 结合你的场景和易错点生成。</p>
+              <p v-if="exampleNotice" class="hint example-notice">{{ exampleNotice }}</p>
             </div>
             <div v-if="current.notes" class="reveal-block">
               <h3>我的笔记</h3>
@@ -446,6 +483,16 @@ onBeforeUnmount(() => {
   gap: 20px;
   text-align: left;
   padding-top: 8px;
+}
+.example-head {
+  align-items: center;
+  margin-bottom: 6px;
+}
+.example-head h3 {
+  margin-bottom: 0;
+}
+.example-notice {
+  margin-top: 6px;
 }
 .reveal-block h3 {
   margin: 0 0 6px;

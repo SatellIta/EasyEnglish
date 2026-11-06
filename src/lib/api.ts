@@ -112,6 +112,16 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ entries, skipDuplicates: options.skipDuplicates }),
       }),
+    generateExamples: (id: number, count = 3) =>
+      request<{
+        entry: Entry
+        added: number
+        examples: Array<{ en: string; zh: string }>
+        message?: string
+      }>(`/entries/${id}/examples`, {
+        method: 'POST',
+        body: JSON.stringify({ count }),
+      }),
   },
 
   errors: {

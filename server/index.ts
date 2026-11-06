@@ -10,6 +10,7 @@ import { ZodError } from 'zod'
 import chatRoutes from './routes/chat'
 import entriesRoutes from './routes/entries'
 import errorsRoutes from './routes/errors'
+import examplesRoutes from './routes/examples'
 import importRoutes from './routes/import'
 import libraryRoutes from './routes/library'
 import reviewRoutes from './routes/review'
@@ -39,6 +40,7 @@ app.route('/', scenesRoutes)
 app.route('/', libraryRoutes)
 app.route('/', importRoutes)
 app.route('/', errorsRoutes)
+app.route('/', examplesRoutes)
 
 app.onError((err, c) => {
   if (err instanceof ZodError) {
