@@ -2,8 +2,12 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import { completeChat } from '../ai/client'
 import { getAiConfig, isConfigured } from '../ai/config'
-import { buildExampleUserPrompt, EXAMPLE_SYSTEM_PROMPT } from '../ai/prompts'
+import {
+  buildExampleSystemPrompt,
+  buildExampleUserPrompt,
+} from '../ai/prompts'
 import { db } from '../db'
+import { getAiTeachingSettings } from '../lib/ai-teaching'
 import { topActiveErrors } from '../lib/errors'
 import { getEntryById } from '../lib/queries'
 import { normalizeEntryText } from '../lib/text'
@@ -62,6 +66,7 @@ app.post('/api/entries/:id/examples', async (c) => {
   if (!entry) return c.json({ error: '词条不存在' }, 404)
 
   const { count } = input.parse(await c.req.json().catch(() => ({})))
+  const teaching = getAiTeachingSettings()
   const sceneNames = [
     ...new Set(entry.sceneRefs.map((ref) => ref.sceneName).filter(Boolean)),
   ]
@@ -69,13 +74,14 @@ app.post('/api/entries/:id/examples', async (c) => {
   try {
     const raw = await completeChat(
       [
-        { role: 'system', content: EXAMPLE_SYSTEM_PROMPT },
+        { role: 'system', content: buildExampleSystemPrompt(teaching.explanationMode) },
         {
           role: 'user',
           content: buildExampleUserPrompt({
             entry,
             sceneNames,
             errors: topActiveErrors(5),
+            explanationMode: teaching.explanationMode,
           }),
         },
       ],
@@ -97,7 +103,11 @@ app.post('/api/entries/:id/examples', async (c) => {
       const key = normalizeEntryText(example.en)
       if (!key || existing.has(key)) continue
       existing.add(key)
-      merged.push(example.zh ? `${example.en} — ${example.zh}` : example.en)
+      merged.push(
+        teaching.explanationMode === 'english' || !example.zh
+          ? example.en
+          : `${example.en} — ${example.zh}`,
+      )
       added.push(example)
       if (added.length >= count) break
     }

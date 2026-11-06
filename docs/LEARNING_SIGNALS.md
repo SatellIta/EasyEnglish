@@ -113,6 +113,7 @@ API 的 `Entry` DTO 同步增加 `errorRate`、`errorSamples`、`sourceSessionId
 
 - `POST /api/entries/:id/examples` `{ count?: 1-5 }` 让 AI 结合词条、所属场景和近期错误生成 2-3 个例句。
 - 返回 `{ entry, added, examples, message? }`；新例句以「英文 — 中文」追加到 `entries.examples`，并按英文部分去重。
+- 全英文模式下只追加英文例句，不追加中文翻译。
 - 入口：复习卡片展开答案后 →「AI 个性化例句」。
 - 发送给模型的上下文只有：当前词条、场景名、近期错误和已有例句，不发送整库内容。
 
@@ -123,6 +124,7 @@ API 的 `Entry` DTO 同步增加 `errorRate`、`errorSamples`、`sourceSessionId
 - 新场景名如果与已有场景重名，会自动转成 `existing`，避免重复建场景。
 - 候选默认 `sceneAccepted = true`；用户可在「今日」页或总结弹窗里取消勾选。
 - 入库时先创建词条，再按建议调用 `POST /api/scenes/:id/entries`；新场景先 `POST /api/scenes`。场景归并失败不会回滚已入库词条。
+- 全英文模式下，summary、entries 的 meaning/explanation、errors 的 pattern/explanation 全部使用英文；只有已有场景的 sceneName 可以保留原中文名。
 
 ## 12. 发音跟读
 
@@ -145,7 +147,9 @@ API 的 `Entry` DTO 同步增加 `errorRate`、`errorSamples`、`sourceSessionId
   7. 当前上下文
 - 全英文模式只锁定「用什么语言解释」：要求模型用简单英文定义、同反义词、搭配和例句解释英文，禁止输出中文；不改变场景、记忆、错误注入和未来的人格/偏好内容。
 - 英文模式会在提示词末尾追加 Final reminder，降低模型回退到中文的概率；记忆和错误数据中的中文会明确标注为「仅供理解，不要输出」。
-- 今日总结和个性化例句暂不跟随该设置，仍保留中文说明。
+- 今日总结和个性化例句也跟随该设置：
+  - 总结：summary、词条 meaning/explanation、错误 pattern/explanation 使用英文；已有场景的 sceneName 允许保留中文。
+  - 例句：只生成并追加英文例句，不追加中文翻译。
 
 ## 14. 暂不包含
 

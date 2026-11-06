@@ -223,7 +223,7 @@ export function buildSystemPrompt(
     : prompt
 }
 
-export const SUMMARY_SYSTEM_PROMPT = `你是英语学习内容整理助手。你的任务是把学习者今天零散的对话和词条，整理成一份可复习的今日总结，抽取值得长期记忆的英文词条，并记录学习者反复出现的错误。
+const SUMMARY_SYSTEM_PROMPT_BILINGUAL = `你是英语学习内容整理助手。你的任务是把学习者今天零散的对话和词条，整理成一份可复习的今日总结，抽取值得长期记忆的英文词条，并记录学习者反复出现的错误。
 
 只输出一个 JSON 对象，不要使用 Markdown 代码块，不要输出任何额外解释。结构必须严格为：
 {
@@ -270,14 +270,76 @@ export const SUMMARY_SYSTEM_PROMPT = `你是英语学习内容整理助手。你
 - 如果多个候选词条构成一个清晰的新场景，用 "new" 并给出简短 sceneName；单个孤立词条优先用 "none"。
 - scene.section 可选，用于场景内的小节；reason 用一句中文说明。`
 
+const SUMMARY_SYSTEM_PROMPT_ENGLISH = `你是英语学习内容整理助手。本轮是 English-only 模式。你的任务是把学习者今天零散的对话和词条，整理成一份可复习的今日总结，抽取值得长期记忆的英文词条，并记录学习者反复出现的错误。
+
+只输出一个 JSON 对象，不要使用 Markdown 代码块，不要输出任何额外解释。结构必须严格为：
+{
+  "summary": "Markdown summary in English",
+  "entries": [
+    {
+      "type": "word",
+      "text": "English word/phrase/sentence",
+      "meaning": "a concise definition in simple English",
+      "explanation": "a short usage note or example in simple English",
+      "scene": {
+        "action": "existing",
+        "sceneId": 1,
+        "sceneName": "existing scene name",
+        "section": "section name",
+        "reason": "why this entry belongs here, in English"
+      }
+    }
+  ],
+  "errors": [
+    {
+      "pattern": "a short English description of the error",
+      "category": "grammar",
+      "explanation": "why it is wrong, in simple English",
+      "correction": "the corrected English",
+      "example": "the learner's original English"
+    }
+  ]
+}
+
+要求：
+- summary 必须全部使用英文，包含：what the learner studied today, key words/phrases, common mistakes, tomorrow's review plan。使用 Markdown 小标题和列表。
+- Do not output Chinese characters, pinyin, or Chinese translations anywhere in the JSON.
+- entries 只收录今天实际出现过的、值得长期复习的英文内容，去重，最多 12 条。
+- type 只能是 "word"、"phrase" 或 "sentence"。
+- text 必须是英文；meaning 和 explanation 必须用简单英文，不要用中文。
+- explanation 控制在 80 words 以内，优先写搭配或一个短例句。
+- 不要收录过于简单、与学习无关的内容。如果今天没有足够内容，entries 使用空数组。
+- errors 只记录今天对话中真实出现的、值得以后提醒的错误，最多 8 条；没有就使用空数组。
+- pattern 用简短英文概括，同一类错误只出现一次；category 只能是 "grammar"、"usage"、"spelling"、"pronunciation" 或 "other"。
+- correction 和 example 必须是英文；example 尽量保留学习者原句。
+- scene.action 只能是 "existing"、"new" 或 "none"。
+- 归入已有场景时，sceneId 必须来自下方「已有场景」列表，不要编造 ID；sceneName 必须与列表中的名字完全一致。唯一的例外：已有场景名可能是中文，此时 sceneName 可以原样保留中文，但 scene.section 和 scene.reason 仍使用英文。
+- 如果候选词条明显属于某个已有场景，用 "existing" 并填 sceneId。
+- 如果多个候选词条构成一个清晰的新场景，用 "new" 并给出简短英文 sceneName；单个孤立词条优先用 "none"。
+- 用户消息里的中文词条释义、场景说明和错误描述只供你理解，不要复制到 JSON 输出中。`
+
+export function buildSummarySystemPrompt(mode: ExplanationMode): string {
+  return mode === 'english'
+    ? SUMMARY_SYSTEM_PROMPT_ENGLISH
+    : SUMMARY_SYSTEM_PROMPT_BILINGUAL
+}
+
 export function buildSummaryUserPrompt(input: {
   date: string
   messages: Pick<ChatMessage, 'role' | 'content'>[]
   entries: Entry[]
   existingTexts?: string[]
   scenes?: Array<{ id: number; name: string; description: string | null }>
+  explanationMode?: ExplanationMode
 }): string {
-  const { date, messages, entries, existingTexts = [], scenes = [] } = input
+  const {
+    date,
+    messages,
+    entries,
+    existingTexts = [],
+    scenes = [],
+    explanationMode = 'bilingual',
+  } = input
 
   const entryLines = entries.length
     ? entries
@@ -330,10 +392,10 @@ ${sceneLines}
 ## 今天的对话记录
 ${conversation}
 
-请整理今天的学习内容，并按要求输出 JSON。`
+${explanationMode === 'english' ? '输出语言：English only。summary、entries 的 meaning/explanation、errors 的 pattern/explanation 全部使用英文，不要输出中文；只有已有场景的 sceneName 可以保留原中文名。\n\n' : ''}请整理今天的学习内容，并按要求输出 JSON。`
 }
 
-export const EXAMPLE_SYSTEM_PROMPT = `你是英语例句生成助手。根据给定词条和学习者的场景、易错点，生成自然、地道、难度适中的英文例句，每句附中文翻译。
+const EXAMPLE_SYSTEM_PROMPT_BILINGUAL = `你是英语例句生成助手。根据给定词条和学习者的场景、易错点，生成自然、地道、难度适中的英文例句，每句附中文翻译。
 
 只输出一个 JSON 对象，不要使用 Markdown 代码块，不要输出任何额外解释。结构必须严格为：
 {
@@ -348,12 +410,35 @@ export const EXAMPLE_SYSTEM_PROMPT = `你是英语例句生成助手。根据给
 - 不要重复已有例句；不要编造不存在的搭配或词义。
 - 不要输出解释、标题或多余字段。`
 
+const EXAMPLE_SYSTEM_PROMPT_ENGLISH = `你是英语例句生成助手。本轮是 English-only 模式。根据给定词条和学习者的场景、易错点，生成自然、地道、难度适中的英文例句。
+
+只输出一个 JSON 对象，不要使用 Markdown 代码块，不要输出任何额外解释。结构必须严格为：
+{
+  "examples": [
+    { "en": "English example sentence" }
+  ]
+}
+
+要求：
+- 生成 2-3 句，覆盖不同语境，句子长短适中。
+- 全部使用英文；不要输出中文、拼音或中文翻译。
+- 如果提供了学习者场景，优先让例句与这些场景相关。
+- 不要重复已有例句；不要编造不存在的搭配或词义。
+- 不要输出解释、标题或多余字段。`
+
+export function buildExampleSystemPrompt(mode: ExplanationMode): string {
+  return mode === 'english'
+    ? EXAMPLE_SYSTEM_PROMPT_ENGLISH
+    : EXAMPLE_SYSTEM_PROMPT_BILINGUAL
+}
+
 export function buildExampleUserPrompt(input: {
   entry: Entry
   sceneNames: string[]
   errors: LearnerError[]
+  explanationMode?: ExplanationMode
 }): string {
-  const { entry, sceneNames, errors } = input
+  const { entry, sceneNames, errors, explanationMode = 'bilingual' } = input
   const entryParts = [`[${ENTRY_TYPE_LABELS[entry.type]}] ${entry.text}`]
   if (entry.meaning) entryParts.push(truncate(entry.meaning, 120))
   if (entry.explanation) entryParts.push(truncate(entry.explanation, 160))
@@ -374,5 +459,5 @@ ${formatLearnerErrors(errors)}
 ## 已有例句（不要重复）
 ${existing}
 
-请生成 2-3 个新的个性化例句，并按要求输出 JSON。`
+${explanationMode === 'english' ? '输出语言：English only。不要输出中文；已有例句和错误描述中的中文只供理解。\n\n' : ''}请生成 2-3 个新的个性化例句，并按要求输出 JSON。`
 }

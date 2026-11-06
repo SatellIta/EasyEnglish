@@ -9,9 +9,10 @@ import type {
 } from '../../shared/types'
 import { completeChat } from '../ai/client'
 import { getAiConfig, isConfigured } from '../ai/config'
-import { buildSummaryUserPrompt, SUMMARY_SYSTEM_PROMPT } from '../ai/prompts'
+import { buildSummarySystemPrompt, buildSummaryUserPrompt } from '../ai/prompts'
 import { db } from '../db'
 import { markDraftDuplicates } from '../lib/dedupe'
+import { getAiTeachingSettings } from '../lib/ai-teaching'
 import { upsertLearnerError } from '../lib/errors'
 import { mapDailySummary, mapEntry } from '../lib/mappers'
 import { ENTRY_SELECT } from '../lib/queries'
@@ -220,6 +221,7 @@ app.post('/api/summary/today/generate', async (c) => {
   ).map((row) => row.text)
 
   const existingScenes = listSceneSummaries()
+  const teaching = getAiTeachingSettings()
   const sceneById = new Map(
     existingScenes.map((scene) => [scene.id, { id: scene.id, name: scene.name }]),
   )
@@ -233,7 +235,7 @@ app.post('/api/summary/today/generate', async (c) => {
   try {
     const raw = await completeChat(
       [
-        { role: 'system', content: SUMMARY_SYSTEM_PROMPT },
+        { role: 'system', content: buildSummarySystemPrompt(teaching.explanationMode) },
         {
           role: 'user',
           content: buildSummaryUserPrompt({
@@ -246,6 +248,7 @@ app.post('/api/summary/today/generate', async (c) => {
               name: scene.name,
               description: scene.description,
             })),
+            explanationMode: teaching.explanationMode,
           }),
         },
       ],
