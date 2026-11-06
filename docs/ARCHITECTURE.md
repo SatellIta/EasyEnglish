@@ -32,8 +32,25 @@
 | `examples` | JSON 字符串数组 |
 | `notes` | 个人笔记 |
 | `tags` | JSON 字符串数组 |
-| `source` | `manual` / `summary` 等 |
+| `source` | `manual` / `summary` / `markdown-import` 等 |
+| `review_enabled` | 是否进入每日复习；场景导入的默认值为 0 |
 | `created_at`, `updated_at` | UTC ISO |
+
+### scenes / scene_entries
+
+场景是用户自定义的联想记忆空间，也是词库的第三种整理维度。
+
+| 表 | 字段 | 说明 |
+| --- | --- | --- |
+| `scenes` | `id`, `name`, `description` | 场景名不区分大小写唯一 |
+| | `created_at`, `updated_at` | UTC ISO |
+| `scene_entries` | `scene_id`, `entry_id` | 多对多关联，主键 |
+| | `section` | 场景内 H3 小节，例如 `Deposit money` |
+| | `subsection` | 场景内加粗小标题或引导语，例如 `Natural conversations · At a bank` |
+| | `position` | 导入/添加顺序，用于「导入顺序」排列 |
+| | `added_at` | 加入场景时间 |
+
+一个词条可以出现在多个场景里。场景成员关系不改变复习调度：是否进入每日复习只看 `entries.review_enabled`。导入 `# Scenery` 时默认把场景词条的 `review_enabled` 设为 0，因此不会额外增加每日复习负担；用户可以在词条编辑表单里重新打开复习，或在导入预览中勾选「场景词条也加入每日复习」。
 
 ### review_states
 
@@ -79,11 +96,36 @@ FTS5 虚拟表，`tokenize='trigram'`，内容来自 entries，通过 INSERT/UPD
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
 | GET | `/api/entries?types=word,phrase&q=&tag=&from=&to=&limit=&offset=` | 列表 + 搜索 + 分页 |
-| POST | `/api/entries` | 新建，自动创建复习状态（立即到期） |
-| POST | `/api/entries/bulk` | 批量新建（最多 50） |
+| POST | `/api/entries` | 新建，自动创建复习状态（立即到期）；主要英文内容重复时返回 409 |
+| POST | `/api/entries/bulk` | 批量新建（最多 50）；默认按规范化后的主要英文内容跳过词库中和批次内重复项（不看释义/例句），返回 `count` / `skipped` / `duplicates` |
 | GET | `/api/entries/:id` | 详情 |
-| PATCH | `/api/entries/:id` | 部分更新 |
+| PATCH | `/api/entries/:id` | 部分更新；改成已存在的英文内容时返回 409 |
 | DELETE | `/api/entries/:id` | 删除（级联复习状态/日志） |
+
+### 场景与词库整理
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/api/scenes` | 场景列表，含总条数和单词/短语/句子计数 |
+| POST | `/api/scenes` | 新建场景；重名返回 409 |
+| GET | `/api/scenes/:id` | 场景详情，返回场景内词条及 `section` / `subsection` |
+| PATCH | `/api/scenes/:id` | 修改名称或描述 |
+| DELETE | `/api/scenes/:id` | 删除场景；词条本身保留 |
+| POST | `/api/scenes/:id/entries` | body `{ entryIds, section?, subsection? }`，把已有词条加入场景 |
+| DELETE | `/api/scenes/:id/entries/:entryId` | 从场景移除词条 |
+| GET | `/api/library/overview` | 按本地日期聚合的条数、类型总数、场景列表 |
+| GET | `/api/library/date/:date?type=&q=` | 某一天（本地时区）的词条，可按类型和关键词过滤 |
+| GET | `/api/export/options` | 导出分组：常规类型计数（不含场景词条）和场景列表 |
+| POST | `/api/export/markdown` | body `{ types, sceneIds }`，返回 `text/markdown` |
+
+### Markdown 导入
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| POST | `/api/import/markdown/preview` | body `{ markdown, filename? }`，解析并标记重复项 |
+| POST | `/api/import/markdown/commit` | body `{ items }`，写入选中词条，按需创建/关联场景 |
+
+解析器在 `server/lib/markdown-import.ts`，只处理文本，不执行 Markdown 中的任何内容。预览会按规范化英文内容标记数据库中和本批次内的重复项，默认不勾选重复项。提交时会再次跳过词库中已有的相同英文内容，并对本批次去重。
 
 ### 复习
 
@@ -125,8 +167,31 @@ FTS5 虚拟表，`tokenize='trigram'`，内容来自 entries，通过 INSERT/UPD
 - 新词条：`stage = 0`，`next_review_at = now`，立即进入队列。
 - 记得：`stage += 1`，下次间隔为 `intervals[stage - 1]`；超过阶梯后 `status = mastered`，下次 365 天。
 - 不记得：`stage = 0`，`lapses += 1`，按配置的重试分钟数重新出现，`status = learning`。
+- 只有 `entries.review_enabled = 1` 的词条会进入 `/api/review/queue` 和到期统计。场景导入默认关闭该开关，但保留复习状态；之后打开开关时会从当前状态继续。
 
 复习界面只展示英文，用户先主动回忆，再选择「记得 / 不记得」。不使用选择题，避免只记选项差异。修改配置只影响之后的评分，不会重排已有词条的下次复习时间。
+
+## Markdown 导入与场景映射
+
+导入器面向约定的 Markdown 格式，规则如下：
+
+- `# words`：一行一个词条，类型固定为单词；明确是单词的目录允许用 ` / ` 分隔多个单词。
+- `# collocations`：一行一个词条，类型固定为短语；不按 `/` 拆分；可选 `text = explanation` / `text — 中文`。
+- `# sentences`：一行一个词条，类型固定为句子；不按 `/` 拆分；`##` / `###` 作为预览分组和标签保留。
+- `# Scenery`：`##` 是场景，`###` 是单词/短语/句子分类；普通行按 H3 类型；`### 单词` 下允许用 ` / ` 分隔多个单词；列表行在场景中一律按句子；`section` 保存最终类型标签。
+- 表格：第一列英文、第二列含义、第三列补充；第四列及以后忽略；第一列为空的行丢弃。
+- 非场景分类的 H2/H3 进入标签和预览分组；未知 H1/H3 会按内容自动判断并给出预览提示。
+- 所有导入词条的 `source = 'markdown-import'`；普通词条默认进入每日复习，场景词条默认不进入。
+- 导入预览按分组折叠，支持逐条改类型、按组全选、只选新词条；提交时按英文内容去重，并复用同名场景。
+
+用户可选的 Markdown 导出实现在 `server/routes/export.ts`：
+
+- `GET /api/export/options` 返回常规类型计数和场景列表。
+- `POST /api/export/markdown` 按选中的类型/场景生成 Markdown。
+- 常规词条只包含未归入场景的内容；场景词条按场景导出。
+- 导出使用三列表格，第三列合并解释、例句、笔记和标签；不包含复习进度。
+
+更完整的格式说明见 `docs/SCENERY_IMPORT.md`，页面内的提示内容来自 `src/assets/import-format.md`。
 
 ## AI 流程
 
@@ -170,6 +235,10 @@ FTS5 虚拟表，`tokenize='trigram'`，内容来自 entries，通过 INSERT/UPD
 ```
 
 解析时容忍 Markdown 代码围栏；解析失败则退化为纯 Markdown 总结、候选词条为空。结果按日期 upsert 到 `daily_summaries`。
+
+候选词条在生成和读取时都会通过 `server/lib/dedupe.ts` 标重：规范化文本会忽略大小写、首尾引号和结尾标点，只以主要英文内容与词库及本批次比较；类型、释义、例句、标签都不参与判重。`POST /api/entries/bulk` 在写入前再次查重，并返回 `skipped` / `duplicates`，所以「全部加入」不会把已有词条重复塞进复习队列。
+
+前端把整理任务放在 `src/stores/summary.ts`，由 `ChatPage` 或 `TodayPage` 触发；任务不依赖页面生命周期，切换路由不会中断。完成或失败后，`AppShell` 里的 `SummaryJobHost` 会在任意页面弹出确认框；关闭后仍保留右下角「今日总结已生成」入口（只有在还有未处理候选时显示）。
 
 ## 主题
 

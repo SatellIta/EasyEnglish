@@ -7,8 +7,10 @@ import MarkdownView from '@/components/MarkdownView.vue'
 import { api, errorMessage, streamChat } from '@/lib/api'
 import { formatRelativeTime, truncate } from '@/lib/format'
 import { useAppStore } from '@/stores/app'
+import { useSummaryStore } from '@/stores/summary'
 
 const store = useAppStore()
+const summaryStore = useSummaryStore()
 const route = useRoute()
 const router = useRouter()
 
@@ -41,6 +43,14 @@ const activeTitle = computed(() => {
 const composerPlaceholder = computed(() =>
   streaming.value ? 'AI 正在回答…' : '问一个英语问题，或把不认识的句子贴进来…',
 )
+
+const organizing = computed(() => summaryStore.running)
+
+async function organizeToday() {
+  error.value = ''
+  const result = await summaryStore.generate()
+  if (!result && summaryStore.error) error.value = summaryStore.error
+}
 
 async function loadSessions() {
   try {
@@ -225,9 +235,15 @@ onMounted(async () => {
           </p>
         </div>
       </div>
-      <RouterLink to="/today?summarize=1" class="btn btn-soft btn-sm">
-        <Icon name="sparkles" :size="15" /> 整理今天
-      </RouterLink>
+      <button
+        class="btn btn-soft btn-sm"
+        type="button"
+        :disabled="organizing"
+        @click="organizeToday"
+      >
+        <Icon :name="organizing ? 'refresh' : 'sparkles'" :size="15" />
+        {{ organizing ? '整理中…' : '整理今天' }}
+      </button>
     </header>
 
     <p v-if="error" class="banner banner-error">{{ error }}</p>

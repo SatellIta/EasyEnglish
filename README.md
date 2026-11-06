@@ -7,9 +7,14 @@
 ## 功能
 
 - **自建语料**：单词、短语、句子统一管理，支持释义、用法、例句、笔记和标签。
+- **Markdown 导入**：识别 `# words` / `# collocations` / `# sentences` / `# Scenery`，支持列表、三列表格、`=` / `—` 释义；明确是单词的目录支持 `/` 分隔，并在导入前预览、改类型、查重。导入页内置 `?` 格式说明。
+- **Markdown 导出**：可选择常规单词/短语/句子或任意场景，导出为三列表格 Markdown，保留含义、解释、例句、笔记和标签。
+- **场景联想记忆**：`# Scenery` 下 `##` 是场景，`###` 是单词/短语/句子分类；场景里的列表行按句子处理。场景词条默认不进入每日复习，不会额外增加复习负担。
+- **三种词库整理**：按学习日期、按词条类型、按场景查看；支持搜索、类型筛选和长列表分批展开。
 - **AI 英语助手**：内置面向中文学习者的提示词，直接在 App 内问词义、辨析、语法和表达。AI 会读取你记录的词句作为联想记忆。
-- **一键今日总结**：让 AI 把今天的对话和词条整理成可复习的总结，并抽取值得加入词库的候选条目。
+- **一键今日总结**：让 AI 把今天的对话和词条整理成可复习的总结，并抽取值得加入词库的候选条目。整理在后台运行，切换页面不会中断；完成后会在任意页面弹出确认框，加入前按主要英文内容查重。
 - **艾宾浩斯复习**：新词条立即进入队列；默认按 1 / 2 / 4 / 7 / 15 / 30 / 60 / 120 / 240 天推进，不记得则在 10 分钟后重试。复习间隔和重试窗口都可以在设置页调整。复习只展示英文，先主动回忆，再展开答案。
+- **浏览器语音朗读**：使用浏览器内置的 Web Speech API 朗读英文，不依赖内置音频文件。
 - **主题切换**：内置「新拟物派」与「瑞士国际风格」两套主题，可在设置页或侧栏底部一键切换，偏好保存在浏览器本地。
 - **本地数据**：所有内容保存在一个 SQLite 文件里，离线可用，备份只需复制 `data/`。
 - **响应式界面**：桌面和手机浏览器都可用。
@@ -60,18 +65,19 @@ pnpm typecheck    # 仅类型检查
 
 ```
 src/                 Vue 前端
-  pages/             今日 / 对话 / 复习 / 词库 / 设置
-  components/        AppShell、词条表单、Markdown 渲染等
-  lib/               API 客户端、时间格式化、朗读
+  pages/             今日 / 对话 / 复习 / 词库 / 导入 / 设置
+  components/        AppShell、词条卡片、场景视图、导入预览等
+  lib/               API 客户端、时间格式化、浏览器语音朗读
   stores/            Pinia 状态
   styles/main.css    设计变量与全局样式
 server/              Hono 后端
-  routes/            词条、复习、对话、总结、设置
-  lib/               调度算法、查询、映射、时间
+  routes/            词条、复习、对话、总结、设置、场景、词库、导入
+  lib/               调度算法、查询、映射、Markdown 解析、场景
   ai/                提示词、配置、OpenAI 兼容客户端
+  migrations/        版本化数据库迁移
   schema.sql         SQLite 表结构与 FTS5 触发器
 shared/types.ts      前后端共享的 API 类型
-docs/                架构说明与 UI 风格约束
+docs/                架构说明、导入设计、UI 风格约束
 data/                运行时生成的 SQLite 数据库（已 gitignore）
 ```
 
@@ -85,6 +91,7 @@ API Key 以明文保存在本地 SQLite 的 `settings` 表中，接口只返回�
 
 - [CLAUDE.md](CLAUDE.md) — 给 AI 编码助手的仓库指南
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — 数据模型、接口、调度与 AI 流程
+- [docs/SCENERY_IMPORT.md](docs/SCENERY_IMPORT.md) — Markdown 导入格式与 Scenery 场景设计
 - [docs/UI_STYLE.md](docs/UI_STYLE.md) — 两套主题的风格索引
 - [docs/UI_STYLE_NEUMORPHISM.md](docs/UI_STYLE_NEUMORPHISM.md) — 新拟物派约束
 - [docs/UI_STYLE_SWISS.md](docs/UI_STYLE_SWISS.md) — 瑞士国际风格约束

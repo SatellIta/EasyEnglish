@@ -1,5 +1,6 @@
 import type {
   AiSettings,
+  BulkCreateResult,
   ChatMessage,
   ChatSession,
   DailySummary,
@@ -7,9 +8,19 @@ import type {
   Entry,
   EntryInput,
   EntryType,
+  ExportInput,
+  ExportOptions,
+  ImportCommitItem,
+  ImportCommitResult,
+  ImportPreview,
+  LibraryOverview,
   ReviewSettings,
   ReviewState,
   ReviewStats,
+  Scene,
+  SceneDetail,
+  SceneInput,
+  SceneSummary,
   SummaryResult,
 } from '@shared/types'
 
@@ -49,6 +60,31 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   if (response.status === 204) return undefined as T
   return (await response.json()) as T
+}
+
+async function requestText(path: string, options: RequestInit = {}): Promise<string> {
+  const response = await fetch(`/api${path}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(options.headers as Record<string, string> | undefined),
+    },
+  })
+
+  if (!response.ok) {
+    let message = `请求失败（${response.status}）`
+    let details: unknown
+    try {
+      const body = await response.json()
+      if (body && typeof body.error === 'string') message = body.error
+      details = body?.details
+    } catch {
+      // ignore
+    }
+    throw new ApiError(message, response.status, details)
+  }
+
+  return response.text()
 }
 
 function toQuery(params: Record<string, string | number | undefined>): string {
@@ -92,10 +128,75 @@ export const api = {
     update: (id: number, input: Partial<EntryInput>) =>
       request<Entry>(`/entries/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
     remove: (id: number) => request<{ ok: boolean }>(`/entries/${id}`, { method: 'DELETE' }),
-    bulkCreate: (entries: EntryInput[]) =>
-      request<{ entries: Entry[]; count: number }>('/entries/bulk', {
+    bulkCreate: (
+      entries: EntryInput[],
+      options: { skipDuplicates?: boolean } = {},
+    ) =>
+      request<BulkCreateResult>('/entries/bulk', {
         method: 'POST',
-        body: JSON.stringify({ entries }),
+        body: JSON.stringify({ entries, skipDuplicates: options.skipDuplicates }),
+      }),
+  },
+
+  library: {
+    overview: () => request<LibraryOverview>('/library/overview'),
+    date: (
+      date: string,
+      params: { type?: EntryType; q?: string; limit?: number } = {},
+    ) =>
+      request<{ date: string; items: Entry[]; total: number; limit: number }>(
+        `/library/date/${date}${toQuery({
+          type: params.type,
+          q: params.q,
+          limit: params.limit,
+        })}`,
+      ),
+  },
+
+  scenes: {
+    list: () => request<{ items: SceneSummary[] }>('/scenes'),
+    detail: (id: number) => request<SceneDetail>(`/scenes/${id}`),
+    create: (input: SceneInput) =>
+      request<Scene>('/scenes', { method: 'POST', body: JSON.stringify(input) }),
+    update: (id: number, input: Partial<SceneInput>) =>
+      request<Scene>(`/scenes/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
+    remove: (id: number) => request<{ ok: boolean }>(`/scenes/${id}`, { method: 'DELETE' }),
+    addEntries: (
+      id: number,
+      entryIds: number[],
+      section?: string | null,
+      subsection?: string | null,
+    ) =>
+      request<{ added: number; skipped: number; scene: SceneSummary }>(
+        `/scenes/${id}/entries`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ entryIds, section, subsection }),
+        },
+      ),
+    removeEntry: (id: number, entryId: number) =>
+      request<{ ok: boolean }>(`/scenes/${id}/entries/${entryId}`, { method: 'DELETE' }),
+  },
+
+  imports: {
+    previewMarkdown: (markdown: string, filename?: string) =>
+      request<ImportPreview>('/import/markdown/preview', {
+        method: 'POST',
+        body: JSON.stringify({ markdown, filename }),
+      }),
+    commitMarkdown: (items: ImportCommitItem[]) =>
+      request<ImportCommitResult>('/import/markdown/commit', {
+        method: 'POST',
+        body: JSON.stringify({ items }),
+      }),
+  },
+
+  exports: {
+    options: () => request<ExportOptions>('/export/options'),
+    markdown: (input: ExportInput) =>
+      requestText('/export/markdown', {
+        method: 'POST',
+        body: JSON.stringify(input),
       }),
   },
 

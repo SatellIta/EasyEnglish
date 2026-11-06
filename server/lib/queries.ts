@@ -2,18 +2,48 @@ import type { Entry } from '../../shared/types'
 import { db } from '../db'
 import { mapEntry } from './mappers'
 
+export const ENTRY_COLUMNS = `
+  e.id, e.type, e.text, e.meaning, e.explanation, e.examples, e.notes, e.tags,
+  e.source, e.review_enabled, e.created_at, e.updated_at,
+  (
+    SELECT json_group_array(json_object(
+      'sceneId', s.id,
+      'sceneName', s.name,
+      'section', se.section,
+      'subsection', se.subsection
+    ))
+    FROM scene_entries se
+    JOIN scenes s ON s.id = se.scene_id
+    WHERE se.entry_id = e.id
+  ) AS scene_refs
+`
+
+export const REVIEW_COLUMNS = `
+  r.stage AS r_stage,
+  r.interval_days AS r_interval_days,
+  r.next_review_at AS r_next_review_at,
+  r.last_reviewed_at AS r_last_reviewed_at,
+  r.lapses AS r_lapses,
+  r.total_reviews AS r_total_reviews,
+  r.status AS r_status
+`
+
 export const ENTRY_SELECT = `
-  SELECT
-    e.id, e.type, e.text, e.meaning, e.explanation, e.examples, e.notes, e.tags,
-    e.source, e.created_at, e.updated_at,
-    r.stage AS r_stage,
-    r.interval_days AS r_interval_days,
-    r.next_review_at AS r_next_review_at,
-    r.last_reviewed_at AS r_last_reviewed_at,
-    r.lapses AS r_lapses,
-    r.total_reviews AS r_total_reviews,
-    r.status AS r_status
+  SELECT ${ENTRY_COLUMNS}, ${REVIEW_COLUMNS}
   FROM entries e
+  LEFT JOIN review_states r ON r.entry_id = e.id
+`
+
+export const SCENE_ENTRY_SELECT = `
+  SELECT
+    ${ENTRY_COLUMNS},
+    ${REVIEW_COLUMNS},
+    se.section AS se_section,
+    se.subsection AS se_subsection,
+    se.added_at AS se_added_at,
+    se.position AS se_position
+  FROM scene_entries se
+  JOIN entries e ON e.id = se.entry_id
   LEFT JOIN review_states r ON r.entry_id = e.id
 `
 

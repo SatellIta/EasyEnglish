@@ -821,3 +821,84 @@ html[data-theme="swiss"] *::-webkit-scrollbar-thumb {
     border-bottom: 1px solid #000000;
   }
 }
+
+/* ---------- library views (dates / types / scenes) ---------- */
+
+html[data-theme="swiss"] #app .date-card:hover,
+html[data-theme="swiss"] #app .scene-open:hover {
+  background: #f0f0f0;
+  border-color: #ff0000;
+}
+
+html[data-theme="swiss"] #app .date-card:active,
+html[data-theme="swiss"] #app .scene-card:active {
+  box-shadow: none;
+  opacity: 0.75;
+}
+
+html[data-theme="swiss"] #app .type-dot {
+  border-radius: 0;
+}
+html[data-theme="swiss"] #app .dot-word,
+html[data-theme="swiss"] #app .dot-sentence {
+  background: #000000;
+}
+html[data-theme="swiss"] #app .dot-phrase {
+  background: #ff0000;
+}
+
+html[data-theme="swiss"] #app .review-flag.off {
+  color: #e30613;
+  border-color: #e30613;
+}
+
+html[data-theme="swiss"] #app .entry-card {
+  background: #ffffff;
+}
+
+html[data-theme="swiss"] #app .type-section .entry-card:hover,
+html[data-theme="swiss"] #app .scene-section .entry-card:hover {
+  border-color: #ff0000;
+  box-shadow: none;
+}
+
+html[data-theme="swiss"] #app .scene-kicker {
+  color: #e30613;
+}
+
+html[data-theme="swiss"] #app .section-head-row {
+  border-bottom-color: #000000;
+}
+
+/* ---------- markdown import ---------- */
+
+html[data-theme="swiss"] #app .stat-card.warn strong {
+  color: #e30613;
+}
+
+html[data-theme="swiss"] #app .group-meta {
+  background: #f0f0f0;
+  border: 1px solid #000000;
+  border-radius: 0;
+  color: #000000;
+}
+
+html[data-theme="swiss"] #app .result-mark {
+  background: #000000;
+  border: 1px solid #000000;
+  border-radius: 0;
+  color: #ffffff;
+}
+
+html[data-theme="swiss"] #app .import-item.selected::before {
+  border-radius: 0;
+}
+
+html[data-theme="swiss"] #app .type-name {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+html[data-theme="swiss"] #app .type-head:hover .type-name {
+  color: #e30613;
+}

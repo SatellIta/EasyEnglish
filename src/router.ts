@@ -8,6 +8,7 @@ export const router = createRouter({
     { path: '/chat/:id?', name: 'chat', component: () => import('@/pages/ChatPage.vue') },
     { path: '/review', name: 'review', component: () => import('@/pages/ReviewPage.vue') },
     { path: '/library', name: 'library', component: () => import('@/pages/LibraryPage.vue') },
+    { path: '/import', name: 'import', component: () => import('@/pages/ImportMarkdownPage.vue') },
     { path: '/settings', name: 'settings', component: () => import('@/pages/SettingsPage.vue') },
     { path: '/:pathMatch(.*)*', redirect: '/today' },
   ],

@@ -8,12 +8,39 @@ CREATE TABLE IF NOT EXISTS entries (
   notes TEXT,
   tags TEXT NOT NULL DEFAULT '[]',
   source TEXT NOT NULL DEFAULT 'manual',
+  review_enabled INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_entries_type ON entries(type);
 CREATE INDEX IF NOT EXISTS idx_entries_created_at ON entries(created_at);
+CREATE INDEX IF NOT EXISTS idx_entries_review_enabled ON entries(review_enabled);
+
+-- 场景：用户自定义的联想记忆空间。场景成员不改变复习调度，
+-- 是否进入每日复习由 entries.review_enabled 决定。
+CREATE TABLE IF NOT EXISTS scenes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL COLLATE NOCASE,
+  description TEXT,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_scenes_name ON scenes(name COLLATE NOCASE);
+
+CREATE TABLE IF NOT EXISTS scene_entries (
+  scene_id INTEGER NOT NULL REFERENCES scenes(id) ON DELETE CASCADE,
+  entry_id INTEGER NOT NULL REFERENCES entries(id) ON DELETE CASCADE,
+  section TEXT,
+  subsection TEXT,
+  position INTEGER NOT NULL DEFAULT 0,
+  added_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  PRIMARY KEY (scene_id, entry_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_scene_entries_entry ON scene_entries(entry_id);
+CREATE INDEX IF NOT EXISTS idx_scene_entries_scene ON scene_entries(scene_id, position);
 
 CREATE TABLE IF NOT EXISTS review_states (
   entry_id INTEGER PRIMARY KEY REFERENCES entries(id) ON DELETE CASCADE,

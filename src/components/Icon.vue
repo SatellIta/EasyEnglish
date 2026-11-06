@@ -40,6 +40,7 @@ const icons: Record<string, string[]> = {
   clock: ['M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z', 'M12 7v5l3 2'],
   'chevron-left': ['m15 18-6-6 6-6'],
   'chevron-right': ['m9 18 6-6-6-6'],
+  'chevron-down': ['m6 9 6 6 6-6'],
   'arrow-right': ['M5 12h14', 'm13 6 6 6-6 6'],
   refresh: [
     'M20 11a8 8 0 0 0-14.9-4M4 4v4h4',
@@ -63,6 +64,13 @@ const icons: Record<string, string[]> = {
   info: ['M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z', 'M12 11v5', 'M12 8h.01'],
   theme: ['M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z', 'M12 3v18'],
   layers: ['m12 3 9 5-9 5-9-5 9-5Z', 'm3 13 9 5 9-5', 'm3 17 9 5 9-5'],
+  upload: ['M12 16V4', 'm7 9 5-5 5 5', 'M4 20h16'],
+  download: ['M12 4v12', 'm7 11 5 5 5-5', 'M4 20h16'],
+  help: [
+    'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z',
+    'M9.2 9a2.8 2.8 0 1 1 4.9 1.8c-.9.8-2.1 1.1-2.1 2.7',
+    'M12 17h.01',
+  ],
 }
 
 const paths = computed(() => icons[props.name] ?? icons.info)

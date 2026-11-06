@@ -1,58 +1,48 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
-import type { Entry, EntryType } from '@shared/types'
-import { ENTRY_TYPE_LABELS } from '@shared/types'
+import { RouterLink } from 'vue-router'
+import type { Entry } from '@shared/types'
 import EntryForm from '@/components/EntryForm.vue'
+import ExportModal from '@/components/ExportModal.vue'
 import Icon from '@/components/Icon.vue'
-import SpeakButton from '@/components/SpeakButton.vue'
-import TypeBadge from '@/components/TypeBadge.vue'
+import DateView from '@/components/library/DateView.vue'
+import SceneView from '@/components/library/SceneView.vue'
+import TypeView from '@/components/library/TypeView.vue'
 import { api, errorMessage } from '@/lib/api'
-import { formatDue, stageLabel, truncate } from '@/lib/format'
+import { truncate } from '@/lib/format'
 import { useAppStore } from '@/stores/app'
+
+type ViewMode = 'date' | 'type' | 'scene'
 
 const store = useAppStore()
 
-const entries = ref<Entry[]>([])
-const total = ref(0)
+const view = ref<ViewMode>('date')
 const q = ref('')
-const activeType = ref<EntryType | 'all'>('all')
-const loading = ref(false)
-const error = ref('')
+const query = ref('')
+const refreshToken = ref(0)
 const formOpen = ref(false)
+const exportOpen = ref(false)
 const editing = ref<Entry | null>(null)
+const error = ref('')
 let timer: number | undefined
 
-const typeFilters: Array<{ value: EntryType | 'all'; label: string }> = [
-  { value: 'all', label: '全部' },
-  { value: 'word', label: ENTRY_TYPE_LABELS.word },
-  { value: 'phrase', label: ENTRY_TYPE_LABELS.phrase },
-  { value: 'sentence', label: ENTRY_TYPE_LABELS.sentence },
+const views: Array<{ value: ViewMode; label: string; hint: string }> = [
+  { value: 'date', label: '按日期', hint: '先看日期，再看当天内容' },
+  { value: 'type', label: '按类型', hint: '单词 / 短语 / 句子' },
+  { value: 'scene', label: '按场景', hint: '联想记忆空间' },
 ]
-
-async function load() {
-  loading.value = true
-  error.value = ''
-  try {
-    const result = await api.entries.list({
-      q: q.value.trim() || undefined,
-      types: activeType.value === 'all' ? undefined : [activeType.value],
-      limit: 300,
-    })
-    entries.value = result.items
-    total.value = result.total
-  } catch (caught) {
-    error.value = errorMessage(caught)
-  } finally {
-    loading.value = false
-  }
-}
 
 watch(q, () => {
   window.clearTimeout(timer)
-  timer = window.setTimeout(load, 250)
+  timer = window.setTimeout(() => {
+    query.value = q.value.trim()
+  }, 220)
 })
 
-watch(activeType, load)
+function refresh() {
+  refreshToken.value += 1
+  store.refreshStats().catch(() => {})
+}
 
 function openCreate() {
   editing.value = null
@@ -65,22 +55,23 @@ function openEdit(entry: Entry) {
 }
 
 async function onSaved() {
-  await load()
-  await store.refreshStats()
+  editing.value = null
+  refresh()
 }
 
 async function remove(entry: Entry) {
   if (!window.confirm(`删除“${truncate(entry.text, 40)}”？此操作不可恢复。`)) return
   try {
     await api.entries.remove(entry.id)
-    await load()
-    await store.refreshStats()
+    refresh()
   } catch (caught) {
     error.value = errorMessage(caught)
   }
 }
 
-onMounted(load)
+onMounted(() => {
+  if (!store.stats) store.refreshStats().catch(() => {})
+})
 </script>
 
 <template>
@@ -88,11 +79,21 @@ onMounted(load)
     <header class="page-head">
       <div>
         <h1>词库</h1>
-        <p>共 {{ total }} 条记录 · 单词、短语和句子都可以放在这里。</p>
+        <p>
+          共 {{ store.totalEntries }} 条记录 · 按日期、类型或场景整理自己的英语材料。
+        </p>
       </div>
-      <button class="btn btn-primary" @click="openCreate">
-        <Icon name="plus" :size="16" /> 添加词条
-      </button>
+      <div class="head-actions">
+        <RouterLink to="/import" class="btn btn-ghost">
+          <Icon name="upload" :size="16" /> 导入 Markdown
+        </RouterLink>
+        <button class="btn btn-ghost" @click="exportOpen = true">
+          <Icon name="download" :size="16" /> 导出 Markdown
+        </button>
+        <button class="btn btn-primary" @click="openCreate">
+          <Icon name="plus" :size="16" /> 添加词条
+        </button>
+      </div>
     </header>
 
     <p v-if="error" class="banner banner-error">{{ error }}</p>
@@ -103,67 +104,50 @@ onMounted(load)
         <input
           v-model="q"
           class="search-input"
-          aria-label="搜索词条"
-          placeholder="搜索英文、中文释义或笔记…"
+          aria-label="搜索词条或场景"
+          placeholder="搜索英文、中文释义、笔记或场景…"
         />
       </div>
       <div class="type-tabs">
         <button
-          v-for="filter in typeFilters"
-          :key="filter.value"
+          v-for="item in views"
+          :key="item.value"
           class="type-tab"
-          :class="{ active: activeType === filter.value }"
-          :aria-pressed="activeType === filter.value"
-          @click="activeType = filter.value"
+          :class="{ active: view === item.value }"
+          :title="item.hint"
+          :aria-pressed="view === item.value"
+          @click="view = item.value"
         >
-          {{ filter.label }}
+          {{ item.label }}
         </button>
       </div>
-      <button class="icon-btn" title="刷新" aria-label="刷新词条列表" @click="load">
+      <button class="icon-btn" title="刷新" aria-label="刷新词库" @click="refresh">
         <Icon name="refresh" :size="17" />
       </button>
     </section>
 
-    <p v-if="loading && !entries.length" class="empty">加载中…</p>
-
-    <div v-else-if="!entries.length" class="empty card">
-      <h3>词库还是空的</h3>
-      <p>把遇到的词句记下来，复习时它们会按遗忘曲线出现。</p>
-      <button class="btn btn-primary" @click="openCreate">
-        <Icon name="plus" :size="16" /> 添加第一条
-      </button>
-    </div>
-
-    <div v-else class="lib-list">
-      <article v-for="entry in entries" :key="entry.id" class="lib-row card">
-        <div class="lib-main">
-          <div class="row wrap lib-title">
-            <TypeBadge :type="entry.type" />
-            <h3>{{ entry.text }}</h3>
-            <SpeakButton :text="entry.text" />
-          </div>
-          <p v-if="entry.meaning" class="lib-meaning">{{ entry.meaning }}</p>
-          <p v-if="entry.explanation" class="lib-explain">
-            {{ truncate(entry.explanation, 180) }}
-          </p>
-          <div class="row wrap lib-meta">
-            <span v-for="tag in entry.tags" :key="tag" class="tag">{{ tag }}</span>
-            <span v-if="entry.review" class="muted small review-info">
-              <Icon name="clock" :size="13" />
-              下次复习 {{ formatDue(entry.review.nextReviewAt) }} · {{ stageLabel(entry.review.stage) }}
-            </span>
-          </div>
-        </div>
-        <div class="lib-actions">
-          <button class="icon-btn" title="编辑" aria-label="编辑词条" @click="openEdit(entry)">
-            <Icon name="edit" :size="17" />
-          </button>
-          <button class="icon-btn danger" title="删除" aria-label="删除词条" @click="remove(entry)">
-            <Icon name="trash" :size="17" />
-          </button>
-        </div>
-      </article>
-    </div>
+    <DateView
+      v-if="view === 'date'"
+      :query="query"
+      :refresh-token="refreshToken"
+      @edit="openEdit"
+      @remove="remove"
+    />
+    <TypeView
+      v-else-if="view === 'type'"
+      :query="query"
+      :refresh-token="refreshToken"
+      @edit="openEdit"
+      @remove="remove"
+    />
+    <SceneView
+      v-else
+      :query="query"
+      :refresh-token="refreshToken"
+      @edit="openEdit"
+      @remove="remove"
+      @changed="refresh"
+    />
 
     <EntryForm
       :open="formOpen"
@@ -171,10 +155,17 @@ onMounted(load)
       @close="formOpen = false"
       @saved="onSaved"
     />
+
+    <ExportModal :open="exportOpen" @close="exportOpen = false" />
   </div>
 </template>
 
 <style scoped>
+.head-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
 .toolbar {
   display: flex;
   align-items: center;
@@ -190,17 +181,15 @@ onMounted(load)
   align-items: center;
   gap: 10px;
   padding: 11px 14px;
-  border: 0;
+  border: var(--border-width, 0) solid var(--border-color, transparent);
   border-radius: var(--radius);
   background: var(--bg);
   color: var(--muted);
   box-shadow: var(--shadow-inset);
-  transition: box-shadow var(--transition);
+  transition: box-shadow var(--transition), border-color var(--transition);
 }
 .search-box:focus-within {
   box-shadow: var(--shadow-inset-focus);
-  outline: 2px solid rgba(109, 93, 252, 0.4);
-  outline-offset: 3px;
 }
 .search-input {
   flex: 1;
@@ -209,99 +198,5 @@ onMounted(load)
   outline: none;
   background: transparent;
   color: var(--ink);
-}
-.search-input::placeholder {
-  color: var(--muted);
-}
-.type-tabs {
-  display: flex;
-  gap: 6px;
-  padding: 5px;
-  border-radius: var(--radius-sm);
-  background: var(--bg);
-  box-shadow: var(--shadow-inset-sm);
-}
-.type-tab {
-  border: 0;
-  background: transparent;
-  border-radius: var(--radius-sm);
-  padding: 7px 13px;
-  font-size: 13px;
-  color: var(--muted);
-  font-weight: 500;
-  box-shadow: none;
-  transition: box-shadow var(--transition), color var(--transition);
-}
-.type-tab:hover {
-  color: var(--ink);
-}
-.type-tab.active {
-  background: var(--bg);
-  color: var(--accent-strong);
-  box-shadow: var(--shadow-raised-sm);
-  font-weight: 600;
-}
-.type-tab:active {
-  box-shadow: var(--shadow-pressed);
-}
-.type-tab.active:hover {
-  box-shadow: var(--shadow-hover-sm);
-}
-.lib-list {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-.lib-row {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 20px 22px;
-}
-.lib-main {
-  min-width: 0;
-}
-.lib-title {
-  gap: 9px;
-}
-.lib-title h3 {
-  margin: 0;
-  flex: 1 1 0;
-  min-width: 0;
-  font-size: 19px;
-  font-weight: 600;
-  line-height: 1.35;
-  color: var(--ink);
-  overflow-wrap: anywhere;
-}
-.lib-meaning {
-  margin: 8px 0 0;
-  font-size: 14px;
-  color: var(--ink-soft);
-}
-.lib-explain {
-  margin: 6px 0 0;
-  font-size: 13px;
-  color: var(--muted);
-  line-height: 1.65;
-  overflow-wrap: anywhere;
-}
-.lib-meta {
-  margin-top: 12px;
-  gap: 8px;
-}
-.review-info {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-.lib-actions {
-  display: flex;
-  gap: 6px;
-  flex: 0 0 auto;
-}
-.icon-btn.danger:hover {
-  color: var(--danger);
 }
 </style>
