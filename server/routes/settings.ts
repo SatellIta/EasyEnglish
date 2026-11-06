@@ -6,6 +6,10 @@ import {
   getAiBehaviorSettings,
   saveAiBehaviorSettings,
 } from '../lib/ai-behavior'
+import {
+  getAiTeachingSettings,
+  saveAiTeachingSettings,
+} from '../lib/ai-teaching'
 import { getReviewConfig, saveReviewConfig } from '../lib/review-config'
 import { deleteSetting, setSetting } from '../lib/settings'
 
@@ -57,6 +61,17 @@ app.get('/api/settings/ai-behavior', (c) => c.json(getAiBehaviorSettings()))
 app.put('/api/settings/ai-behavior', async (c) => {
   const input = behaviorInput.parse(await c.req.json())
   return c.json(saveAiBehaviorSettings(input))
+})
+
+const teachingInput = z.object({
+  explanationMode: z.enum(['bilingual', 'english']),
+})
+
+app.get('/api/settings/ai-teaching', (c) => c.json(getAiTeachingSettings()))
+
+app.put('/api/settings/ai-teaching', async (c) => {
+  const input = teachingInput.parse(await c.req.json())
+  return c.json(saveAiTeachingSettings(input))
 })
 
 app.put('/api/settings', async (c) => {

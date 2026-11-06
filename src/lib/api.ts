@@ -1,6 +1,7 @@
 import type {
   AiBehaviorSettings,
   AiSettings,
+  AiTeachingSettings,
   BulkCreateResult,
   ChatMessage,
   ChatSession,
@@ -251,6 +252,12 @@ export const api = {
     aiBehavior: () => request<AiBehaviorSettings>('/settings/ai-behavior'),
     updateAiBehavior: (input: Partial<AiBehaviorSettings>) =>
       request<AiBehaviorSettings>('/settings/ai-behavior', {
+        method: 'PUT',
+        body: JSON.stringify(input),
+      }),
+    aiTeaching: () => request<AiTeachingSettings>('/settings/ai-teaching'),
+    updateAiTeaching: (input: AiTeachingSettings) =>
+      request<AiTeachingSettings>('/settings/ai-teaching', {
         method: 'PUT',
         body: JSON.stringify(input),
       }),

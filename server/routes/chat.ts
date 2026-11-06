@@ -7,6 +7,7 @@ import { streamChat, type ChatTurn } from '../ai/client'
 import { buildSystemPrompt, type ScenePromptContext } from '../ai/prompts'
 import { db } from '../db'
 import { getAiBehaviorSettings } from '../lib/ai-behavior'
+import { getAiTeachingSettings } from '../lib/ai-teaching'
 import { topActiveErrors } from '../lib/errors'
 import { mapChatMessage, mapChatSession, mapEntry } from '../lib/mappers'
 import { buildSearchFilter, ENTRY_SELECT } from '../lib/queries'
@@ -177,6 +178,7 @@ function memoryFor(
 function buildTurns(sessionId: number, userMessage: string): ChatTurn[] {
   const { date } = dayRange()
   const behavior = getAiBehaviorSettings()
+  const teaching = getAiTeachingSettings()
   const session = getSession(sessionId)
   const sceneId = session?.scene_id ?? null
   const scene = sceneId ? getSceneContext(sceneId) : null
@@ -191,6 +193,7 @@ function buildTurns(sessionId: number, userMessage: string): ChatTurn[] {
           errors: topActiveErrors(8),
           memoryCharBudget: behavior.memoryCharBudget,
           scene,
+          explanationMode: teaching.explanationMode,
         },
       ),
     },

@@ -286,6 +286,13 @@ export interface AiBehaviorSettings {
   memoryCharBudget: number
 }
 
+/** 解释语言：中文辅助 / 全英文（英译英） */
+export type ExplanationMode = 'bilingual' | 'english'
+
+export interface AiTeachingSettings {
+  explanationMode: ExplanationMode
+}
+
 export interface ChatSession {
   id: number
   title: string | null

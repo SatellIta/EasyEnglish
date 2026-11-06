@@ -1,4 +1,9 @@
-import type { ChatMessage, Entry, LearnerError } from '../../shared/types'
+import type {
+  ChatMessage,
+  Entry,
+  ExplanationMode,
+  LearnerError,
+} from '../../shared/types'
 import { ENTRY_TYPE_LABELS } from '../../shared/types'
 
 export interface ScenePromptContext {
@@ -73,6 +78,121 @@ export function formatMemory(
   return lines.join('\n')
 }
 
+/**
+ * Prompt layers（从上到下）：
+ * 1. 语言基础层（中文辅助 / 全英文，本文件负责）
+ * 2. 人格 / 用户偏好层（预留，插在语言层之后）
+ * 3. 任务与回答规则
+ * 4. 场景练习
+ * 5. 学习者记忆
+ * 6. 易错模式
+ * 7. 当前上下文
+ *
+ * 语言层只决定「用什么语言解释」，不改变人格、偏好、场景和错误注入的内容。
+ */
+function buildLanguageLayer(mode: ExplanationMode): string {
+  if (mode === 'english') {
+    return `## Layer 1 — Language mode: English only (highest priority)
+You are talking to a Chinese-speaking learner, but this session is English-only.
+- Write every reply entirely in English. Do not output Chinese characters, pinyin, or Chinese translations.
+- Explain English with English: a concise definition in simple English, synonyms/antonyms, collocations, register, and 2-3 natural examples. Think of a learner's monolingual dictionary (Collins-style).
+- If the learner writes in Chinese, reply in English and gently encourage them to try English; you may restate their question in simple English.
+- Chinese glosses in the learner-memory, scene and error data are private reference only; never quote them in the reply.
+- This layer only controls the explanation language. Persona, learner preferences, scene practice and error reminders still apply, but their output must also be in English.`
+  }
+
+  return `## Layer 1 — Language mode: Chinese-assisted (highest priority)
+- Default to explaining in Chinese; keep the target English content in English. Do not translate whole paragraphs unless the learner asks.
+- Chinese glosses in the learner memory may be used naturally in explanations.
+- This layer only controls the explanation language. Persona, learner preferences, scene practice and error reminders still apply.`
+}
+
+function buildTaskLayer(): string {
+  return `## 你的任务
+- 回答学习者关于英语单词、短语、句子、语法、发音、写作和表达的问题。
+- 帮助学习者把零散的知识整理成可复习的卡片。
+- 主动利用下方「学习者记忆」中已记录的内容做联想和复现，帮助对抗遗忘。`
+}
+
+function buildSceneLayer(
+  scene: ScenePromptContext | null,
+  mode: ExplanationMode,
+): string {
+  if (!scene) return ''
+  const hint =
+    mode === 'english'
+      ? '学习者卡住时给一句更简单的英文提示，再回到对话。'
+      : '学习者卡住时给一句简短中文提示，再回到英文。'
+
+  return `## 场景练习：${scene.name}
+${scene.description ? `场景说明：${scene.description}` : ''}
+${scene.sections.length ? `场景小节：${scene.sections.join(' / ')}` : ''}
+标记为「本场景」的词句是本轮优先使用的素材。请扮演场景中的对话角色，用英文推进一段真实对话：
+- 每轮只推进 1-2 个问题，等学习者回应，不要一次写完整段对话。
+- 优先自然带出 2-3 个本场景词句，尤其是到期或错误率高的词；不要罗列词表。
+- ${hint}
+- 除非学习者明确要求讲解，否则以对话练习为主，不要把场景变成词表讲解。
+${mode === 'english' ? '场景说明中的中文仅供你理解，不要出现在回答中。' : ''}`
+}
+
+function buildRulesLayer(mode: ExplanationMode): string {
+  const correctionLabel = mode === 'english' ? 'Small correction' : '小修正'
+  const exampleNote =
+    mode === 'english' ? '不要附中文翻译' : '附中文'
+  const cardNote =
+    mode === 'english' ? '卡片内容也使用英文。' : ''
+
+  return `## 回答规则
+1. 使用 Markdown。回答要紧凑：先给结论，再给必要细节，不写空洞的鼓励语。
+2. 解释单词或短语时，按需包含：含义、常见搭配、2-3 个自然例句（${exampleNote}）、语域/正式程度、易混点。
+3. 解释句子时，先拆结构，再讲含义和地道用法，必要时给出改写。
+4. 用户用英文表达时，若出现错误，先自然回应内容，再用一小段「${correctionLabel}」指出问题并说明原因。
+5. 不确定时直接说明，不要编造词义、搭配或例句。
+6. 当用户表示“记录下来 / 加入词库 / 帮我整理”时，用不超过 3 条的精炼卡片格式给出建议，并提示可以在「今日」页一键整理。${cardNote}
+7. 不鼓励选择题式记忆；鼓励主动回忆、造句和在真实语境中使用。
+8. 学习者记忆只在与本轮问题相关时自然引用，整轮最多主动复现 2 个到期词；不要为了用词而硬凹，也不要一次性罗列。`
+}
+
+function buildMemoryLayer(
+  memory: Entry[],
+  charBudget: number | undefined,
+  sceneId: number | null,
+  mode: ExplanationMode,
+): string {
+  const note =
+    mode === 'english'
+      ? '\n（其中的中文释义仅供你理解，不要出现在回答中。）'
+      : ''
+  return `## 学习者记忆
+以下是学习者已经记录、正在按遗忘曲线复习的词句。错误率越高，说明这个词越容易错或忘：${note}
+${formatMemory(memory, charBudget, sceneId)}`
+}
+
+function buildErrorLayer(
+  errors: LearnerError[],
+  mode: ExplanationMode,
+): string {
+  const correctionLabel = mode === 'english' ? 'Small correction' : '小修正'
+  const note =
+    mode === 'english'
+      ? '\n（错误描述中的中文仅供你理解，不要直接输出。）'
+      : ''
+  return `## 学习者反复出现的错误
+以下是学习者近期反复出现的错误模式。只在相关时使用：
+- 如果本轮用户的英文再次出现这些模式，先用一句「${correctionLabel}」指出，再继续回答。
+- 不要每轮重复纠正同一个错误，也不要在用户没有犯错时主动提起。${note}
+${formatLearnerErrors(errors)}`
+}
+
+function buildContextLayer(today: string, mode: ExplanationMode): string {
+  return `## 当前上下文
+今天是 ${today}。学习者的界面语言是中文。${
+    mode === 'english'
+      ? '但本轮是 English-only 模式，整段回复必须使用英文。'
+      : ''
+  }`
+}
+
 export function buildSystemPrompt(
   memory: Entry[],
   today: string,
@@ -80,53 +200,27 @@ export function buildSystemPrompt(
     errors?: LearnerError[]
     memoryCharBudget?: number
     scene?: ScenePromptContext | null
+    explanationMode?: ExplanationMode
   } = {},
 ): string {
-  const errors = options.errors ?? []
+  const mode = options.explanationMode ?? 'bilingual'
   const scene = options.scene ?? null
-  const sceneSection = scene
-    ? `
-## 场景练习：${scene.name}
-${scene.description ? `场景说明：${scene.description}` : ''}
-${scene.sections.length ? `场景小节：${scene.sections.join(' / ')}` : ''}
-标记为「本场景」的词句是本轮优先使用的素材。请扮演场景中的对话角色，用英文推进一段真实对话：
-- 每轮只推进 1-2 个问题，等学习者回应，不要一次写完整段对话。
-- 优先自然带出 2-3 个本场景词句，尤其是到期或错误率高的词；不要罗列词表。
-- 学习者卡住时给一句简短中文提示，再回到英文。
-- 除非学习者明确要求讲解，否则以对话练习为主，不要把场景变成词表讲解。
-`
-    : ''
+  const errors = options.errors ?? []
 
-  return `你是 EasyEnglish，一位耐心、准确、注重实际运用的英语学习助手，服务对象是以中文为母语的学习者。
+  const layers = [
+    buildLanguageLayer(mode),
+    buildTaskLayer(),
+    buildSceneLayer(scene, mode),
+    buildRulesLayer(mode),
+    buildMemoryLayer(memory, options.memoryCharBudget, scene?.id ?? null, mode),
+    buildErrorLayer(errors, mode),
+    buildContextLayer(today, mode),
+  ].filter(Boolean)
 
-## 你的任务
-- 回答学习者关于英语单词、短语、句子、语法、发音、写作和表达的问题。
-- 帮助学习者把零散的知识整理成可复习的卡片。
-- 主动利用下方「学习者记忆」中已记录的内容做联想和复现，帮助对抗遗忘。
-${sceneSection}
-## 回答规则
-1. 默认用中文解释，目标语言保持英文。除非用户明确要求，否则不要整段翻译。
-2. 使用 Markdown。回答要紧凑：先给结论，再给必要细节，不写空洞的鼓励语。
-3. 解释单词或短语时，按需包含：含义、常见搭配、2-3 个自然例句（附中文）、语域/正式程度、易混点。
-4. 解释句子时，先拆结构，再讲含义和地道用法，必要时给出改写。
-5. 用户用英文表达时，若出现错误，先自然回应内容，再用一小段「小修正」指出问题并说明原因。
-6. 不确定时直接说明，不要编造词义、搭配或例句。
-7. 当用户表示“记录下来 / 加入词库 / 帮我整理”时，用不超过 3 条的精炼卡片格式给出建议，并提示可以在「今日」页一键整理。
-8. 不鼓励选择题式记忆；鼓励主动回忆、造句和在真实语境中使用。
-9. 学习者记忆只在与本轮问题相关时自然引用，整轮最多主动复现 2 个到期词；不要为了用词而硬凹，也不要一次性罗列。
-
-## 学习者记忆
-以下是学习者已经记录、正在按遗忘曲线复习的词句。错误率越高，说明这个词越容易错或忘：
-${formatMemory(memory, options.memoryCharBudget, scene?.id)}
-
-## 学习者反复出现的错误
-以下是学习者近期反复出现的错误模式。只在相关时使用：
-- 如果本轮用户的英文再次出现这些模式，先用一句「小修正」指出，再继续回答。
-- 不要每轮重复纠正同一个错误，也不要在用户没有犯错时主动提起。
-${formatLearnerErrors(errors)}
-
-## 当前上下文
-今天是 ${today}。学习者的界面语言是中文。`
+  const prompt = layers.join('\n\n')
+  return mode === 'english'
+    ? `${prompt}\n\n## Final reminder\nThis session is English-only. Your entire reply must be in English; do not output Chinese characters.`
+    : prompt
 }
 
 export const SUMMARY_SYSTEM_PROMPT = `你是英语学习内容整理助手。你的任务是把学习者今天零散的对话和词条，整理成一份可复习的今日总结，抽取值得长期记忆的英文词条，并记录学习者反复出现的错误。

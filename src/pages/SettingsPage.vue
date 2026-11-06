@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
-import type { AiBehaviorSettings, ReviewSettings } from '@shared/types'
+import type {
+  AiBehaviorSettings,
+  AiTeachingSettings,
+  ExplanationMode,
+  ReviewSettings,
+} from '@shared/types'
 import Icon from '@/components/Icon.vue'
 import { api, errorMessage } from '@/lib/api'
 import { useAppStore } from '@/stores/app'
@@ -26,11 +31,15 @@ const behaviorForm = reactive({
   historyLimit: 20,
   memoryCharBudget: 2400,
 })
+const teachingForm = reactive<{ explanationMode: ExplanationMode }>({
+  explanationMode: 'bilingual',
+})
 const loading = ref(true)
 const saving = ref(false)
 const testing = ref(false)
 const reviewSaving = ref(false)
 const behaviorSaving = ref(false)
+const teachingSaving = ref(false)
 const savedReviewText = ref('')
 const error = ref('')
 const notice = ref('')
@@ -38,6 +47,8 @@ const reviewError = ref('')
 const reviewNotice = ref('')
 const behaviorError = ref('')
 const behaviorNotice = ref('')
+const teachingError = ref('')
+const teachingNotice = ref('')
 const testResult = ref<{ ok: boolean; message: string } | null>(null)
 
 const presets = [
@@ -55,10 +66,11 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const [settings, review, behavior] = await Promise.all([
+    const [settings, review, behavior, teaching] = await Promise.all([
       api.settings.get(),
       api.settings.review(),
       api.settings.aiBehavior(),
+      api.settings.aiTeaching(),
     ])
     form.baseUrl = settings.baseUrl
     form.model = settings.model
@@ -75,6 +87,7 @@ async function load() {
     behaviorForm.memoryLimit = behavior.memoryLimit
     behaviorForm.historyLimit = behavior.historyLimit
     behaviorForm.memoryCharBudget = behavior.memoryCharBudget
+    teachingForm.explanationMode = teaching.explanationMode
   } catch (caught) {
     error.value = errorMessage(caught)
   } finally {
@@ -186,6 +199,26 @@ async function saveBehavior() {
     behaviorError.value = errorMessage(caught)
   } finally {
     behaviorSaving.value = false
+  }
+}
+
+async function saveTeaching() {
+  teachingSaving.value = true
+  teachingError.value = ''
+  teachingNotice.value = ''
+  try {
+    const saved: AiTeachingSettings = await api.settings.updateAiTeaching({
+      explanationMode: teachingForm.explanationMode,
+    })
+    teachingForm.explanationMode = saved.explanationMode
+    teachingNotice.value =
+      saved.explanationMode === 'english'
+        ? '已切换到全英文模式，下一轮对话生效。'
+        : '已切换到中文辅助模式，下一轮对话生效。'
+  } catch (caught) {
+    teachingError.value = errorMessage(caught)
+  } finally {
+    teachingSaving.value = false
   }
 }
 
@@ -379,6 +412,68 @@ onMounted(load)
       <div class="actions">
         <button class="btn btn-primary" :disabled="behaviorSaving" @click="saveBehavior">
           {{ behaviorSaving ? '保存中…' : '保存上下文预算' }}
+        </button>
+      </div>
+    </section>
+
+    <section class="card settings-card">
+      <div class="card-title">
+        <div>
+          <h2>解释语言</h2>
+          <p class="hint">
+            决定 AI 对话用中文辅助还是全英文解释；人格、场景和易错词注入不受影响。
+          </p>
+        </div>
+        <span class="status-pill ok">
+          {{ teachingForm.explanationMode === 'english' ? '全英文' : '中文辅助' }}
+        </span>
+      </div>
+
+      <p v-if="teachingError" class="banner banner-error">{{ teachingError }}</p>
+      <p v-if="teachingNotice" class="banner banner-ok">{{ teachingNotice }}</p>
+
+      <div class="theme-options">
+        <button
+          class="theme-option"
+          :class="{ active: teachingForm.explanationMode === 'bilingual' }"
+          type="button"
+          :aria-pressed="teachingForm.explanationMode === 'bilingual'"
+          @click="teachingForm.explanationMode = 'bilingual'"
+        >
+          <span class="theme-copy">
+            <strong>中文辅助</strong>
+            <small>用中文解释，英文作为目标语言。适合想先理解意思的学习者。</small>
+          </span>
+          <Icon
+            v-if="teachingForm.explanationMode === 'bilingual'"
+            class="theme-check"
+            name="check"
+            :size="17"
+          />
+        </button>
+        <button
+          class="theme-option"
+          :class="{ active: teachingForm.explanationMode === 'english' }"
+          type="button"
+          :aria-pressed="teachingForm.explanationMode === 'english'"
+          @click="teachingForm.explanationMode = 'english'"
+        >
+          <span class="theme-copy">
+            <strong>全英文</strong>
+            <small>用简单英文解释英文，像柯林斯词典。适合想沉浸式练习的学习者。</small>
+          </span>
+          <Icon
+            v-if="teachingForm.explanationMode === 'english'"
+            class="theme-check"
+            name="check"
+            :size="17"
+          />
+        </button>
+      </div>
+
+      <div class="actions">
+        <button class="btn btn-primary" :disabled="teachingSaving" @click="saveTeaching">
+          {{ teachingSaving ? '保存中…' : '保存解释语言' }}
         </button>
       </div>
     </section>
