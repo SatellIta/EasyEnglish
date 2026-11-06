@@ -96,6 +96,18 @@ export interface DraftEntry {
   /** 服务端根据当天对话匹配出的来源，前端只读 */
   sourceSessionId?: number | null
   sourceMessageId?: number | null
+  /** AI 建议归入的场景；服务端已校验 ID 合法性 */
+  sceneSuggestion?: SceneSuggestion | null
+  /** 用户是否接受场景建议，默认 true */
+  sceneAccepted?: boolean
+}
+
+export interface SceneSuggestion {
+  action: 'existing' | 'new' | 'none'
+  sceneId: number | null
+  sceneName: string | null
+  section: string | null
+  reason: string | null
 }
 
 /** 新建 / 编辑词条的请求体 */

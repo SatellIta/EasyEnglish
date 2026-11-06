@@ -316,6 +316,21 @@ watch(
                 <span class="entry-text">{{ entry.text }}</span>
                 <span v-if="entry.meaning" class="muted small">{{ entry.meaning }}</span>
                 <span v-if="entry.duplicate" class="tag">已在词库</span>
+                <span
+                  v-if="entry.sceneSuggestion && entry.sceneSuggestion.action !== 'none'"
+                  class="tag"
+                >
+                  {{
+                    entry.sceneSuggestion.action === 'new' ? '建议新建' : '建议归入'
+                  }}：{{ entry.sceneSuggestion.sceneName }}
+                </span>
+                <span
+                  v-if="entry.sceneSuggestion && entry.sceneSuggestion.action !== 'none' && !entry.duplicate"
+                  class="scene-accept"
+                >
+                  <input v-model="entry.sceneAccepted" type="checkbox" />
+                  加入场景
+                </span>
                 <RouterLink
                   v-if="entry.sourceSessionId"
                   :to="`/chat/${entry.sourceSessionId}`"
@@ -513,6 +528,13 @@ watch(
   margin-left: auto;
   font-size: 12px;
   color: var(--accent-strong);
+}
+.scene-accept {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted);
 }
 .errors-panel {
   margin-top: 24px;

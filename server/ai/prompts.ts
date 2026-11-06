@@ -135,7 +135,19 @@ export const SUMMARY_SYSTEM_PROMPT = `你是英语学习内容整理助手。你
 {
   "summary": "Markdown 格式的今日总结",
   "entries": [
-    { "type": "word", "text": "英文原文", "meaning": "中文含义", "explanation": "简短用法/例句/记忆点" }
+    {
+      "type": "word",
+      "text": "英文原文",
+      "meaning": "中文含义",
+      "explanation": "简短用法/例句/记忆点",
+      "scene": {
+        "action": "existing",
+        "sceneId": 1,
+        "sceneName": "咖啡店",
+        "section": "点单",
+        "reason": "这些词都出现在点单对话里"
+      }
+    }
   ],
   "errors": [
     {
@@ -157,15 +169,21 @@ export const SUMMARY_SYSTEM_PROMPT = `你是英语学习内容整理助手。你
 - 不要收录过于简单、与学习无关的内容。如果今天没有足够内容，entries 使用空数组。
 - errors 只记录今天对话中真实出现的、值得以后提醒的错误，最多 8 条；没有就使用空数组。
 - pattern 用简短中文概括，同一类错误只出现一次；category 只能是 "grammar"、"usage"、"spelling"、"pronunciation" 或 "other"。
-- correction 和 example 必须是英文；example 尽量保留学习者原句。`
+- correction 和 example 必须是英文；example 尽量保留学习者原句。
+- scene.action 只能是 "existing"、"new" 或 "none"。
+- 归入已有场景时，sceneId 必须来自下方「已有场景」列表，不要编造 ID；sceneName 与列表保持一致。
+- 如果候选词条明显属于某个已有场景，用 "existing" 并填 sceneId。
+- 如果多个候选词条构成一个清晰的新场景，用 "new" 并给出简短 sceneName；单个孤立词条优先用 "none"。
+- scene.section 可选，用于场景内的小节；reason 用一句中文说明。`
 
 export function buildSummaryUserPrompt(input: {
   date: string
   messages: Pick<ChatMessage, 'role' | 'content'>[]
   entries: Entry[]
   existingTexts?: string[]
+  scenes?: Array<{ id: number; name: string; description: string | null }>
 }): string {
-  const { date, messages, entries, existingTexts = [] } = input
+  const { date, messages, entries, existingTexts = [], scenes = [] } = input
 
   const entryLines = entries.length
     ? entries
@@ -181,6 +199,15 @@ export function buildSummaryUserPrompt(input: {
 
   const existingLines = existingTexts.length
     ? existingTexts.slice(0, 120).map((text) => `- ${truncate(text, 120)}`).join('\n')
+    : '（暂无）'
+
+  const sceneLines = scenes.length
+    ? scenes
+        .map((scene) => {
+          const description = scene.description ? `｜${truncate(scene.description, 80)}` : ''
+          return `- id=${scene.id}｜${scene.name}${description}`
+        })
+        .join('\n')
     : '（暂无）'
 
   // 从最近的消息开始截取，控制提示词长度。
@@ -202,6 +229,9 @@ ${entryLines}
 
 ## 词库中已经存在的词条（不要重复推荐）
 ${existingLines}
+
+## 已有场景（归入已有场景时只能使用这些 ID）
+${sceneLines}
 
 ## 今天的对话记录
 ${conversation}

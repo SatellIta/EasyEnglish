@@ -140,6 +140,22 @@ async function addSelected() {
                   {{ entry.explanation }}
                 </span>
               </span>
+              <span
+                v-if="entry.sceneSuggestion && entry.sceneSuggestion.action !== 'none'"
+                class="tag"
+              >
+                {{
+                  entry.sceneSuggestion.action === 'new' ? '建议新建' : '建议归入'
+                }}：{{ entry.sceneSuggestion.sceneName }}
+              </span>
+              <span
+                v-if="entry.sceneSuggestion && entry.sceneSuggestion.action !== 'none' && !entry.duplicate"
+                class="scene-accept"
+                @click.stop
+              >
+                <input v-model="entry.sceneAccepted" type="checkbox" @click.stop />
+                加入场景
+              </span>
               <span v-if="entry.duplicate" class="tag">已在词库</span>
             </label>
           </li>
@@ -247,6 +263,18 @@ button.job-pill:hover {
 }
 .duplicate-hint {
   margin-top: 10px;
+}
+.scene-accept {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  font-size: 11.5px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.scene-accept input {
+  margin: 0;
 }
 .candidate-list {
   list-style: none;

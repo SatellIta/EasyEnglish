@@ -1,6 +1,11 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import type { BulkCreateResult, DraftEntry, SummaryResult } from '@shared/types'
+import type {
+  BulkCreateResult,
+  DraftEntry,
+  SceneSuggestion,
+  SummaryResult,
+} from '@shared/types'
 import { api, errorMessage } from '@/lib/api'
 import { useAppStore } from '@/stores/app'
 
@@ -61,6 +66,34 @@ export const useSummaryStore = defineStore('summary', () => {
     if (result.value || error.value) modalOpen.value = true
   }
 
+  async function resolveSceneId(
+    suggestion: SceneSuggestion,
+    cache: Map<string, number>,
+  ): Promise<number | null> {
+    if (suggestion.action === 'existing' && suggestion.sceneId) {
+      return suggestion.sceneId
+    }
+
+    const name = suggestion.sceneName?.trim()
+    if (!name) return null
+    const key = name.toLowerCase()
+    const cached = cache.get(key)
+    if (cached) return cached
+
+    const scenes = await api.scenes.list()
+    const existing = scenes.items.find(
+      (scene) => scene.name.trim().toLowerCase() === key,
+    )
+    if (existing) {
+      cache.set(key, existing.id)
+      return existing.id
+    }
+
+    const created = await api.scenes.create({ name })
+    cache.set(key, created.id)
+    return created.id
+  }
+
   async function addEntries(entries: DraftEntry[]): Promise<BulkCreateResult | null> {
     if (!entries.length) return null
     adding.value = true
@@ -90,6 +123,49 @@ export const useSummaryStore = defineStore('summary', () => {
         addNotice.value = response.skipped
           ? `新增 ${response.count} 条，跳过 ${response.skipped} 条已存在词条。`
           : `新增 ${response.count} 条，并加入复习队列。`
+      }
+
+      // 把接受场景建议的新词条归入对应场景；场景失败不影响词条已入库。
+      const candidates = new Map(
+        entries.map((entry) => [
+          `${entry.type}:${entry.text.trim().toLowerCase()}`,
+          entry,
+        ]),
+      )
+      const sceneIdsByName = new Map<string, number>()
+      let sceneAdded = 0
+      let sceneFailed = 0
+
+      for (const created of response.entries) {
+        const candidate = candidates.get(
+          `${created.type}:${created.text.trim().toLowerCase()}`,
+        )
+        const suggestion = candidate?.sceneSuggestion
+        if (
+          !suggestion ||
+          suggestion.action === 'none' ||
+          candidate?.sceneAccepted === false
+        ) {
+          continue
+        }
+
+        try {
+          const sceneId = await resolveSceneId(suggestion, sceneIdsByName)
+          if (!sceneId) {
+            sceneFailed += 1
+            continue
+          }
+          await api.scenes.addEntries(sceneId, [created.id], suggestion.section)
+          sceneAdded += 1
+        } catch {
+          sceneFailed += 1
+        }
+      }
+
+      if (sceneAdded) addNotice.value += ` 已归入场景 ${sceneAdded} 条。`
+      if (sceneFailed) {
+        addNoticeKind.value = 'info'
+        addNotice.value += ` 有 ${sceneFailed} 条场景归并失败，词条仍已入库。`
       }
 
       // 已提交的候选标记为已存在，避免用户重复点击；词条本身仍在总结里可回看。

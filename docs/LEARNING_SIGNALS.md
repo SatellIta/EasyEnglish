@@ -116,7 +116,14 @@ API 的 `Entry` DTO 同步增加 `errorRate`、`errorSamples`、`sourceSessionId
 - 入口：复习卡片展开答案后 →「AI 个性化例句」。
 - 发送给模型的上下文只有：当前词条、场景名、近期错误和已有例句，不发送整库内容。
 
-## 11. 暂不包含
+## 11. 总结场景建议
 
-- 总结智能归并到场景
+- 今日总结的每个候选词条会带 `sceneSuggestion`：`existing`（归入已有场景）、`new`（新建场景）或 `none`。
+- 服务端只接受真实存在的 `sceneId`；模型给出未知 ID 时按 `sceneName` 匹配，匹配不到则丢弃建议。
+- 新场景名如果与已有场景重名，会自动转成 `existing`，避免重复建场景。
+- 候选默认 `sceneAccepted = true`；用户可在「今日」页或总结弹窗里取消勾选。
+- 入库时先创建词条，再按建议调用 `POST /api/scenes/:id/entries`；新场景先 `POST /api/scenes`。场景归并失败不会回滚已入库词条。
+
+## 12. 暂不包含
+
 - 发音跟读
