@@ -3,6 +3,10 @@ import { getSetting, setSetting } from './settings'
 
 export const DEFAULT_REVIEW_INTERVALS_DAYS = [1, 2, 4, 7, 15, 30, 60, 120, 240]
 export const DEFAULT_FORGOT_RETRY_MINUTES = 10
+/** 错误率指数平滑的近期权重默认值 */
+export const DEFAULT_ERROR_RATE_RECENT_WEIGHT = 0.35
+/** 错误率对复习间隔的惩罚默认值 */
+export const DEFAULT_ERROR_RATE_INTERVAL_PENALTY = 0.6
 export const MAX_REVIEW_INTERVALS = 20
 export const MAX_INTERVAL_DAYS = 3650
 
@@ -19,6 +23,13 @@ function normalizeIntervals(values: number[]): number[] {
 function normalizeRetryMinutes(value: number): number {
   if (!Number.isFinite(value) || value <= 0) return DEFAULT_FORGOT_RETRY_MINUTES
   return Math.min(Math.round(value * 100) / 100, 1440)
+}
+
+function normalizeUnit(value: unknown, fallback: number): number {
+  if (value === null || value === undefined || value === '') return fallback
+  const number = Number(value)
+  if (!Number.isFinite(number)) return fallback
+  return Math.min(Math.max(number, 0), 1)
 }
 
 /** 读取遗忘曲线配置；数据库里的值非法时回退到默认值。 */
@@ -38,9 +49,19 @@ export function getReviewConfig(): ReviewSettings {
   }
 
   const rawRetry = Number(getSetting('review.forgotRetryMinutes') ?? DEFAULT_FORGOT_RETRY_MINUTES)
+  const errorRateRecentWeight = normalizeUnit(
+    getSetting('review.errorRateRecentWeight'),
+    DEFAULT_ERROR_RATE_RECENT_WEIGHT,
+  )
+  const errorRateIntervalPenalty = normalizeUnit(
+    getSetting('review.errorRateIntervalPenalty'),
+    DEFAULT_ERROR_RATE_INTERVAL_PENALTY,
+  )
   return {
     intervalsDays: intervals,
     forgotRetryMinutes: normalizeRetryMinutes(rawRetry),
+    errorRateRecentWeight,
+    errorRateIntervalPenalty,
   }
 }
 
@@ -48,9 +69,24 @@ export function saveReviewConfig(input: ReviewSettings): ReviewSettings {
   const intervals = normalizeIntervals(input.intervalsDays)
   if (!intervals.length) throw new Error('至少需要保留一个复习间隔')
   const forgotRetryMinutes = normalizeRetryMinutes(input.forgotRetryMinutes)
+  const errorRateRecentWeight = normalizeUnit(
+    input.errorRateRecentWeight,
+    DEFAULT_ERROR_RATE_RECENT_WEIGHT,
+  )
+  const errorRateIntervalPenalty = normalizeUnit(
+    input.errorRateIntervalPenalty,
+    DEFAULT_ERROR_RATE_INTERVAL_PENALTY,
+  )
 
   setSetting('review.intervalsDays', JSON.stringify(intervals))
   setSetting('review.forgotRetryMinutes', String(forgotRetryMinutes))
+  setSetting('review.errorRateRecentWeight', String(errorRateRecentWeight))
+  setSetting('review.errorRateIntervalPenalty', String(errorRateIntervalPenalty))
 
-  return { intervalsDays: intervals, forgotRetryMinutes }
+  return {
+    intervalsDays: intervals,
+    forgotRetryMinutes,
+    errorRateRecentWeight,
+    errorRateIntervalPenalty,
+  }
 }

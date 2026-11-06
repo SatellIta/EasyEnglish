@@ -75,6 +75,8 @@ export const useSummaryStore = defineStore('summary', () => {
           meaning: entry.meaning ?? null,
           explanation: entry.explanation ?? null,
           source: 'summary',
+          sourceSessionId: entry.sourceSessionId ?? null,
+          sourceMessageId: entry.sourceMessageId ?? null,
         })),
       )
 

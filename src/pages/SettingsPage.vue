@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
-import type { ReviewSettings } from '@shared/types'
+import type { AiBehaviorSettings, ReviewSettings } from '@shared/types'
 import Icon from '@/components/Icon.vue'
 import { api, errorMessage } from '@/lib/api'
 import { useAppStore } from '@/stores/app'
@@ -18,16 +18,26 @@ const form = reactive({
 const reviewForm = reactive({
   intervalsText: '',
   forgotRetryMinutes: 10,
+  errorRateRecentWeight: 0.35,
+  errorRateIntervalPenalty: 0.6,
+})
+const behaviorForm = reactive({
+  memoryLimit: 12,
+  historyLimit: 20,
+  memoryCharBudget: 2400,
 })
 const loading = ref(true)
 const saving = ref(false)
 const testing = ref(false)
 const reviewSaving = ref(false)
+const behaviorSaving = ref(false)
 const savedReviewText = ref('')
 const error = ref('')
 const notice = ref('')
 const reviewError = ref('')
 const reviewNotice = ref('')
+const behaviorError = ref('')
+const behaviorNotice = ref('')
 const testResult = ref<{ ok: boolean; message: string } | null>(null)
 
 const presets = [
@@ -45,9 +55,10 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const [settings, review] = await Promise.all([
+    const [settings, review, behavior] = await Promise.all([
       api.settings.get(),
       api.settings.review(),
+      api.settings.aiBehavior(),
     ])
     form.baseUrl = settings.baseUrl
     form.model = settings.model
@@ -57,7 +68,13 @@ async function load() {
 
     reviewForm.intervalsText = review.intervalsDays.join(', ')
     reviewForm.forgotRetryMinutes = review.forgotRetryMinutes
-    savedReviewText.value = `${review.intervalsDays.join(' / ')} 天 · 重试 ${review.forgotRetryMinutes} 分钟`
+    reviewForm.errorRateRecentWeight = review.errorRateRecentWeight
+    reviewForm.errorRateIntervalPenalty = review.errorRateIntervalPenalty
+    savedReviewText.value = `${review.intervalsDays.join(' / ')} 天 · 重试 ${review.forgotRetryMinutes} 分钟 · 错误率权重 ${review.errorRateRecentWeight}`
+
+    behaviorForm.memoryLimit = behavior.memoryLimit
+    behaviorForm.historyLimit = behavior.historyLimit
+    behaviorForm.memoryCharBudget = behavior.memoryCharBudget
   } catch (caught) {
     error.value = errorMessage(caught)
   } finally {
@@ -135,15 +152,40 @@ async function saveReview() {
     const saved: ReviewSettings = await api.settings.updateReview({
       intervalsDays: intervals,
       forgotRetryMinutes: retry,
+      errorRateRecentWeight: Number(reviewForm.errorRateRecentWeight),
+      errorRateIntervalPenalty: Number(reviewForm.errorRateIntervalPenalty),
     })
     reviewForm.intervalsText = saved.intervalsDays.join(', ')
     reviewForm.forgotRetryMinutes = saved.forgotRetryMinutes
-    savedReviewText.value = `${saved.intervalsDays.join(' / ')} 天 · 重试 ${saved.forgotRetryMinutes} 分钟`
+    reviewForm.errorRateRecentWeight = saved.errorRateRecentWeight
+    reviewForm.errorRateIntervalPenalty = saved.errorRateIntervalPenalty
+    savedReviewText.value = `${saved.intervalsDays.join(' / ')} 天 · 重试 ${saved.forgotRetryMinutes} 分钟 · 错误率权重 ${saved.errorRateRecentWeight}`
     reviewNotice.value = '遗忘曲线已保存，新的安排会应用于之后的复习。'
   } catch (caught) {
     reviewError.value = errorMessage(caught)
   } finally {
     reviewSaving.value = false
+  }
+}
+
+async function saveBehavior() {
+  behaviorSaving.value = true
+  behaviorError.value = ''
+  behaviorNotice.value = ''
+  try {
+    const saved: AiBehaviorSettings = await api.settings.updateAiBehavior({
+      memoryLimit: Number(behaviorForm.memoryLimit),
+      historyLimit: Number(behaviorForm.historyLimit),
+      memoryCharBudget: Number(behaviorForm.memoryCharBudget),
+    })
+    behaviorForm.memoryLimit = saved.memoryLimit
+    behaviorForm.historyLimit = saved.historyLimit
+    behaviorForm.memoryCharBudget = saved.memoryCharBudget
+    behaviorNotice.value = 'AI 上下文预算已保存，下一轮对话生效。'
+  } catch (caught) {
+    behaviorError.value = errorMessage(caught)
+  } finally {
+    behaviorSaving.value = false
   }
 }
 
@@ -239,9 +281,104 @@ onMounted(load)
         </span>
       </div>
 
+      <div class="field">
+        <label for="review-error-weight">近期错误权重（0–1）</label>
+        <input
+          id="review-error-weight"
+          v-model.number="reviewForm.errorRateRecentWeight"
+          type="number"
+          min="0"
+          max="1"
+          step="0.05"
+          class="input"
+          :disabled="loading"
+        />
+        <span class="hint">
+          每次复习后按指数平滑更新错误率。数值越大，越看重最近一次「不记得」；默认 0.35。
+        </span>
+      </div>
+
+      <div class="field">
+        <label for="review-error-penalty">错误率对间隔的惩罚（0–1）</label>
+        <input
+          id="review-error-penalty"
+          v-model.number="reviewForm.errorRateIntervalPenalty"
+          type="number"
+          min="0"
+          max="1"
+          step="0.05"
+          class="input"
+          :disabled="loading"
+        />
+        <span class="hint">
+          实际间隔 = 基础间隔 × (1 − 错误率 × 惩罚系数)。错误率越高，复习越密；设为 0 可关闭该影响。
+        </span>
+      </div>
+
       <div class="actions">
         <button class="btn btn-primary" :disabled="reviewSaving" @click="saveReview">
           {{ reviewSaving ? '保存中…' : '保存遗忘曲线' }}
+        </button>
+      </div>
+    </section>
+
+    <section class="card settings-card">
+      <div class="card-title">
+        <div>
+          <h2>AI 上下文预算</h2>
+          <p class="hint">控制每轮对话注入多少记忆和历史，直接影响成本与回复稳定性。</p>
+        </div>
+      </div>
+
+      <p v-if="behaviorError" class="banner banner-error">{{ behaviorError }}</p>
+      <p v-if="behaviorNotice" class="banner banner-ok">{{ behaviorNotice }}</p>
+
+      <div class="field">
+        <label for="memory-limit">每次注入记忆条数</label>
+        <input
+          id="memory-limit"
+          v-model.number="behaviorForm.memoryLimit"
+          type="number"
+          min="1"
+          max="30"
+          class="input"
+          :disabled="loading"
+        />
+        <span class="hint">优先注入到期词和高错误率词，默认 12 条。</span>
+      </div>
+
+      <div class="field">
+        <label for="memory-budget">记忆字符预算</label>
+        <input
+          id="memory-budget"
+          v-model.number="behaviorForm.memoryCharBudget"
+          type="number"
+          min="200"
+          max="12000"
+          step="100"
+          class="input"
+          :disabled="loading"
+        />
+        <span class="hint">超出预算的词条会被截断，避免提示词过长。默认 2400 字符。</span>
+      </div>
+
+      <div class="field">
+        <label for="history-limit">携带历史消息条数</label>
+        <input
+          id="history-limit"
+          v-model.number="behaviorForm.historyLimit"
+          type="number"
+          min="2"
+          max="50"
+          class="input"
+          :disabled="loading"
+        />
+        <span class="hint">只影响发送给模型的历史消息数量，不会删除本地对话。默认 20 条。</span>
+      </div>
+
+      <div class="actions">
+        <button class="btn btn-primary" :disabled="behaviorSaving" @click="saveBehavior">
+          {{ behaviorSaving ? '保存中…' : '保存上下文预算' }}
         </button>
       </div>
     </section>

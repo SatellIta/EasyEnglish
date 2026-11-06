@@ -75,7 +75,8 @@ async function rate(rating: 'remembered' | 'forgot') {
   loading.value = true
   error.value = ''
   try {
-    await api.review.rate(entry.id, rating)
+    const result = await api.review.rate(entry.id, rating)
+    if (current.value && result.entry) Object.assign(current.value, result.entry)
     if (rating === 'remembered') {
       remembered.value += 1
       advance()
@@ -212,6 +213,16 @@ onBeforeUnmount(() => {
         <div class="review-meta">
           <TypeBadge :type="current.type" />
           <span class="muted small">{{ stageLabel(current.review?.stage ?? 0) }}</span>
+          <span v-if="current.errorRate >= 0.05" class="tag-soft">
+            错误率 {{ Math.round(current.errorRate * 100) }}%
+          </span>
+          <RouterLink
+            v-if="current.sourceSessionId"
+            :to="`/chat/${current.sourceSessionId}`"
+            class="source-link"
+          >
+            来自对话
+          </RouterLink>
           <SpeakButton :text="current.text" :size="20" />
         </div>
 
@@ -388,6 +399,20 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.tag-soft {
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-size: 11px;
+  font-weight: 600;
+}
+.source-link {
+  font-size: 12px;
+  color: var(--accent-strong);
 }
 .review-text {
   margin: 0;

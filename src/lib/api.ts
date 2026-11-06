@@ -1,4 +1,5 @@
 import type {
+  AiBehaviorSettings,
   AiSettings,
   BulkCreateResult,
   ChatMessage,
@@ -11,6 +12,8 @@ import type {
   ImportCommitItem,
   ImportCommitResult,
   ImportPreview,
+  LearnerError,
+  LearnerErrorStatus,
   LibraryOverview,
   ReviewSettings,
   ReviewState,
@@ -109,6 +112,18 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ entries, skipDuplicates: options.skipDuplicates }),
       }),
+  },
+
+  errors: {
+    list: (status?: LearnerErrorStatus, limit = 20) =>
+      request<{ items: LearnerError[] }>(`/errors${toQuery({ status, limit })}`),
+    update: (id: number, status: LearnerErrorStatus) =>
+      request<LearnerError>(`/errors/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status }),
+      }),
+    remove: (id: number) =>
+      request<{ ok: boolean }>(`/errors/${id}`, { method: 'DELETE' }),
   },
 
   library: {
@@ -220,6 +235,12 @@ export const api = {
     review: () => request<ReviewSettings>('/settings/review'),
     updateReview: (input: ReviewSettings) =>
       request<ReviewSettings>('/settings/review', {
+        method: 'PUT',
+        body: JSON.stringify(input),
+      }),
+    aiBehavior: () => request<AiBehaviorSettings>('/settings/ai-behavior'),
+    updateAiBehavior: (input: Partial<AiBehaviorSettings>) =>
+      request<AiBehaviorSettings>('/settings/ai-behavior', {
         method: 'PUT',
         body: JSON.stringify(input),
       }),

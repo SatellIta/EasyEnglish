@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import type { DailySummary, DraftEntry, Entry } from '@shared/types'
+import type { DailySummary, DraftEntry, Entry, LearnerError } from '@shared/types'
+import { ERROR_CATEGORY_LABELS } from '@shared/types'
 import Icon from '@/components/Icon.vue'
 import MarkdownView from '@/components/MarkdownView.vue'
 import SpeakButton from '@/components/SpeakButton.vue'
@@ -25,6 +26,7 @@ const router = useRouter()
 const entries = ref<Entry[]>([])
 const summary = ref<DailySummary | null>(null)
 const summaryEntries = ref<DraftEntry[]>([])
+const activeErrors = ref<LearnerError[]>([])
 const loading = ref(true)
 const error = ref('')
 const notice = ref('')
@@ -41,6 +43,14 @@ const existingSummaryCount = computed(
 
 const dateLabel = todayLongLabel()
 
+async function loadActiveErrors() {
+  try {
+    activeErrors.value = (await api.errors.list('active', 8)).items
+  } catch {
+    // 错误档案是增强信息，加载失败不影响今日页主流程
+  }
+}
+
 async function load() {
   loading.value = true
   error.value = ''
@@ -48,6 +58,7 @@ async function load() {
     const [list, saved] = await Promise.all([
       api.entries.list({ from: startOfTodayIso(), limit: 50 }),
       api.summary.today(),
+      loadActiveErrors(),
     ])
     entries.value = list.items
     summary.value = saved.summary
@@ -73,6 +84,7 @@ async function generateSummary() {
       createdAt: summary.value?.createdAt ?? new Date().toISOString(),
     }
     summaryEntries.value = result.entries
+    await loadActiveErrors()
     noticeKind.value = 'ok'
     notice.value = '今日总结已生成并保存。'
   } else if (summaryStore.error) {
@@ -104,6 +116,15 @@ async function handleSummarizeQuery() {
   await generateSummary()
 }
 
+async function setErrorStatus(id: number, status: 'resolved' | 'ignored') {
+  try {
+    await api.errors.update(id, status)
+    await loadActiveErrors()
+  } catch (caught) {
+    error.value = errorMessage(caught)
+  }
+}
+
 watch(
   () => summaryStore.result,
   (result) => {
@@ -116,6 +137,7 @@ watch(
       createdAt: summary.value?.createdAt ?? new Date().toISOString(),
     }
     summaryEntries.value = result.entries
+    loadActiveErrors().catch(() => {})
   },
 )
 
@@ -294,6 +316,13 @@ watch(
                 <span class="entry-text">{{ entry.text }}</span>
                 <span v-if="entry.meaning" class="muted small">{{ entry.meaning }}</span>
                 <span v-if="entry.duplicate" class="tag">已在词库</span>
+                <RouterLink
+                  v-if="entry.sourceSessionId"
+                  :to="`/chat/${entry.sourceSessionId}`"
+                  class="source-link"
+                >
+                  来自对话
+                </RouterLink>
               </li>
             </ul>
           </div>
@@ -302,6 +331,38 @@ watch(
         </template>
       </section>
     </div>
+
+    <section class="card panel errors-panel">
+      <header class="panel-head">
+        <h2>反复出现的错误</h2>
+        <span class="muted small">由最近的 AI 总结自动提取</span>
+      </header>
+
+      <p v-if="!activeErrors.length" class="empty">
+        还没有记录。生成今日总结时，AI 会从对话里抽取反复出现的错误；之后对话和总结会参考这些弱点。
+      </p>
+      <ul v-else class="error-list">
+        <li v-for="item in activeErrors" :key="item.id" class="error-row">
+          <div class="error-main">
+            <div class="row wrap">
+              <span class="tag">{{ ERROR_CATEGORY_LABELS[item.category] }}</span>
+              <span class="error-pattern">{{ item.pattern }}</span>
+              <span class="muted small">出现 {{ item.occurrences }} 次</span>
+            </div>
+            <p v-if="item.correction" class="error-detail">正确：{{ item.correction }}</p>
+            <p v-if="item.example" class="error-detail muted">例：{{ item.example }}</p>
+          </div>
+          <div class="error-actions">
+            <button class="btn btn-ghost btn-sm" @click="setErrorStatus(item.id, 'resolved')">
+              已解决
+            </button>
+            <button class="btn btn-ghost btn-sm" @click="setErrorStatus(item.id, 'ignored')">
+              忽略
+            </button>
+          </div>
+        </li>
+      </ul>
+    </section>
   </div>
 </template>
 
@@ -447,6 +508,55 @@ watch(
 }
 .summary-time {
   margin: 18px 0 0;
+}
+.source-link {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--accent-strong);
+}
+.errors-panel {
+  margin-top: 24px;
+}
+.error-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.error-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.error-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.error-pattern {
+  font-weight: 600;
+  color: var(--ink);
+}
+.error-detail {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-soft);
+  overflow-wrap: anywhere;
+}
+.error-actions {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+@media (max-width: 620px) {
+  .error-row {
+    flex-direction: column;
+  }
 }
 @media (max-width: 860px) {
   .today-grid {

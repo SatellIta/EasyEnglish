@@ -5,6 +5,36 @@ export type ReviewStatus = 'learning' | 'reviewing' | 'mastered'
 
 export type ReviewRating = 'remembered' | 'forgot'
 
+/** 学习者反复出现的错误类型 */
+export type ErrorCategory = 'grammar' | 'usage' | 'spelling' | 'pronunciation' | 'other'
+
+export type LearnerErrorStatus = 'active' | 'resolved' | 'ignored'
+
+export interface LearnerError {
+  id: number
+  /** 归一化后的简短错误描述，用于去重 */
+  pattern: string
+  category: ErrorCategory
+  explanation: string | null
+  /** 正确写法 */
+  correction: string | null
+  /** 出错时的原始例句 */
+  example: string | null
+  occurrences: number
+  firstSeenAt: string
+  lastSeenAt: string
+  status: LearnerErrorStatus
+}
+
+/** AI 总结时抽取的错误草稿，尚未入库 */
+export interface LearnerErrorDraft {
+  pattern: string
+  category?: ErrorCategory
+  explanation?: string | null
+  correction?: string | null
+  example?: string | null
+}
+
 export interface ReviewState {
   entryId: number
   /** 已成功复习通过的阶段数，0 表示新词/学习中 */
@@ -39,6 +69,13 @@ export interface Entry {
   reviewEnabled: boolean
   /** 该词条所属的场景（一个词条可以出现在多个场景里） */
   sceneRefs: SceneRef[]
+  /** 近期加权错误率 0..1；越高表示越容易错/忘，复习间隔会被压缩 */
+  errorRate: number
+  /** 参与错误率计算的复习样本数 */
+  errorSamples: number
+  /** 来源对话，便于回到当时语境 */
+  sourceSessionId: number | null
+  sourceMessageId: number | null
   createdAt: string
   updatedAt: string
   review?: ReviewState
@@ -54,6 +91,11 @@ export interface DraftEntry {
   tags?: string[]
   /** 预览/总结生成时，词库里或本批次内已存在同类型同文本 */
   duplicate?: boolean
+  /** 已存在词条的 ID，便于 UI 跳转或说明 */
+  existingEntryId?: number | null
+  /** 服务端根据当天对话匹配出的来源，前端只读 */
+  sourceSessionId?: number | null
+  sourceMessageId?: number | null
 }
 
 /** 新建 / 编辑词条的请求体 */
@@ -69,6 +111,9 @@ export interface EntryInput {
   reviewEnabled?: boolean
   /** 来源标记，默认 manual */
   source?: string
+  /** 来源对话 / 消息，用于词条溯源 */
+  sourceSessionId?: number | null
+  sourceMessageId?: number | null
 }
 
 export interface Scene {
@@ -192,7 +237,7 @@ export interface BulkCreateResult {
   entries: Entry[]
   count: number
   skipped: number
-  duplicates: Array<{ type: EntryType; text: string }>
+  duplicates: Array<{ type: EntryType; text: string; existingEntryId?: number | null }>
 }
 
 export interface ReviewStats {
@@ -213,6 +258,20 @@ export interface ReviewStats {
 export interface ReviewSettings {
   intervalsDays: number[]
   forgotRetryMinutes: number
+  /** 错误率指数平滑的近期权重：越大越看重最近一次复习结果 */
+  errorRateRecentWeight: number
+  /** 错误率对间隔的惩罚：间隔 = 基础间隔 × (1 - 错误率 × 惩罚系数) */
+  errorRateIntervalPenalty: number
+}
+
+/** AI 每次对话注入的上下文预算 */
+export interface AiBehaviorSettings {
+  /** 最多注入多少条学习者记忆 */
+  memoryLimit: number
+  /** 最多携带多少条历史消息 */
+  historyLimit: number
+  /** 学习者记忆部分的最大字符数 */
+  memoryCharBudget: number
 }
 
 export interface ChatSession {
@@ -245,6 +304,8 @@ export interface SummaryResult {
   date: string
   summary: string
   entries: DraftEntry[]
+  /** 本次总结抽取并入库的反复错误 */
+  errors: LearnerError[]
   saved: boolean
 }
 
@@ -267,4 +328,12 @@ export const ENTRY_TYPE_LABELS: Record<EntryType, string> = {
   word: '单词',
   phrase: '短语',
   sentence: '句子',
+}
+
+export const ERROR_CATEGORY_LABELS: Record<ErrorCategory, string> = {
+  grammar: '语法',
+  usage: '用法',
+  spelling: '拼写',
+  pronunciation: '发音',
+  other: '其他',
 }
