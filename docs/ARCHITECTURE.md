@@ -96,10 +96,10 @@ FTS5 虚拟表，`tokenize='trigram'`，内容来自 entries，通过 INSERT/UPD
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
 | GET | `/api/entries?types=word,phrase&q=&tag=&from=&to=&limit=&offset=` | 列表 + 搜索 + 分页 |
-| POST | `/api/entries` | 新建，自动创建复习状态（立即到期） |
-| POST | `/api/entries/bulk` | 批量新建（最多 50）；默认按「类型 + 规范化文本」跳过词库中和批次内重复项，返回 `count` / `skipped` / `duplicates` |
+| POST | `/api/entries` | 新建，自动创建复习状态（立即到期）；主要英文内容重复时返回 409 |
+| POST | `/api/entries/bulk` | 批量新建（最多 50）；默认按规范化后的主要英文内容跳过词库中和批次内重复项（不看释义/例句），返回 `count` / `skipped` / `duplicates` |
 | GET | `/api/entries/:id` | 详情 |
-| PATCH | `/api/entries/:id` | 部分更新 |
+| PATCH | `/api/entries/:id` | 部分更新；改成已存在的英文内容时返回 409 |
 | DELETE | `/api/entries/:id` | 删除（级联复习状态/日志） |
 
 ### 场景与词库整理
@@ -115,6 +115,8 @@ FTS5 虚拟表，`tokenize='trigram'`，内容来自 entries，通过 INSERT/UPD
 | DELETE | `/api/scenes/:id/entries/:entryId` | 从场景移除词条 |
 | GET | `/api/library/overview` | 按本地日期聚合的条数、类型总数、场景列表 |
 | GET | `/api/library/date/:date?type=&q=` | 某一天（本地时区）的词条，可按类型和关键词过滤 |
+| GET | `/api/export/options` | 导出分组：常规类型计数（不含场景词条）和场景列表 |
+| POST | `/api/export/markdown` | body `{ types, sceneIds }`，返回 `text/markdown` |
 
 ### Markdown 导入
 
@@ -123,7 +125,7 @@ FTS5 虚拟表，`tokenize='trigram'`，内容来自 entries，通过 INSERT/UPD
 | POST | `/api/import/markdown/preview` | body `{ markdown, filename? }`，解析并标记重复项 |
 | POST | `/api/import/markdown/commit` | body `{ items }`，写入选中词条，按需创建/关联场景 |
 
-解析器在 `server/lib/markdown-import.ts`，只处理文本，不执行 Markdown 中的任何内容。预览会按「类型 + 文本」标记数据库中和本批次内的重复项，默认不勾选重复项；用户仍可手动选中并导入。提交时会先按「类型 + 文本」对本批次去重，再写入数据库。
+解析器在 `server/lib/markdown-import.ts`，只处理文本，不执行 Markdown 中的任何内容。预览会按规范化英文内容标记数据库中和本批次内的重复项，默认不勾选重复项。提交时会再次跳过词库中已有的相同英文内容，并对本批次去重。
 
 ### 复习
 
@@ -171,16 +173,25 @@ FTS5 虚拟表，`tokenize='trigram'`，内容来自 entries，通过 INSERT/UPD
 
 ## Markdown 导入与场景映射
 
-导入器面向「按 H1/H2/H3 手写笔记」的 Markdown，规则如下：
+导入器面向约定的 Markdown 格式，规则如下：
 
-- `# words`：普通行按单词导入；`a / b / c` 会拆成多个词条。
-- `# collocations`：普通行按短语导入；`text = explanation`、`text — 中文` 会拆成正文和释义/解释；结尾括号注释会进入解释。
-- `# sentences`：普通行按句子导入；`=` / `—` 同样拆分释义；`##` / `###` 会作为标签保留，`### Vocabulary` 下的表格按单词处理。
-- `# Scenery`：`##` 是场景，`###` 是场景小节，加粗小标题和 `At a bank:` 这类引导语进入 `subsection`。表格行、列表、普通行都会按内容判断单词/短语/句子。
+- `# words`：一行一个词条，类型固定为单词；明确是单词的目录允许用 ` / ` 分隔多个单词。
+- `# collocations`：一行一个词条，类型固定为短语；不按 `/` 拆分；可选 `text = explanation` / `text — 中文`。
+- `# sentences`：一行一个词条，类型固定为句子；不按 `/` 拆分；`##` / `###` 作为预览分组和标签保留。
+- `# Scenery`：`##` 是场景，`###` 是单词/短语/句子分类；普通行按 H3 类型；`### 单词` 下允许用 ` / ` 分隔多个单词；列表行在场景中一律按句子；`section` 保存最终类型标签。
+- 表格：第一列英文、第二列含义、第三列补充；第四列及以后忽略；第一列为空的行丢弃。
+- 非场景分类的 H2/H3 进入标签和预览分组；未知 H1/H3 会按内容自动判断并给出预览提示。
 - 所有导入词条的 `source = 'markdown-import'`；普通词条默认进入每日复习，场景词条默认不进入。
-- 导入预览按分组折叠，支持逐条改类型、按组全选、只选新词条；提交时按「类型 + 文本」去重，并复用同名场景。
+- 导入预览按分组折叠，支持逐条改类型、按组全选、只选新词条；提交时按英文内容去重，并复用同名场景。
 
-更完整的格式说明见 `docs/SCENERY_IMPORT.md`。
+用户可选的 Markdown 导出实现在 `server/routes/export.ts`：
+
+- `GET /api/export/options` 返回常规类型计数和场景列表。
+- `POST /api/export/markdown` 按选中的类型/场景生成 Markdown。
+- 常规词条只包含未归入场景的内容；场景词条按场景导出。
+- 导出使用三列表格，第三列合并解释、例句、笔记和标签；不包含复习进度。
+
+更完整的格式说明见 `docs/SCENERY_IMPORT.md`，页面内的提示内容来自 `src/assets/import-format.md`。
 
 ## AI 流程
 
@@ -225,7 +236,7 @@ FTS5 虚拟表，`tokenize='trigram'`，内容来自 entries，通过 INSERT/UPD
 
 解析时容忍 Markdown 代码围栏；解析失败则退化为纯 Markdown 总结、候选词条为空。结果按日期 upsert 到 `daily_summaries`。
 
-候选词条在生成和读取时都会通过 `server/lib/dedupe.ts` 标重：规范化文本会忽略大小写、首尾引号和结尾标点，再按「类型 + 文本」与词库及本批次比较。`POST /api/entries/bulk` 在写入前再次查重，并返回 `skipped` / `duplicates`，所以「全部加入」不会把已有词条重复塞进复习队列。
+候选词条在生成和读取时都会通过 `server/lib/dedupe.ts` 标重：规范化文本会忽略大小写、首尾引号和结尾标点，只以主要英文内容与词库及本批次比较；类型、释义、例句、标签都不参与判重。`POST /api/entries/bulk` 在写入前再次查重，并返回 `skipped` / `duplicates`，所以「全部加入」不会把已有词条重复塞进复习队列。
 
 前端把整理任务放在 `src/stores/summary.ts`，由 `ChatPage` 或 `TodayPage` 触发；任务不依赖页面生命周期，切换路由不会中断。完成或失败后，`AppShell` 里的 `SummaryJobHost` 会在任意页面弹出确认框；关闭后仍保留右下角「今日总结已生成」入口（只有在还有未处理候选时显示）。
 

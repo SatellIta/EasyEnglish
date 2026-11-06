@@ -54,13 +54,13 @@ export function getEntryById(id: number): Entry | null {
   return row ? mapEntry(row) : null
 }
 
-/** 按类型 + 归一化文本查找已有词条，用于导入/总结入库前的去重。 */
-export function findDuplicateEntry(type: Entry['type'], text: string): Entry | null {
+/** 按归一化英文内容查找已有词条（去重只看文本，不看类型）。 */
+export function findDuplicateEntry(_type: Entry['type'], text: string): Entry | null {
   const normalized = normalizeEntryText(text)
   if (!normalized) return null
   const row = db
-    .prepare(`${ENTRY_SELECT} WHERE e.type = ? AND e.normalized_text = ? LIMIT 1`)
-    .get(type, normalized)
+    .prepare(`${ENTRY_SELECT} WHERE e.normalized_text = ? LIMIT 1`)
+    .get(normalized)
   return row ? mapEntry(row) : null
 }
 

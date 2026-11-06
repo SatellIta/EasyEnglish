@@ -11,6 +11,7 @@ import chatRoutes from './routes/chat'
 import entriesRoutes from './routes/entries'
 import errorsRoutes from './routes/errors'
 import examplesRoutes from './routes/examples'
+import exportRoutes from './routes/export'
 import importRoutes from './routes/import'
 import libraryRoutes from './routes/library'
 import personasRoutes from './routes/personas'
@@ -42,6 +43,7 @@ app.route('/', libraryRoutes)
 app.route('/', importRoutes)
 app.route('/', errorsRoutes)
 app.route('/', examplesRoutes)
+app.route('/', exportRoutes)
 app.route('/', personasRoutes)
 
 app.onError((err, c) => {

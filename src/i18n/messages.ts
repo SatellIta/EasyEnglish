@@ -281,7 +281,7 @@ export const zh = {
     '整理请求在后台失败了。可以重试；已经生成并保存的旧总结不会受影响。',
   'summary.job.candidates': '值得加入复习的词条',
   'summary.job.candidatesHint':
-    '默认不选已存在于词库的条目；加入时会再次按类型和文本查重。',
+    '默认不选已存在于词库的条目；加入时会再次按英文内容查重。',
   'summary.job.selectAll': '全选',
   'summary.job.selectNone': '全不选',
   'summary.job.allDuplicate':
@@ -321,6 +321,8 @@ export const zh = {
     '加入复习的词条会立即进入复习队列，并按艾宾浩斯曲线安排下一次复习。',
   'entryForm.saveChanges': '保存修改',
   'entryForm.add': '添加词条',
+  'entryForm.duplicateHint':
+    '保存时会按英文内容查重：忽略大小写、首尾空格和结尾标点；释义、例句不同也算重复，同一个英文内容只会保留一条。',
 
   'library.title': '词库',
   'library.subtitle':
@@ -337,6 +339,26 @@ export const zh = {
   'library.view.scene': '按场景',
   'library.view.sceneHint': '联想记忆空间',
   'library.deleteConfirm': '删除“{text}”？此操作不可恢复。',
+
+  'export.title': '导出 Markdown',
+  'export.description':
+    '选择要导出的分组。常规词条只包含未归入场景的内容；场景词条按场景导出。同一词条属于多个场景时，会在每个场景中分别导出。导出不包含复习进度。',
+  'export.loading': '正在读取导出分组…',
+  'export.selectedGroups': '已选 {groups} 组 · 约 {count} 条',
+  'export.selectAll': '全选',
+  'export.selectNone': '全不选',
+  'export.regular': '常规词条',
+  'export.regularHint': '这些词条还没有归入任何场景。',
+  'export.scenes': '场景',
+  'export.noScenes': '还没有场景。',
+  'export.formatHint':
+    '导出格式：常规词条使用 # words / # collocations / # sentences；场景使用 # Scenery → ## 场景名 → ### 单词/短语/句子。表格的「补充」列会合并解释、例句、笔记和标签。',
+  'export.cancel': '取消',
+  'export.exporting': '导出中…',
+  'export.submit': '导出 Markdown（{count} 条）',
+  'export.done': '已导出 {groups} 个分组，约 {count} 条词条。',
+  'export.duplicateEntry':
+    '词库中已存在相同的英文内容。请直接编辑已有词条。',
 
   'chat.suggestion.effect': 'affect 和 effect 到底怎么区分？',
   'chat.suggestion.ball': '用简单英语解释：The ball is in your court.',
@@ -478,14 +500,15 @@ export const zh = {
   'import.empty': '请先粘贴或上传 Markdown 内容。',
   'import.back': '返回词库',
   'import.title': '导入 Markdown',
+  'import.helpTitle': 'Markdown 格式说明',
   'import.subtitle':
-    '识别你手写笔记里的 # / ## / ### 结构。# words、# collocations、# sentences 会成为普通词条；# Scenery 下的 H2 会成为场景，H3 和加粗小标题会保留为场景小节。',
+    '识别 # words / # collocations / # sentences / # Scenery。# Scenery 下 H2 是场景，H3 是单词/短语/句子分类；表格只取前三列。',
   'import.step1': '1. 选择或粘贴笔记',
   'import.step1Hint': '支持 .md / .markdown / 纯文本，单次最大 2 MB。',
   'import.chooseFile': '选择文件',
   'import.clear': '清空',
   'import.placeholder':
-    '# words\n\ncheap-looking\n\nindex finger / middle finger / ring finger\n\n# sentences\n\n## Everyday expressions\n\nThat really got me.\n\n# Scenery\n\n## Bank\n\n### Deposit money\n\n| Expression | Meaning |\n| --- | --- |\n| Deposit money | 存钱 |',
+    '# words\n\ncheap-looking\nindex finger / middle finger / ring finger\n\n# sentences\n\nThat really got me.\n\n# Scenery\n\n## Bank\n\n### 单词\n\nDeposit money\n- I\'d like to deposit $500 into my savings account.\n\n| English | 含义 | 补充 |\n| --- | --- | --- |\n| Deposit money | 存钱 | 办理存款 |',
   'import.parsing': '解析中…',
   'import.parsePreview': '解析预览',
   'import.statEntries': '识别词条',
@@ -863,7 +886,7 @@ export const en: Record<MessageKey, string> = {
     'The background request failed. You can retry; the previously saved summary is safe.',
   'summary.job.candidates': 'Entries worth reviewing',
   'summary.job.candidatesHint':
-    'Entries already in your library are unselected by default; duplicates are checked again when adding.',
+    'Entries already in your library are unselected by default; duplicates are checked again by English text when adding.',
   'summary.job.selectAll': 'Select all',
   'summary.job.selectNone': 'Select none',
   'summary.job.allDuplicate':
@@ -906,6 +929,8 @@ export const en: Record<MessageKey, string> = {
     'Entries added to review enter the queue immediately and follow the forgetting curve.',
   'entryForm.saveChanges': 'Save changes',
   'entryForm.add': 'Add entry',
+  'entryForm.duplicateHint':
+    'Saving dedupes by English text: case, surrounding whitespace and trailing punctuation are ignored. Different meanings or examples still count as duplicates, and only one entry per English text is kept.',
 
   'library.title': 'Library',
   'library.subtitle':
@@ -923,6 +948,26 @@ export const en: Record<MessageKey, string> = {
   'library.view.scene': 'By scene',
   'library.view.sceneHint': 'Memory scenes',
   'library.deleteConfirm': 'Delete “{text}”? This cannot be undone.',
+
+  'export.title': 'Export Markdown',
+  'export.description':
+    'Choose groups to export. Regular entries include only unscened content; scene entries export by scene. An entry in multiple scenes is exported in each. Review progress is not exported.',
+  'export.loading': 'Loading export groups…',
+  'export.selectedGroups': '{groups} groups · about {count} entries',
+  'export.selectAll': 'Select all',
+  'export.selectNone': 'Select none',
+  'export.regular': 'Regular entries',
+  'export.regularHint': 'These entries are not in any scene yet.',
+  'export.scenes': 'Scenes',
+  'export.noScenes': 'No scenes yet.',
+  'export.formatHint':
+    'Export format: regular entries use # words / # collocations / # sentences; scenes use # Scenery → ## scene name → ### word/phrase/sentence. The Supplement column merges explanation, examples, notes and tags.',
+  'export.cancel': 'Cancel',
+  'export.exporting': 'Exporting…',
+  'export.submit': 'Export Markdown ({count})',
+  'export.done': 'Exported {groups} groups, about {count} entries.',
+  'export.duplicateEntry':
+    'An entry with the same English text already exists. Please edit the existing entry.',
 
   'chat.suggestion.effect': 'What is the difference between affect and effect?',
   'chat.suggestion.ball': 'Explain in simple English: The ball is in your court.',
@@ -1073,14 +1118,15 @@ export const en: Record<MessageKey, string> = {
   'import.empty': 'Paste or upload Markdown first.',
   'import.back': 'Back to library',
   'import.title': 'Import Markdown',
+  'import.helpTitle': 'Markdown format help',
   'import.subtitle':
-    'Recognizes # / ## / ### structure. # words, # collocations and # sentences become regular entries; H2 under # Scenery becomes a scene, and H3 or bold subheadings become scene sections.',
+    'Recognizes # words / # collocations / # sentences / # Scenery. H2 under # Scenery is a scene, H3 is the word/phrase/sentence group; tables use only the first three columns.',
   'import.step1': '1. Choose or paste notes',
   'import.step1Hint': 'Supports .md / .markdown / plain text, up to 2 MB.',
   'import.chooseFile': 'Choose file',
   'import.clear': 'Clear',
   'import.placeholder':
-    '# words\n\ncheap-looking\n\nindex finger / middle finger / ring finger\n\n# sentences\n\n## Everyday expressions\n\nThat really got me.\n\n# Scenery\n\n## Bank\n\n### Deposit money\n\n| Expression | Meaning |\n| --- | --- |\n| Deposit money | save money |',
+    '# words\n\ncheap-looking\nindex finger / middle finger / ring finger\n\n# sentences\n\nThat really got me.\n\n# Scenery\n\n## Bank\n\n### Words\n\nDeposit money\n- I\'d like to deposit $500 into my savings account.\n\n| English | Meaning | Supplement |\n| --- | --- | --- |\n| Deposit money | save money | make a deposit |',
   'import.parsing': 'Parsing…',
   'import.parsePreview': 'Preview',
   'import.statEntries': 'Entries found',

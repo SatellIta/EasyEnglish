@@ -167,7 +167,13 @@ async function addSelected() {
 
       <p v-else class="empty">{{ t('summary.job.empty') }}</p>
 
-      <p v-if="store.addNotice" class="banner banner-ok">{{ store.addNotice }}</p>
+      <p
+        v-if="store.addNotice"
+        class="banner"
+        :class="store.addNoticeKind === 'info' ? 'banner-info' : 'banner-ok'"
+      >
+        {{ store.addNotice }}
+      </p>
       <p v-if="store.addError" class="banner banner-error">{{ store.addError }}</p>
     </div>
 

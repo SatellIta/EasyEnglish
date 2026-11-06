@@ -116,6 +116,7 @@ export function localizeServerError(raw: string): string {
   if (raw.includes('人格名称不能为空')) return t('api.personaNameRequired')
   if (raw.includes('人格提示词不能为空')) return t('api.personaPromptRequired')
   if (raw.includes('今天还没有学习记录')) return t('api.noStudyRecords')
+  if (raw.includes('词库中已存在相同的英文内容')) return t('export.duplicateEntry')
   if (raw.includes('没有返回可用的例句')) return t('api.examplesEmpty')
   if (raw.startsWith('AI 整理失败：')) {
     return t('api.summaryFailed', { message: raw.slice('AI 整理失败：'.length) })

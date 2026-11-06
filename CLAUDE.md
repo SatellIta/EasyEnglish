@@ -43,7 +43,7 @@ Tables: `entries`, `review_states`, `review_logs`, `chat_sessions`, `chat_messag
 - Timestamps are UTC ISO strings; "today" boundaries are computed in the server's local timezone in `server/lib/time.ts`. Library date grouping uses SQLite `date(created_at, 'localtime')`.
 - API uses camelCase, DB uses snake_case; mapping lives in `server/lib/mappers.ts`.
 - Search: `server/lib/queries.ts` uses FTS5 MATCH for queries ≥ 3 chars and falls back to LIKE for shorter/CJK queries. Tag filters use `json_each`.
-- Dedupe: `server/lib/dedupe.ts` normalizes text (case, whitespace, surrounding quotes, trailing punctuation) and keys by `type + text`. `POST /api/entries/bulk` skips existing/batch duplicates by default and returns `count` / `skipped` / `duplicates`; summary candidates and Markdown import previews use the same key.
+- Dedupe: `server/lib/dedupe.ts` normalizes the main English text (case, whitespace, surrounding quotes, trailing punctuation) and keys by **text only** — type, meaning, explanation, examples, and tags are not part of the key. Manual create/update returns 409 on a text collision; `POST /api/entries/bulk` skips existing/batch duplicates by default and returns `count` / `skipped` / `duplicates`; summary candidates, import preview/commit use the same key.
 - `ENTRY_SELECT` includes `review_enabled` and a JSON `scene_refs` aggregate; `SCENE_ENTRY_SELECT` adds scene metadata.
 
 ### Review scheduling
@@ -52,11 +52,13 @@ Tables: `entries`, `review_states`, `review_logs`, `chat_sessions`, `chat_messag
 
 ## Markdown import and scenes
 
-- `server/lib/markdown-import.ts` turns H1/H2/H3 notes into `ParsedImportItem[]`. `# words`, `# collocations`, `# sentences` become normal entries; `# Scenery` maps H2 → scene, H3 → `section`, bold labels / `At a bank:` → `subsection`.
-- The parser splits `a / b / c` into alternatives for words/phrases/scene lists, parses `text = explanation` and `text — 中文`, handles tables, bullets, quotes, trailing parenthetical notes, and one malformed pipe-table row.
-- `POST /api/import/markdown/preview` marks duplicates by `type + lower(trim(text))` against the DB and within the batch. `POST /api/import/markdown/commit` dedupes again, inserts with `source = 'markdown-import'`, creates/links scenes, and defaults scene entries to `review_enabled = 0`.
-- The import page (`/import`) is a preview/selection UI: collapsible groups, per-item type override, group select, duplicate handling, and a global "场景词条也加入每日复习" toggle.
-- `docs/SCENERY_IMPORT.md` documents the mapping and trade-offs.
+- `server/lib/markdown-import.ts` turns the agreed format into `ParsedImportItem[]`. `# words` / `# collocations` / `# sentences` force types; `# Scenery` maps H2 → scene and H3 → 单词/短语/句子 classification. Plain scene lines use the H3 type; list lines in scenes are always sentences.
+- Tables are three columns: English, meaning, supplement. Fourth and later columns are dropped; rows with an empty first column are skipped. Escaped `\|` is supported. Line entries can optionally use `text = explanation` or `text — 中文`.
+- Slash splitting is limited to explicit word directories (`# words` and scene `### 单词`); phrases/sentences are never slash-split. There is no double-space splitting, no bold-label/lead-in subsection handling, and no arbitrary H3 sections. Unknown H1/H3 fall back to `detectType()` with a preview warning.
+- Dedup is text-only via `server/lib/dedupe.ts`. `POST /api/entries` and `PATCH /api/entries/:id` return 409 on collisions; bulk/import skip existing text. `POST /api/import/markdown/commit` inserts with `source = 'markdown-import'`, creates/links scenes, and defaults scene entries to `review_enabled = 0`.
+- The import page (`/import`) is a preview/selection UI: collapsible groups, per-item type override, group select, duplicate handling, a global "场景词条也加入每日复习" toggle, and a `?` help modal fed by `src/assets/import-format.md`.
+- Export: `server/routes/export.ts` exposes `GET /api/export/options` and `POST /api/export/markdown`. The Library page's export modal selects unscened type groups and/or scenes; output uses the same H1/H2/H3 + three-column tables, with explanation/examples/notes/tags merged into the supplement column. Review progress is not exported.
+- `docs/SCENERY_IMPORT.md` documents the mapping, export, and trade-offs.
 
 ### AI
 

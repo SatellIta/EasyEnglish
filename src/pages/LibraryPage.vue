@@ -3,6 +3,7 @@ import { onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import type { Entry } from '@shared/types'
 import EntryForm from '@/components/EntryForm.vue'
+import ExportModal from '@/components/ExportModal.vue'
 import Icon from '@/components/Icon.vue'
 import DateView from '@/components/library/DateView.vue'
 import SceneView from '@/components/library/SceneView.vue'
@@ -21,6 +22,7 @@ const q = ref('')
 const query = ref('')
 const refreshToken = ref(0)
 const formOpen = ref(false)
+const exportOpen = ref(false)
 const editing = ref<Entry | null>(null)
 const error = ref('')
 let timer: number | undefined
@@ -99,6 +101,9 @@ onMounted(() => {
         <RouterLink to="/import" class="btn btn-ghost">
           <Icon name="upload" :size="16" /> {{ t('library.import') }}
         </RouterLink>
+        <button class="btn btn-ghost" @click="exportOpen = true">
+          <Icon name="download" :size="16" /> {{ t('export.title') }}
+        </button>
         <button class="btn btn-primary" @click="openCreate">
           <Icon name="plus" :size="16" /> {{ t('library.addEntry') }}
         </button>
@@ -164,6 +169,8 @@ onMounted(() => {
       @close="formOpen = false"
       @saved="onSaved"
     />
+
+    <ExportModal :open="exportOpen" @close="exportOpen = false" />
   </div>
 </template>
 

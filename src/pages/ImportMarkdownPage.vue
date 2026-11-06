@@ -7,10 +7,14 @@ import type {
   ImportItem,
   ImportPreview,
 } from '@shared/types'
+import importFormatHelp from '@/assets/import-format.md?raw'
+import importFormatHelpEn from '@/assets/import-format.en.md?raw'
+import BaseModal from '@/components/BaseModal.vue'
 import Icon from '@/components/Icon.vue'
 import ImportItemRow from '@/components/import/ImportItemRow.vue'
-import { t } from '@/i18n'
+import { locale, t } from '@/i18n'
 import type { MessageKey } from '@/i18n/messages'
+import MarkdownView from '@/components/MarkdownView.vue'
 import { api, errorMessage } from '@/lib/api'
 import { useAppStore } from '@/stores/app'
 
@@ -52,6 +56,10 @@ const selected = ref<Set<string>>(new Set())
 const expanded = ref<Set<string>>(new Set())
 const sceneReview = ref(false)
 const commitResult = ref<ImportCommitResult | null>(null)
+const helpOpen = ref(false)
+const helpContent = computed(() =>
+  locale.value === 'en' ? importFormatHelpEn : importFormatHelp,
+)
 
 const categoryKeys: Record<string, MessageKey> = {
   words: 'import.category.words',
@@ -306,6 +314,15 @@ function reset() {
           {{ t('import.subtitle') }}
         </p>
       </div>
+      <button
+        class="icon-btn"
+        type="button"
+        :title="t('import.helpTitle')"
+        :aria-label="t('import.helpTitle')"
+        @click="helpOpen = true"
+      >
+        <Icon name="help" :size="18" />
+      </button>
     </header>
 
     <p v-if="error" class="banner banner-error">{{ error }}</p>
@@ -529,6 +546,20 @@ function reset() {
         </button>
       </div>
     </template>
+
+    <BaseModal
+      :open="helpOpen"
+      :title="t('import.helpTitle')"
+      width="760px"
+      @close="helpOpen = false"
+    >
+      <MarkdownView :content="helpContent" />
+      <template #footer>
+        <button class="btn btn-ghost" type="button" @click="helpOpen = false">
+          {{ t('common.close') }}
+        </button>
+      </template>
+    </BaseModal>
   </div>
 </template>
 

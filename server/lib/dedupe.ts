@@ -4,18 +4,53 @@ import { normalizeEntryText } from './text'
 
 export { normalizeEntryText }
 
-export function entryKey(type: EntryType | string, text: string): string {
-  return `${type}:${normalizeEntryText(text)}`
+/**
+ * 词条去重只看主要英文内容，不把类型、释义、解释、例句、标签算进去。
+ * normalizeEntryText 负责大小写、空白、首尾引号和结尾标点的归一化。
+ */
+export function entryKey(text: string): string {
+  return normalizeEntryText(text)
+}
+
+export interface ExistingEntry {
+  id: number
+  type: EntryType
+  text: string
+  reviewEnabled: boolean
+}
+
+/** 按规范化英文内容查找已有词条；excludeId 用于编辑时排除自身。 */
+export function findExistingEntryByText(
+  text: string,
+  excludeId?: number,
+): ExistingEntry | null {
+  const key = entryKey(text)
+  if (!key) return null
+
+  const rows = db
+    .prepare('SELECT id, type, text, review_enabled FROM entries')
+    .all() as Array<{ id: number; type: EntryType; text: string; review_enabled: number }>
+
+  const row = rows.find(
+    (item) => item.id !== excludeId && entryKey(item.text) === key,
+  )
+  return row
+    ? {
+        id: row.id,
+        type: row.type,
+        text: row.text,
+        reviewEnabled: row.review_enabled !== 0,
+      }
+    : null
 }
 
 /** 已有词条的 key → id 映射，用于批量入库时报告重复项来源。 */
 export function loadExistingEntryKeyMap(): Map<string, number> {
-  const rows = db.prepare('SELECT id, type, text FROM entries').all() as Array<{
+  const rows = db.prepare('SELECT id, text FROM entries').all() as Array<{
     id: number
-    type: EntryType
     text: string
   }>
-  return new Map(rows.map((row) => [entryKey(row.type, row.text), row.id]))
+  return new Map(rows.map((row) => [entryKey(row.text), row.id]))
 }
 
 export function loadExistingEntryKeys(): Set<string> {
@@ -32,7 +67,7 @@ export function markDraftDuplicates(
 ): DraftEntry[] {
   const seen = new Set<string>()
   return entries.map((entry) => {
-    const key = entryKey(entry.type, entry.text)
+    const key = entryKey(entry.text)
     const existingEntryId = existing.get(key) ?? null
     const duplicate = existingEntryId !== null || seen.has(key)
     seen.add(key)

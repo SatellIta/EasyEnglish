@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, ref, watch } from 'vue'
+import { nextTick, reactive, ref, watch } from 'vue'
 import type { Entry, EntryInput, EntryType } from '@shared/types'
 import { api, errorMessage } from '@/lib/api'
 import BaseModal from '@/components/BaseModal.vue'
@@ -99,6 +99,13 @@ async function submit() {
     emit('close')
   } catch (caught) {
     error.value = errorMessage(caught)
+    await nextTick()
+    document.querySelector('.entry-form .banner-error')?.scrollIntoView({
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        ? 'auto'
+        : 'smooth',
+      block: 'center',
+    })
   } finally {
     saving.value = false
   }
@@ -140,6 +147,9 @@ async function submit() {
           rows="2"
           :placeholder="t('entryForm.textPlaceholder')"
         />
+        <span class="hint">
+          {{ t('entryForm.duplicateHint') }}
+        </span>
       </div>
 
       <div class="field">

@@ -71,6 +71,12 @@ const icons: Record<string, string[]> = {
   theme: ['M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z', 'M12 3v18'],
   layers: ['m12 3 9 5-9 5-9-5 9-5Z', 'm3 13 9 5 9-5', 'm3 17 9 5 9-5'],
   upload: ['M12 16V4', 'm7 9 5-5 5 5', 'M4 20h16'],
+  download: ['M12 4v12', 'm7 11 5 5 5-5', 'M4 20h16'],
+  help: [
+    'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z',
+    'M9.2 9a2.8 2.8 0 1 1 4.9 1.8c-.9.8-2.1 1.1-2.1 2.7',
+    'M12 17h.01',
+  ],
 }
 
 const paths = computed(() => icons[props.name] ?? icons.info)
