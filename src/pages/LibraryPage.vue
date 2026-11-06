@@ -7,6 +7,7 @@ import Icon from '@/components/Icon.vue'
 import DateView from '@/components/library/DateView.vue'
 import SceneView from '@/components/library/SceneView.vue'
 import TypeView from '@/components/library/TypeView.vue'
+import { t } from '@/i18n'
 import { api, errorMessage } from '@/lib/api'
 import { truncate } from '@/lib/format'
 import { useAppStore } from '@/stores/app'
@@ -24,10 +25,17 @@ const editing = ref<Entry | null>(null)
 const error = ref('')
 let timer: number | undefined
 
-const views: Array<{ value: ViewMode; label: string; hint: string }> = [
-  { value: 'date', label: '按日期', hint: '先看日期，再看当天内容' },
-  { value: 'type', label: '按类型', hint: '单词 / 短语 / 句子' },
-  { value: 'scene', label: '按场景', hint: '联想记忆空间' },
+const views: Array<{
+  value: ViewMode
+  labelKey: 'library.view.date' | 'library.view.type' | 'library.view.scene'
+  hintKey:
+    | 'library.view.dateHint'
+    | 'library.view.typeHint'
+    | 'library.view.sceneHint'
+}> = [
+  { value: 'date', labelKey: 'library.view.date', hintKey: 'library.view.dateHint' },
+  { value: 'type', labelKey: 'library.view.type', hintKey: 'library.view.typeHint' },
+  { value: 'scene', labelKey: 'library.view.scene', hintKey: 'library.view.sceneHint' },
 ]
 
 watch(q, () => {
@@ -58,7 +66,13 @@ async function onSaved() {
 }
 
 async function remove(entry: Entry) {
-  if (!window.confirm(`删除“${truncate(entry.text, 40)}”？此操作不可恢复。`)) return
+  if (
+    !window.confirm(
+      t('library.deleteConfirm', { text: truncate(entry.text, 40) }),
+    )
+  ) {
+    return
+  }
   try {
     await api.entries.remove(entry.id)
     refresh()
@@ -76,17 +90,17 @@ onMounted(() => {
   <div class="page">
     <header class="page-head">
       <div>
-        <h1>词库</h1>
+        <h1>{{ t('library.title') }}</h1>
         <p>
-          共 {{ store.totalEntries }} 条记录 · 按日期、类型或场景整理自己的英语材料。
+          {{ t('library.subtitle', { count: store.totalEntries }) }}
         </p>
       </div>
       <div class="head-actions">
         <RouterLink to="/import" class="btn btn-ghost">
-          <Icon name="upload" :size="16" /> 导入 Markdown
+          <Icon name="upload" :size="16" /> {{ t('library.import') }}
         </RouterLink>
         <button class="btn btn-primary" @click="openCreate">
-          <Icon name="plus" :size="16" /> 添加词条
+          <Icon name="plus" :size="16" /> {{ t('library.addEntry') }}
         </button>
       </div>
     </header>
@@ -99,8 +113,8 @@ onMounted(() => {
         <input
           v-model="q"
           class="search-input"
-          aria-label="搜索词条或场景"
-          placeholder="搜索英文、中文释义、笔记或场景…"
+          :aria-label="t('library.searchLabel')"
+          :placeholder="t('library.searchPlaceholder')"
         />
       </div>
       <div class="type-tabs">
@@ -109,14 +123,14 @@ onMounted(() => {
           :key="item.value"
           class="type-tab"
           :class="{ active: view === item.value }"
-          :title="item.hint"
+          :title="t(item.hintKey)"
           :aria-pressed="view === item.value"
           @click="view = item.value"
         >
-          {{ item.label }}
+          {{ t(item.labelKey) }}
         </button>
       </div>
-      <button class="icon-btn" title="刷新" aria-label="刷新词库" @click="refresh">
+      <button class="icon-btn" :title="t('library.refresh')" :aria-label="t('library.refresh')" @click="refresh">
         <Icon name="refresh" :size="17" />
       </button>
     </section>

@@ -3,6 +3,7 @@ import { onMounted, watch } from 'vue'
 import { RouterLink, RouterView, useRoute } from 'vue-router'
 import Icon from '@/components/Icon.vue'
 import SummaryJobHost from '@/components/SummaryJobHost.vue'
+import { t } from '@/i18n'
 import { useAppStore } from '@/stores/app'
 import { useThemeStore } from '@/stores/theme'
 
@@ -11,10 +12,10 @@ const themeStore = useThemeStore()
 const route = useRoute()
 
 const nav = [
-  { to: '/today', label: '今日', icon: 'calendar' },
-  { to: '/chat', label: '对话', icon: 'chat' },
-  { to: '/review', label: '复习', icon: 'review', badge: true },
-  { to: '/library', label: '词库', icon: 'book-open' },
+  { to: '/today', labelKey: 'nav.today' as const, icon: 'calendar' },
+  { to: '/chat', labelKey: 'nav.chat' as const, icon: 'chat' },
+  { to: '/review', labelKey: 'nav.review' as const, icon: 'review', badge: true },
+  { to: '/library', labelKey: 'nav.library' as const, icon: 'book-open' },
 ]
 
 function refresh() {
@@ -40,7 +41,7 @@ watch(
         <span class="brand-mark">E</span>
         <span class="brand-text">
           <strong>EasyEnglish</strong>
-          <small>把英语学成自己的</small>
+          <small>{{ t('app.tagline') }}</small>
         </span>
       </RouterLink>
 
@@ -51,12 +52,12 @@ watch(
           :to="item.to"
           class="nav-item"
           :class="{ active: route.path.startsWith(item.to) }"
-          :title="item.label"
-          :aria-label="item.label"
+          :title="t(item.labelKey)"
+          :aria-label="t(item.labelKey)"
           :aria-current="route.path.startsWith(item.to) ? 'page' : undefined"
         >
           <Icon :name="item.icon" :size="19" />
-          <span class="nav-label">{{ item.label }}</span>
+          <span class="nav-label">{{ t(item.labelKey) }}</span>
           <span v-if="item.badge && store.dueTotal > 0" class="nav-badge">{{ store.dueTotal }}</span>
         </RouterLink>
       </nav>
@@ -65,8 +66,8 @@ watch(
         <div class="sidebar-note">
           <Icon name="sparkles" :size="16" />
           <p>
-            艾宾浩斯复习
-            <span>{{ store.stats?.reviewedToday ?? 0 }} 条今日已复习</span>
+            {{ t('app.spacedReview') }}
+            <span>{{ t('app.reviewedToday', { count: store.stats?.reviewedToday ?? 0 }) }}</span>
           </p>
         </div>
 
@@ -75,18 +76,18 @@ watch(
             to="/settings"
             class="nav-item settings-link"
             :class="{ active: route.path.startsWith('/settings') }"
-            title="设置"
-            aria-label="设置"
+            :title="t('nav.settings')"
+            :aria-label="t('nav.settings')"
             :aria-current="route.path.startsWith('/settings') ? 'page' : undefined"
           >
             <Icon name="settings" :size="19" />
-            <span class="nav-label">设置</span>
+            <span class="nav-label">{{ t('nav.settings') }}</span>
           </RouterLink>
           <button
             class="icon-btn theme-toggle"
             type="button"
-            :title="themeStore.isSwiss ? '切换到新拟物派' : '切换到瑞士国际风格'"
-            :aria-label="themeStore.isSwiss ? '切换到新拟物派' : '切换到瑞士国际风格'"
+            :title="t(themeStore.isSwiss ? 'theme.switchToNeumorphism' : 'theme.switchToSwiss')"
+            :aria-label="t(themeStore.isSwiss ? 'theme.switchToNeumorphism' : 'theme.switchToSwiss')"
             @click="themeStore.toggleTheme()"
           >
             <Icon name="theme" :size="18" />

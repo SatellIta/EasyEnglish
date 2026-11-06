@@ -2,11 +2,11 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import type { DailySummary, DraftEntry, Entry, LearnerError } from '@shared/types'
-import { ERROR_CATEGORY_LABELS } from '@shared/types'
 import Icon from '@/components/Icon.vue'
 import MarkdownView from '@/components/MarkdownView.vue'
 import SpeakButton from '@/components/SpeakButton.vue'
 import TypeBadge from '@/components/TypeBadge.vue'
+import { errorCategoryLabel, t } from '@/i18n'
 import { api, errorMessage } from '@/lib/api'
 import {
   formatDateTime,
@@ -86,7 +86,7 @@ async function generateSummary() {
     summaryEntries.value = result.entries
     await loadActiveErrors()
     noticeKind.value = 'ok'
-    notice.value = '今日总结已生成并保存。'
+    notice.value = t('today.summarySaved')
   } else if (summaryStore.error) {
     error.value = summaryStore.error
   }
@@ -166,11 +166,11 @@ watch(
     <header class="page-head">
       <div>
         <p class="today-date">{{ dateLabel }}</p>
-        <h1>今天学点什么？</h1>
-        <p>把遇到的词句记下来，剩下的交给遗忘曲线和 AI。</p>
+        <h1>{{ t('today.title') }}</h1>
+        <p>{{ t('today.subtitle') }}</p>
       </div>
       <button class="btn btn-ghost" :disabled="loading" @click="load">
-        <Icon name="refresh" :size="16" /> 刷新
+        <Icon name="refresh" :size="16" /> {{ t('common.refresh') }}
       </button>
     </header>
 
@@ -185,20 +185,19 @@ watch(
 
     <section class="hero">
       <div class="hero-copy">
-        <p class="hero-kicker">今日复习</p>
-        <h2 v-if="store.dueTotal > 0">有 {{ store.dueTotal }} 个词句等你回忆</h2>
-        <h2 v-else>今天的复习已经清空</h2>
+        <p class="hero-kicker">{{ t('today.heroKicker') }}</p>
+        <h2 v-if="store.dueTotal > 0">{{ t('today.dueTitle', { count: store.dueTotal }) }}</h2>
+        <h2 v-else>{{ t('today.cleared') }}</h2>
         <p>
-          {{ store.stats?.due.word ?? 0 }} 个单词 · {{ store.stats?.due.phrase ?? 0 }} 个短语 ·
-          {{ store.stats?.due.sentence ?? 0 }} 个句子
+          {{ t('today.dueBreakdown', { word: store.stats?.due.word ?? 0, phrase: store.stats?.due.phrase ?? 0, sentence: store.stats?.due.sentence ?? 0 }) }}
         </p>
       </div>
       <div class="hero-actions">
         <RouterLink to="/review" class="btn btn-primary">
-          <Icon name="review" :size="16" /> 开始复习
+          <Icon name="review" :size="16" /> {{ t('today.startReview') }}
         </RouterLink>
         <RouterLink to="/chat" class="btn">
-          <Icon name="chat" :size="16" /> 问 AI
+          <Icon name="chat" :size="16" /> {{ t('today.askAi') }}
         </RouterLink>
       </div>
     </section>
@@ -207,39 +206,39 @@ watch(
       <div class="stat">
         <span class="stat-icon"><Icon name="clock" :size="17" /></span>
         <strong>{{ store.dueTotal }}</strong>
-        <span>待复习</span>
+        <span>{{ t('today.statDue') }}</span>
       </div>
       <div class="stat">
         <span class="stat-icon"><Icon name="check" :size="17" /></span>
         <strong>{{ store.stats?.reviewedToday ?? 0 }}</strong>
-        <span>今日已复习</span>
+        <span>{{ t('today.statReviewed') }}</span>
       </div>
       <div class="stat">
         <span class="stat-icon"><Icon name="plus" :size="17" /></span>
         <strong>{{ store.stats?.addedToday ?? 0 }}</strong>
-        <span>今日新增</span>
+        <span>{{ t('today.statAdded') }}</span>
       </div>
       <div class="stat">
         <span class="stat-icon"><Icon name="flame" :size="17" /></span>
         <strong>{{ store.stats?.streakDays ?? 0 }}</strong>
-        <span>连续复习天数</span>
+        <span>{{ t('today.statStreak') }}</span>
       </div>
     </section>
 
     <div class="today-grid">
       <section class="card panel">
         <header class="panel-head">
-          <h2>今日词句</h2>
+          <h2>{{ t('today.entriesTitle') }}</h2>
           <RouterLink to="/library" class="link">
-            全部词库 <Icon name="arrow-right" :size="14" />
+            {{ t('today.allEntries') }} <Icon name="arrow-right" :size="14" />
           </RouterLink>
         </header>
 
-        <p v-if="loading" class="empty">加载中…</p>
+        <p v-if="loading" class="empty">{{ t('common.loading') }}</p>
         <div v-else-if="!entries.length" class="empty">
-          <h3>今天还没有记录</h3>
-          <p>在对话里问 AI，或直接把遇到的表达添加进来。</p>
-          <RouterLink to="/chat" class="btn btn-soft">去和 AI 聊聊</RouterLink>
+          <h3>{{ t('today.noEntriesTitle') }}</h3>
+          <p>{{ t('today.noEntriesHint') }}</p>
+          <RouterLink to="/chat" class="btn btn-soft">{{ t('today.chatCta') }}</RouterLink>
         </div>
         <ul v-else class="entry-list">
           <li v-for="entry in entries" :key="entry.id" class="entry-row">
@@ -258,7 +257,7 @@ watch(
 
       <section class="card panel">
         <header class="panel-head">
-          <h2>今日总结</h2>
+          <h2>{{ t('today.summaryTitle') }}</h2>
           <button
             v-if="summary"
             class="btn btn-soft btn-sm"
@@ -266,18 +265,18 @@ watch(
             @click="generateSummary"
           >
             <Icon :name="generating ? 'refresh' : 'sparkles'" :size="15" />
-            {{ generating ? '整理中…' : '重新整理' }}
+            {{ generating ? t('today.generating') : t('today.regenerate') }}
           </button>
         </header>
 
         <div v-if="generating && !summary" class="empty">
-          <p>AI 正在阅读今天的对话和词条…</p>
+          <p>{{ t('today.summaryGenerating') }}</p>
         </div>
         <div v-else-if="!summary" class="empty">
-          <h3>让 AI 帮你收个尾</h3>
-          <p>把今天聊过的内容整理成可复习的总结，并提取值得记住的词句。</p>
+          <h3>{{ t('today.summaryEmptyTitle') }}</h3>
+          <p>{{ t('today.summaryEmptyHint') }}</p>
           <button class="btn btn-primary" @click="generateSummary">
-            <Icon name="sparkles" :size="16" /> 生成今日总结
+            <Icon name="sparkles" :size="16" /> {{ t('today.generateSummary') }}
           </button>
         </div>
         <template v-else>
@@ -285,7 +284,7 @@ watch(
 
           <div v-if="summaryEntries.length" class="suggested">
             <div class="row between wrap">
-              <strong>值得加入词库</strong>
+              <strong>{{ t('today.worthAdding') }}</strong>
               <button
                 class="btn btn-soft btn-sm"
                 :disabled="adding || newSummaryCount === 0"
@@ -294,10 +293,10 @@ watch(
                 <Icon :name="adding ? 'refresh' : 'plus'" :size="15" />
                 {{
                   adding
-                    ? '添加中…'
+                    ? t('today.adding')
                     : newSummaryCount
-                      ? `加入新词条（${newSummaryCount}）`
-                      : '全部已在词库'
+                      ? t('today.addNew', { count: newSummaryCount })
+                      : t('today.allInLibrary')
                 }}
               </button>
             </div>
@@ -305,23 +304,25 @@ watch(
               v-if="newSummaryCount === 0"
               class="banner banner-info suggested-all-existing"
             >
-              这些候选词条都已经在词库中，因此没有新增内容。重复词条不会再次进入复习队列。
+              {{ t('today.allDuplicateHint') }}
             </p>
             <p v-else-if="existingSummaryCount" class="hint suggested-hint">
-              其中 {{ existingSummaryCount }} 条已在词库中，加入时会自动跳过，只会加入新词条。
+              {{ t('today.duplicateHint', { count: existingSummaryCount }) }}
             </p>
             <ul>
               <li v-for="(entry, index) in summaryEntries" :key="index">
                 <TypeBadge :type="entry.type" />
                 <span class="entry-text">{{ entry.text }}</span>
                 <span v-if="entry.meaning" class="muted small">{{ entry.meaning }}</span>
-                <span v-if="entry.duplicate" class="tag">已在词库</span>
+                <span v-if="entry.duplicate" class="tag">{{ t('today.exists') }}</span>
                 <span
                   v-if="entry.sceneSuggestion && entry.sceneSuggestion.action !== 'none'"
                   class="tag"
                 >
                   {{
-                    entry.sceneSuggestion.action === 'new' ? '建议新建' : '建议归入'
+                    entry.sceneSuggestion.action === 'new'
+                      ? t('today.suggestNew')
+                      : t('today.suggestExisting')
                   }}：{{ entry.sceneSuggestion.sceneName }}
                 </span>
                 <span
@@ -329,50 +330,50 @@ watch(
                   class="scene-accept"
                 >
                   <input v-model="entry.sceneAccepted" type="checkbox" />
-                  加入场景
+                  {{ t('today.sceneAccept') }}
                 </span>
                 <RouterLink
                   v-if="entry.sourceSessionId"
                   :to="`/chat/${entry.sourceSessionId}`"
                   class="source-link"
                 >
-                  来自对话
+                  {{ t('today.fromChat') }}
                 </RouterLink>
               </li>
             </ul>
           </div>
 
-          <p class="small muted summary-time">更新于 {{ formatDateTime(summary.createdAt) }}</p>
+          <p class="small muted summary-time">{{ t('today.updatedAt', { time: formatDateTime(summary.createdAt) }) }}</p>
         </template>
       </section>
     </div>
 
     <section class="card panel errors-panel">
       <header class="panel-head">
-        <h2>反复出现的错误</h2>
-        <span class="muted small">由最近的 AI 总结自动提取</span>
+        <h2>{{ t('today.errorsTitle') }}</h2>
+        <span class="muted small">{{ t('today.errorsSource') }}</span>
       </header>
 
       <p v-if="!activeErrors.length" class="empty">
-        还没有记录。生成今日总结时，AI 会从对话里抽取反复出现的错误；之后对话和总结会参考这些弱点。
+        {{ t('today.errorsEmpty') }}
       </p>
       <ul v-else class="error-list">
         <li v-for="item in activeErrors" :key="item.id" class="error-row">
           <div class="error-main">
             <div class="row wrap">
-              <span class="tag">{{ ERROR_CATEGORY_LABELS[item.category] }}</span>
+              <span class="tag">{{ errorCategoryLabel(item.category) }}</span>
               <span class="error-pattern">{{ item.pattern }}</span>
-              <span class="muted small">出现 {{ item.occurrences }} 次</span>
+              <span class="muted small">{{ t('today.errorOccurrences', { count: item.occurrences }) }}</span>
             </div>
-            <p v-if="item.correction" class="error-detail">正确：{{ item.correction }}</p>
-            <p v-if="item.example" class="error-detail muted">例：{{ item.example }}</p>
+            <p v-if="item.correction" class="error-detail">{{ t('today.errorCorrection', { text: item.correction }) }}</p>
+            <p v-if="item.example" class="error-detail muted">{{ t('today.errorExample', { text: item.example }) }}</p>
           </div>
           <div class="error-actions">
             <button class="btn btn-ghost btn-sm" @click="setErrorStatus(item.id, 'resolved')">
-              已解决
+              {{ t('today.resolve') }}
             </button>
             <button class="btn btn-ghost btn-sm" @click="setErrorStatus(item.id, 'ignored')">
-              忽略
+              {{ t('today.ignore') }}
             </button>
           </div>
         </li>

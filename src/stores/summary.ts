@@ -6,6 +6,7 @@ import type {
   SceneSuggestion,
   SummaryResult,
 } from '@shared/types'
+import { t } from '@/i18n'
 import { api, errorMessage } from '@/lib/api'
 import { useAppStore } from '@/stores/app'
 
@@ -116,13 +117,16 @@ export const useSummaryStore = defineStore('summary', () => {
       if (response.count === 0) {
         addNoticeKind.value = 'info'
         addNotice.value = response.skipped
-          ? `没有新增内容：这 ${response.skipped} 条词条都已经在词库中，重复词条不会再次进入复习队列。`
-          : '没有新增内容。'
+          ? t('summary.noNewAllDuplicate', { count: response.skipped })
+          : t('summary.noNew')
       } else {
         addNoticeKind.value = 'ok'
         addNotice.value = response.skipped
-          ? `新增 ${response.count} 条，跳过 ${response.skipped} 条已存在词条。`
-          : `新增 ${response.count} 条，并加入复习队列。`
+          ? t('summary.addedSkipped', {
+              count: response.count,
+              skipped: response.skipped,
+            })
+          : t('summary.added', { count: response.count })
       }
 
       // 把接受场景建议的新词条归入对应场景；场景失败不影响词条已入库。
@@ -162,10 +166,12 @@ export const useSummaryStore = defineStore('summary', () => {
         }
       }
 
-      if (sceneAdded) addNotice.value += ` 已归入场景 ${sceneAdded} 条。`
+      if (sceneAdded) {
+        addNotice.value += ` ${t('summary.sceneAdded', { count: sceneAdded })}`
+      }
       if (sceneFailed) {
         addNoticeKind.value = 'info'
-        addNotice.value += ` 有 ${sceneFailed} 条场景归并失败，词条仍已入库。`
+        addNotice.value += ` ${t('summary.sceneFailed', { count: sceneFailed })}`
       }
 
       // 已提交的候选标记为已存在，避免用户重复点击；词条本身仍在总结里可回看。

@@ -8,7 +8,7 @@ import type {
   SceneEntry,
   SceneSummary,
 } from '@shared/types'
-import { ENTRY_TYPE_LABELS } from '@shared/types'
+import { entryTypeLabel, t } from '@/i18n'
 import EntryCard from '@/components/EntryCard.vue'
 import EntryForm from '@/components/EntryForm.vue'
 import Icon from '@/components/Icon.vue'
@@ -39,12 +39,11 @@ const pickerOpen = ref(false)
 const entryFormOpen = ref(false)
 const startingChat = ref(false)
 
-const typeFilters: Array<{ value: EntryType | 'all'; label: string }> = [
-  { value: 'all', label: '全部' },
-  { value: 'word', label: ENTRY_TYPE_LABELS.word },
-  { value: 'phrase', label: ENTRY_TYPE_LABELS.phrase },
-  { value: 'sentence', label: ENTRY_TYPE_LABELS.sentence },
-]
+const typeFilterValues: Array<EntryType | 'all'> = ['all', 'word', 'phrase', 'sentence']
+
+function filterLabel(value: EntryType | 'all'): string {
+  return value === 'all' ? t('common.all') : entryTypeLabel(value)
+}
 
 const filteredScenes = computed(() => {
   const q = props.query.trim().toLowerCase()
@@ -100,7 +99,7 @@ interface SectionGroup {
 const groups = computed<SectionGroup[]>(() => {
   const sectionMap = new Map<string, SectionGroup>()
   for (const item of filteredItems.value) {
-    const sectionName = item.section?.trim() || '未分组'
+    const sectionName = item.section?.trim() || t('import.ungrouped')
     const sectionKey = sectionName
     let section = sectionMap.get(sectionKey)
     if (!section) {
@@ -134,7 +133,7 @@ async function startSceneChat() {
   try {
     const session = await api.chat.createSession({
       sceneId: detail.scene.id,
-      title: `${detail.scene.name} · 场景练习`,
+      title: t('scene.view.practiceTitle', { name: detail.scene.name }),
     })
     router.push(`/chat/${session.id}`)
   } catch (caught) {
@@ -216,7 +215,7 @@ async function onSceneSaved() {
 }
 
 async function removeScene(scene: SceneSummary) {
-  if (!window.confirm(`删除场景「${scene.name}」？场景里的词条会保留在词库中。`)) return
+  if (!window.confirm(t('scene.view.deleteConfirm', { name: scene.name }))) return
   try {
     await api.scenes.remove(scene.id)
     activeScene.value = null
@@ -274,24 +273,24 @@ onMounted(bootstrap)
     <template v-if="!activeScene">
       <div class="section-head">
         <div>
-          <h2>按场景</h2>
-          <p class="hint">把相关的词句放进同一个联想空间；场景不会改变每日复习安排。</p>
+          <h2>{{ t('scene.view.title') }}</h2>
+          <p class="hint">{{ t('scene.view.hint') }}</p>
         </div>
         <button class="btn btn-primary" @click="openCreateScene">
-          <Icon name="plus" :size="16" /> 新建场景
+          <Icon name="plus" :size="16" /> {{ t('scene.view.new') }}
         </button>
       </div>
 
-      <p v-if="loading && !scenes.length" class="empty">加载中…</p>
+      <p v-if="loading && !scenes.length" class="empty">{{ t('common.loading') }}</p>
       <div v-else-if="!filteredScenes.length" class="empty card">
-        <h3>{{ query ? '没有匹配的场景' : '还没有场景' }}</h3>
+        <h3>{{ query ? t('scene.view.noMatchTitle') : t('scene.view.emptyTitle') }}</h3>
         <p v-if="query && matchedEntries.length">
-          有 {{ matchedEntries.length }} 条匹配词条没有归入场景。可以切换到「按日期」或「按类型」查看。
+          {{ t('scene.view.matchedUnassigned', { count: matchedEntries.length }) }}
         </p>
-        <p v-else-if="query">换个关键词试试，或清空搜索。</p>
-        <p v-else>可以手动新建，也可以从 Markdown 导入带 Scenery 分类的笔记。</p>
+        <p v-else-if="query">{{ t('scene.view.tryAnother') }}</p>
+        <p v-else>{{ t('scene.view.createHint') }}</p>
         <button v-if="!query" class="btn btn-primary" @click="openCreateScene">
-          <Icon name="plus" :size="16" /> 新建第一个场景
+          <Icon name="plus" :size="16" /> {{ t('scene.view.createFirst') }}
         </button>
       </div>
       <div v-else class="scene-grid">
@@ -300,28 +299,28 @@ onMounted(bootstrap)
             <span class="scene-name">{{ scene.name }}</span>
             <span v-if="scene.description" class="scene-desc">{{ scene.description }}</span>
             <span class="scene-counts">
-              <span>{{ scene.counts.total }} 条</span>
-              <span>单词 {{ scene.counts.word }}</span>
-              <span>短语 {{ scene.counts.phrase }}</span>
-              <span>句子 {{ scene.counts.sentence }}</span>
+              <span>{{ t('scene.view.count', { count: scene.counts.total }) }}</span>
+              <span>{{ entryTypeLabel('word') }} {{ scene.counts.word }}</span>
+              <span>{{ entryTypeLabel('phrase') }} {{ scene.counts.phrase }}</span>
+              <span>{{ entryTypeLabel('sentence') }} {{ scene.counts.sentence }}</span>
             </span>
             <span v-if="query && sceneMatchCount(scene.id)" class="scene-match">
-              匹配 {{ sceneMatchCount(scene.id) }} 条词条
+              {{ t('scene.view.matchedCount', { count: sceneMatchCount(scene.id) }) }}
             </span>
           </button>
           <div class="scene-actions">
             <button
               class="icon-btn"
-              title="编辑场景"
-              aria-label="编辑场景"
+              :title="t('scene.view.edit')"
+              :aria-label="t('scene.view.edit')"
               @click="openEditScene(scene)"
             >
               <Icon name="edit" :size="16" />
             </button>
             <button
               class="icon-btn danger"
-              title="删除场景"
-              aria-label="删除场景"
+              :title="t('scene.view.delete')"
+              :aria-label="t('scene.view.delete')"
               @click="removeScene(scene)"
             >
               <Icon name="trash" :size="16" />
@@ -334,7 +333,7 @@ onMounted(bootstrap)
     <template v-else>
       <div class="detail-head">
         <button class="btn btn-ghost btn-sm" @click="backToScenes">
-          <Icon name="chevron-left" :size="15" /> 返回场景
+          <Icon name="chevron-left" :size="15" /> {{ t('scene.view.back') }}
         </button>
         <div class="detail-actions">
           <button
@@ -343,13 +342,13 @@ onMounted(bootstrap)
             @click="startSceneChat"
           >
             <Icon :name="startingChat ? 'refresh' : 'chat'" :size="15" />
-            {{ startingChat ? '创建中…' : '和 AI 练习' }}
+            {{ startingChat ? t('scene.view.creating') : t('scene.view.startChat') }}
           </button>
           <button class="btn btn-ghost btn-sm" @click="pickerOpen = true">
-            <Icon name="layers" :size="15" /> 从词库添加
+            <Icon name="layers" :size="15" /> {{ t('scene.view.addFromLibrary') }}
           </button>
           <button class="btn btn-primary btn-sm" @click="entryFormOpen = true">
-            <Icon name="plus" :size="15" /> 添加新词条
+            <Icon name="plus" :size="15" /> {{ t('scene.view.addEntry') }}
           </button>
         </div>
       </div>
@@ -362,20 +361,20 @@ onMounted(bootstrap)
             {{ activeScene.scene.description }}
           </p>
           <div class="scene-counts">
-            <span>{{ activeScene.scene.counts.total }} 条</span>
-            <span>单词 {{ activeScene.scene.counts.word }}</span>
-            <span>短语 {{ activeScene.scene.counts.phrase }}</span>
-            <span>句子 {{ activeScene.scene.counts.sentence }}</span>
+            <span>{{ t('scene.view.count', { count: activeScene.scene.counts.total }) }}</span>
+            <span>{{ entryTypeLabel('word') }} {{ activeScene.scene.counts.word }}</span>
+            <span>{{ entryTypeLabel('phrase') }} {{ activeScene.scene.counts.phrase }}</span>
+            <span>{{ entryTypeLabel('sentence') }} {{ activeScene.scene.counts.sentence }}</span>
           </div>
         </div>
         <div class="scene-hero-actions">
-          <button class="icon-btn" title="编辑场景" aria-label="编辑场景" @click="openEditScene(activeScene.scene)">
+          <button class="icon-btn" :title="t('scene.view.edit')" :aria-label="t('scene.view.edit')" @click="openEditScene(activeScene.scene)">
             <Icon name="edit" :size="17" />
           </button>
           <button
             class="icon-btn danger"
-            title="删除场景"
-            aria-label="删除场景"
+            :title="t('scene.view.delete')"
+            :aria-label="t('scene.view.delete')"
             @click="removeScene(activeScene.scene)"
           >
             <Icon name="trash" :size="17" />
@@ -386,16 +385,16 @@ onMounted(bootstrap)
       <div class="scene-toolbar">
         <div class="type-tabs">
           <button
-            v-for="filter in typeFilters"
-            :key="filter.value"
+            v-for="filter in typeFilterValues"
+            :key="filter"
             class="type-tab"
-            :class="{ active: activeType === filter.value }"
-            :aria-pressed="activeType === filter.value"
-            @click="activeType = filter.value"
+            :class="{ active: activeType === filter }"
+            :aria-pressed="activeType === filter"
+            @click="activeType = filter"
           >
-            {{ filter.label }}
+            {{ filterLabel(filter) }}
             <span class="tab-count">
-              {{ filter.value === 'all' ? activeScene.scene.counts.total : typeCount(filter.value) }}
+              {{ filter === 'all' ? activeScene.scene.counts.total : typeCount(filter) }}
             </span>
           </button>
         </div>
@@ -406,7 +405,7 @@ onMounted(bootstrap)
             :aria-pressed="sortMode === 'memory'"
             @click="sortMode = 'memory'"
           >
-            记忆时间
+            {{ t('scene.view.sortMemory') }}
           </button>
           <button
             class="type-tab"
@@ -414,22 +413,22 @@ onMounted(bootstrap)
             :aria-pressed="sortMode === 'order'"
             @click="sortMode = 'order'"
           >
-            导入顺序
+            {{ t('scene.view.sortOrder') }}
           </button>
         </div>
       </div>
 
-      <p v-if="loading && !activeScene.items.length" class="empty">加载中…</p>
+      <p v-if="loading && !activeScene.items.length" class="empty">{{ t('common.loading') }}</p>
       <div v-else-if="!filteredItems.length" class="empty card">
-        <h3>{{ query ? '场景里没有匹配的词条' : '这个场景还是空的' }}</h3>
-        <p>{{ query ? '换个关键词试试。' : '从词库添加已有词条，或者直接新建。' }}</p>
+        <h3>{{ query ? t('scene.view.emptyItemsQuery') : t('scene.view.emptyItemsTitle') }}</h3>
+        <p>{{ query ? t('scene.view.emptyItemsQueryHint') : t('scene.view.emptyItemsHint') }}</p>
       </div>
 
       <div v-else class="scene-sections">
         <section v-for="section in groups" :key="section.key" class="scene-section card">
           <header class="section-head-row">
             <h3>{{ section.name }}</h3>
-            <span class="muted small">{{ section.total }} 条</span>
+            <span class="muted small">{{ t('scene.view.count', { count: section.total }) }}</span>
           </header>
 
           <div

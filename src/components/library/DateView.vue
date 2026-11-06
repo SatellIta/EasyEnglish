@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import type { Entry, EntryType, LibraryOverview } from '@shared/types'
-import { ENTRY_TYPE_LABELS } from '@shared/types'
 import EntryCard from '@/components/EntryCard.vue'
 import Icon from '@/components/Icon.vue'
+import { entryTypeLabel, locale, t } from '@/i18n'
 import { api, errorMessage } from '@/lib/api'
 
 const props = defineProps<{ query: string; refreshToken: number }>()
@@ -22,12 +22,11 @@ const loadingOverview = ref(false)
 const loadingList = ref(false)
 const error = ref('')
 
-const typeFilters: Array<{ value: EntryType | 'all'; label: string }> = [
-  { value: 'all', label: '全部' },
-  { value: 'word', label: ENTRY_TYPE_LABELS.word },
-  { value: 'phrase', label: ENTRY_TYPE_LABELS.phrase },
-  { value: 'sentence', label: ENTRY_TYPE_LABELS.sentence },
-]
+const typeFilterValues: Array<EntryType | 'all'> = ['all', 'word', 'phrase', 'sentence']
+
+function filterLabel(value: EntryType | 'all'): string {
+  return value === 'all' ? t('common.all') : entryTypeLabel(value)
+}
 
 const isSearching = computed(() => Boolean(props.query.trim()))
 const activeGroup = computed(
@@ -53,7 +52,7 @@ function showMoreSearch() {
 function dateLabel(value: string): string {
   const [year, month, day] = value.split('-').map(Number)
   const date = new Date(year, month - 1, day)
-  return new Intl.DateTimeFormat('zh-CN', {
+  return new Intl.DateTimeFormat(locale.value === 'en' ? 'en-US' : 'zh-CN', {
     month: 'long',
     day: 'numeric',
     weekday: 'short',
@@ -66,10 +65,10 @@ function relativeLabel(value: string): string {
   const target = new Date(year, month - 1, day)
   const todayKey = new Date(today.getFullYear(), today.getMonth(), today.getDate())
   const diff = Math.round((todayKey.getTime() - target.getTime()) / 86_400_000)
-  if (diff === 0) return '今天'
-  if (diff === 1) return '昨天'
-  if (diff > 1 && diff < 7) return `${diff} 天前`
-  return year === today.getFullYear() ? '' : `${year} 年`
+  if (diff === 0) return t('library.date.relativeToday')
+  if (diff === 1) return t('library.date.relativeYesterday')
+  if (diff > 1 && diff < 7) return t('library.date.daysAgo', { count: diff })
+  return year === today.getFullYear() ? '' : t('library.date.year', { year })
 }
 
 async function loadOverview() {
@@ -165,14 +164,14 @@ onMounted(bootstrap)
     <section v-if="isSearching" class="search-results">
       <div class="section-head">
         <div>
-          <h2>搜索结果</h2>
-          <p class="hint">“{{ query }}” · 共 {{ searchTotal }} 条</p>
+          <h2>{{ t('library.date.searchTitle') }}</h2>
+          <p class="hint">{{ t('library.date.searchSummary', { query, total: searchTotal }) }}</p>
         </div>
       </div>
-      <p v-if="loadingList && !searchResults.length" class="empty">搜索中…</p>
+      <p v-if="loadingList && !searchResults.length" class="empty">{{ t('library.date.searching') }}</p>
       <div v-else-if="!searchResults.length" class="empty card">
-        <h3>没有匹配的词条</h3>
-        <p>试试更短的关键词，或切换到其他分类。</p>
+        <h3>{{ t('library.date.noSearchTitle') }}</h3>
+        <p>{{ t('library.date.noSearchHint') }}</p>
       </div>
       <div v-else class="lib-list">
         <EntryCard
@@ -187,7 +186,7 @@ onMounted(bootstrap)
           class="btn btn-ghost btn-sm show-more"
           @click="showMoreSearch"
         >
-          显示更多（还有 {{ remainingSearch }} 条）
+          {{ t('library.date.showMore', { count: remainingSearch }) }}
         </button>
       </div>
     </section>
@@ -195,34 +194,34 @@ onMounted(bootstrap)
     <template v-else-if="activeDate">
       <div class="detail-head">
         <button class="btn btn-ghost btn-sm" @click="backToDates">
-          <Icon name="chevron-left" :size="15" /> 返回日期
+          <Icon name="chevron-left" :size="15" /> {{ t('library.date.back') }}
         </button>
         <div class="detail-title">
           <h2>{{ dateLabel(activeDate) }}</h2>
-          <span class="muted small">{{ relativeLabel(activeDate) }} · {{ total }} 条</span>
+          <span class="muted small">{{ t('library.date.daySummary', { relative: relativeLabel(activeDate), total }) }}</span>
         </div>
       </div>
 
       <div class="type-tabs date-tabs">
         <button
-          v-for="filter in typeFilters"
-          :key="filter.value"
+          v-for="filter in typeFilterValues"
+          :key="filter"
           class="type-tab"
-          :class="{ active: activeType === filter.value }"
-          :aria-pressed="activeType === filter.value"
-          @click="activeType = filter.value"
+          :class="{ active: activeType === filter }"
+          :aria-pressed="activeType === filter"
+          @click="activeType = filter"
         >
-          {{ filter.label }}
+          {{ filterLabel(filter) }}
           <span class="tab-count">
-            {{ filter.value === 'all' ? activeGroup?.total ?? 0 : entriesFor(filter.value) }}
+            {{ filter === 'all' ? activeGroup?.total ?? 0 : entriesFor(filter) }}
           </span>
         </button>
       </div>
 
-      <p v-if="loadingList && !entries.length" class="empty">加载中…</p>
+      <p v-if="loadingList && !entries.length" class="empty">{{ t('common.loading') }}</p>
       <div v-else-if="!entries.length" class="empty card">
-        <h3>这一天没有符合条件的词条</h3>
-        <p>换个类型看看，或者回到日期列表。</p>
+        <h3>{{ t('library.date.emptyTitle') }}</h3>
+        <p>{{ t('library.date.emptyHint') }}</p>
       </div>
       <div v-else class="lib-list">
         <EntryCard
@@ -237,7 +236,7 @@ onMounted(bootstrap)
           class="btn btn-ghost btn-sm show-more"
           @click="showMoreEntries"
         >
-          显示更多（还有 {{ remainingEntries }} 条）
+          {{ t('library.date.showMore', { count: remainingEntries }) }}
         </button>
       </div>
     </template>
@@ -245,16 +244,16 @@ onMounted(bootstrap)
     <template v-else>
       <div class="section-head">
         <div>
-          <h2>按学习日期</h2>
-          <p class="hint">先选一天，再按单词、短语、句子查看当天新学的内容。</p>
+          <h2>{{ t('library.date.title') }}</h2>
+          <p class="hint">{{ t('library.date.hint') }}</p>
         </div>
-        <span class="muted small">{{ overview?.dates.length ?? 0 }} 天</span>
+        <span class="muted small">{{ t('library.date.daysCount', { count: overview?.dates.length ?? 0 }) }}</span>
       </div>
 
-      <p v-if="loadingOverview && !overview" class="empty">加载中…</p>
+      <p v-if="loadingOverview && !overview" class="empty">{{ t('common.loading') }}</p>
       <div v-else-if="!overview?.dates.length" class="empty card">
-        <h3>还没有学习记录</h3>
-        <p>添加词条或导入 Markdown 后，这里会按日期自动归档。</p>
+        <h3>{{ t('library.date.noRecordsTitle') }}</h3>
+        <p>{{ t('library.date.noRecordsHint') }}</p>
       </div>
       <div v-else class="date-grid">
         <button
@@ -269,11 +268,11 @@ onMounted(bootstrap)
               {{ relativeLabel(group.date) }}
             </span>
           </span>
-          <span class="date-total">{{ group.total }} 条</span>
+          <span class="date-total">{{ t('library.date.count', { count: group.total }) }}</span>
           <span class="date-counts">
-            <span>单词 {{ group.word }}</span>
-            <span>短语 {{ group.phrase }}</span>
-            <span>句子 {{ group.sentence }}</span>
+            <span>{{ entryTypeLabel('word') }} {{ group.word }}</span>
+            <span>{{ entryTypeLabel('phrase') }} {{ group.phrase }}</span>
+            <span>{{ entryTypeLabel('sentence') }} {{ group.sentence }}</span>
           </span>
         </button>
       </div>

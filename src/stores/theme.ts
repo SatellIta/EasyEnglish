@@ -1,24 +1,25 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
+import type { MessageKey } from '@/i18n/messages'
 
 export type ThemeId = 'neumorphism' | 'swiss'
 
 export interface ThemeOption {
   id: ThemeId
-  name: string
-  description: string
+  nameKey: MessageKey
+  descriptionKey: MessageKey
 }
 
 export const THEMES: ThemeOption[] = [
   {
     id: 'neumorphism',
-    name: '新拟物派',
-    description: '柔和的双光源阴影，同色系表面，安静可触。',
+    nameKey: 'theme.neumorphism.name',
+    descriptionKey: 'theme.neumorphism.description',
   },
   {
     id: 'swiss',
-    name: '瑞士国际风格',
-    description: '严格网格、黑白与红色、Helvetica 式排版。',
+    nameKey: 'theme.swiss.name',
+    descriptionKey: 'theme.swiss.description',
   },
 ]
 

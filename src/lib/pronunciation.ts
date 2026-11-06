@@ -1,3 +1,5 @@
+import { t } from '@/i18n'
+
 export interface PronunciationResult {
   transcript: string
   score: number
@@ -136,10 +138,10 @@ export function startRecognition(
     const error = event?.error
     handlers.onError?.(
       error === 'not-allowed'
-        ? '没有麦克风权限，请在浏览器里允许访问麦克风。'
+        ? t('pronunciation.noPermission')
         : error === 'no-speech'
-          ? '没有听到语音，再试一次。'
-          : `语音识别失败（${error ?? '未知错误'}）。`,
+          ? t('pronunciation.noSpeech')
+          : t('pronunciation.failed', { error: error ?? t('api.unknownError') }),
     )
   }
   recognition.onend = () => handlers.onEnd?.(transcript)
@@ -147,7 +149,7 @@ export function startRecognition(
   try {
     recognition.start()
   } catch {
-    handlers.onError?.('无法启动语音识别。')
+    handlers.onError?.(t('pronunciation.cannotStart'))
     return null
   }
 

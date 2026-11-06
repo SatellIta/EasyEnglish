@@ -2,10 +2,10 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import type { Entry, EntryType } from '@shared/types'
-import { ENTRY_TYPE_LABELS } from '@shared/types'
 import Icon from '@/components/Icon.vue'
 import SpeakButton from '@/components/SpeakButton.vue'
 import TypeBadge from '@/components/TypeBadge.vue'
+import { entryTypeLabel, t } from '@/i18n'
 import { api, errorMessage } from '@/lib/api'
 import { stageLabel } from '@/lib/format'
 import {
@@ -74,7 +74,7 @@ async function start() {
     exampleNotice.value = ''
     resetShadowing()
     if (!queue.value.length) {
-      error.value = '当前筛选下没有到期的复习内容。可以先去词库添加，或者稍后再来。'
+      error.value = t('review.noDue')
       return
     }
     phase.value = 'session'
@@ -120,8 +120,8 @@ async function generateExamples() {
     const result = await api.entries.generateExamples(entry.id, 3)
     if (current.value && result.entry) Object.assign(current.value, result.entry)
     exampleNotice.value = result.added
-      ? `已添加 ${result.added} 条个性化例句。`
-      : result.message || '没有生成新的例句。'
+      ? t('review.examplesAdded', { count: result.added })
+      : result.message || t('review.noExamples')
   } catch (caught) {
     error.value = errorMessage(caught)
   } finally {
@@ -147,7 +147,7 @@ function startShadowing() {
   const entry = current.value
   if (!entry || shadowing.value) return
   if (!recognitionSupported) {
-    shadowingError.value = '当前浏览器不支持语音识别，建议使用 Chrome 或 Edge。'
+    shadowingError.value = t('pronunciation.unsupported')
     return
   }
 
@@ -176,7 +176,7 @@ function startShadowing() {
 
     if (!controller) {
       shadowing.value = false
-      shadowingError.value = '无法启动语音识别。'
+      shadowingError.value = t('pronunciation.cannotStart')
       return
     }
     recognitionController = controller
@@ -187,12 +187,12 @@ function startShadowing() {
     onError: () => {
       if (token !== shadowingToken) return
       shadowing.value = false
-      shadowingError.value = '朗读失败，无法开始跟读。'
+      shadowingError.value = t('review.speakFailed')
     },
   })
   if (!ok) {
     shadowing.value = false
-    shadowingError.value = '当前浏览器不支持语音朗读。'
+    shadowingError.value = t('review.speechUnsupported')
   }
 }
 
@@ -256,8 +256,8 @@ onBeforeUnmount(() => {
   <div class="page">
     <header class="page-head">
       <div>
-        <h1>复习</h1>
-        <p>先看英文，主动回忆。记得就跳过，不记得再展开答案。</p>
+        <h1>{{ t('review.title') }}</h1>
+        <p>{{ t('review.subtitle') }}</p>
       </div>
     </header>
 
@@ -265,7 +265,7 @@ onBeforeUnmount(() => {
 
     <template v-if="phase === 'setup'">
       <section class="card setup-card">
-        <h2>选择要复习的类型</h2>
+        <h2>{{ t('review.selectTypes') }}</h2>
         <div class="type-filters">
           <button
             v-for="type in allTypes"
@@ -275,7 +275,7 @@ onBeforeUnmount(() => {
             :aria-pressed="selectedTypes.includes(type)"
             @click="toggleType(type)"
           >
-            <span>{{ ENTRY_TYPE_LABELS[type] }}</span>
+            <span>{{ entryTypeLabel(type) }}</span>
             <strong>{{ dueCount(type) }}</strong>
           </button>
         </div>
@@ -283,15 +283,15 @@ onBeforeUnmount(() => {
         <div class="setup-summary">
           <div>
             <strong>{{ store.dueTotal }}</strong>
-            <span>当前到期</span>
+            <span>{{ t('review.dueNow') }}</span>
           </div>
           <div>
             <strong>{{ store.stats?.reviewedToday ?? 0 }}</strong>
-            <span>今日已复习</span>
+            <span>{{ t('review.reviewedToday') }}</span>
           </div>
           <div>
             <strong>{{ store.stats?.streakDays ?? 0 }}</strong>
-            <span>连续天数</span>
+            <span>{{ t('review.streak') }}</span>
           </div>
         </div>
 
@@ -301,16 +301,16 @@ onBeforeUnmount(() => {
           @click="start"
         >
           <Icon :name="loading ? 'refresh' : 'review'" :size="18" />
-          {{ loading ? '加载中…' : '开始复习' }}
+          {{ loading ? t('common.loading') : t('review.start') }}
         </button>
-        <p class="hint">进入复习后：按 1 表示记得，按 2 表示不记得；展开答案后按空格继续。</p>
+        <p class="hint">{{ t('review.startHint') }}</p>
       </section>
     </template>
 
     <template v-else-if="phase === 'session' && current">
       <div class="review-bar">
         <button class="btn btn-ghost btn-sm" @click="exit">
-          <Icon name="chevron-left" :size="15" /> 退出
+          <Icon name="chevron-left" :size="15" /> {{ t('review.exit') }}
         </button>
         <div class="progress-track">
           <div class="progress-fill" :style="{ width: `${progress}%` }" />
@@ -323,14 +323,14 @@ onBeforeUnmount(() => {
           <TypeBadge :type="current.type" />
           <span class="muted small">{{ stageLabel(current.review?.stage ?? 0) }}</span>
           <span v-if="current.errorRate >= 0.05" class="tag-soft">
-            错误率 {{ Math.round(current.errorRate * 100) }}%
+            {{ t('review.errorRate', { rate: Math.round(current.errorRate * 100) }) }}
           </span>
           <RouterLink
             v-if="current.sourceSessionId"
             :to="`/chat/${current.sourceSessionId}`"
             class="source-link"
           >
-            来自对话
+            {{ t('review.fromChat') }}
           </RouterLink>
           <SpeakButton :text="current.text" :size="20" />
           <button
@@ -339,12 +339,12 @@ onBeforeUnmount(() => {
             type="button"
             :title="
               !recognitionSupported
-                ? '当前浏览器不支持语音识别'
+                ? t('review.shadowUnsupported')
                 : shadowing
-                  ? '停止跟读'
-                  : '跟读练习'
+                  ? t('review.shadowStop')
+                  : t('review.shadowTitle')
             "
-            aria-label="跟读练习"
+            :aria-label="t('review.shadowTitle')"
             :aria-pressed="shadowing"
             :disabled="!recognitionSupported"
             @click="shadowing ? stopShadowing() : startShadowing()"
@@ -358,27 +358,27 @@ onBeforeUnmount(() => {
         </p>
 
         <div v-if="shadowing || shadowingResult || shadowingError" class="shadowing-box">
-          <p v-if="shadowing" class="hint">先听一遍，再跟着读…</p>
+          <p v-if="shadowing" class="hint">{{ t('review.shadowListening') }}</p>
           <p v-else-if="shadowingError" class="hint">{{ shadowingError }}</p>
           <template v-else-if="shadowingResult">
             <div class="row between wrap">
-              <strong>跟读匹配度 {{ shadowingResult.score }}%</strong>
+              <strong>{{ t('review.shadowScore', { score: shadowingResult.score }) }}</strong>
               <span class="muted small">
-                {{ shadowingResult.matchedWords }} / {{ shadowingResult.totalWords }} 词匹配
+                {{ t('review.shadowWords', { matched: shadowingResult.matchedWords, total: shadowingResult.totalWords }) }}
               </span>
             </div>
-            <p class="hint">识别到：{{ shadowingResult.transcript }}</p>
+            <p class="hint">{{ t('review.shadowHeard', { text: shadowingResult.transcript }) }}</p>
           </template>
         </div>
 
         <template v-if="!revealed">
-          <p class="recall-prompt">你记得它的意思吗？</p>
+          <p class="recall-prompt">{{ t('review.recallPrompt') }}</p>
           <div class="recall-actions">
             <button class="btn btn-primary btn-lg" :disabled="loading" @click="rate('remembered')">
-              <Icon name="check" :size="18" /> 记得
+              <Icon name="check" :size="18" /> {{ t('review.remembered') }}
             </button>
             <button class="btn btn-ghost btn-lg" :disabled="loading" @click="rate('forgot')">
-              <Icon name="refresh" :size="18" /> 不记得
+              <Icon name="refresh" :size="18" /> {{ t('review.forgot') }}
             </button>
           </div>
         </template>
@@ -386,23 +386,23 @@ onBeforeUnmount(() => {
         <template v-else>
           <div class="reveal">
             <div v-if="current.meaning" class="reveal-block">
-              <h3>含义</h3>
+              <h3>{{ t('review.meaning') }}</h3>
               <p>{{ current.meaning }}</p>
             </div>
             <div v-if="current.explanation" class="reveal-block">
-              <h3>解释与用法</h3>
+              <h3>{{ t('review.explanation') }}</h3>
               <p class="pre-wrap">{{ current.explanation }}</p>
             </div>
             <div class="reveal-block">
               <div class="row between wrap example-head">
-                <h3>例句</h3>
+                <h3>{{ t('review.examples') }}</h3>
                 <button
                   class="btn btn-ghost btn-sm"
                   :disabled="generatingExamples"
                   @click="generateExamples"
                 >
                   <Icon :name="generatingExamples ? 'refresh' : 'sparkles'" :size="14" />
-                  {{ generatingExamples ? '生成中…' : 'AI 个性化例句' }}
+                  {{ generatingExamples ? t('review.generatingExamples') : t('review.generateExamples') }}
                 </button>
               </div>
               <ul v-if="current.examples.length">
@@ -410,11 +410,11 @@ onBeforeUnmount(() => {
                   {{ example }}
                 </li>
               </ul>
-              <p v-else class="hint">还没有例句，可以让 AI 结合你的场景和易错点生成。</p>
+              <p v-else class="hint">{{ t('review.noExamplesHint') }}</p>
               <p v-if="exampleNotice" class="hint example-notice">{{ exampleNotice }}</p>
             </div>
             <div v-if="current.notes" class="reveal-block">
-              <h3>我的笔记</h3>
+              <h3>{{ t('review.notes') }}</h3>
               <p class="pre-wrap">{{ current.notes }}</p>
             </div>
             <div v-if="current.tags.length" class="reveal-tags">
@@ -423,28 +423,28 @@ onBeforeUnmount(() => {
           </div>
 
           <button class="btn btn-primary btn-lg" :disabled="loading" @click="advance">
-            继续 <Icon name="arrow-right" :size="18" />
+            {{ t('review.continue') }} <Icon name="arrow-right" :size="18" />
           </button>
-          <p class="hint">按空格继续 · 这个词条会在 {{ retryMinutes }} 分钟后再次出现</p>
+          <p class="hint">{{ t('review.continueHint', { minutes: retryMinutes }) }}</p>
         </template>
       </section>
 
       <div class="review-stats">
-        <span class="ok">记得 {{ remembered }}</span>
-        <span class="bad">不记得 {{ forgot }}</span>
+        <span class="ok">{{ t('review.rememberedCount', { count: remembered }) }}</span>
+        <span class="bad">{{ t('review.forgotCount', { count: forgot }) }}</span>
       </div>
     </template>
 
     <template v-else-if="phase === 'done'">
       <section class="card done-card">
         <div class="done-mark"><Icon name="check" :size="30" /></div>
-        <h2>这一轮复习完成</h2>
+        <h2>{{ t('review.doneTitle') }}</h2>
         <p class="muted">
-          共 {{ queue.length }} 条 · 记得 {{ remembered }} · 不记得 {{ forgot }}
+          {{ t('review.doneSummary', { total: queue.length, remembered, forgot }) }}
         </p>
         <div class="done-actions">
-          <button class="btn btn-primary" @click="start">再来一轮</button>
-          <button class="btn btn-ghost" @click="router.push('/today')">回到今日</button>
+          <button class="btn btn-primary" @click="start">{{ t('review.again') }}</button>
+          <button class="btn btn-ghost" @click="router.push('/today')">{{ t('review.backToday') }}</button>
         </div>
       </section>
     </template>

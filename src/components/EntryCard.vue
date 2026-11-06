@@ -3,6 +3,7 @@ import type { Entry } from '@shared/types'
 import Icon from '@/components/Icon.vue'
 import SpeakButton from '@/components/SpeakButton.vue'
 import TypeBadge from '@/components/TypeBadge.vue'
+import { t } from '@/i18n'
 import { formatDue, stageLabel, truncate } from '@/lib/format'
 
 const props = defineProps<{
@@ -43,7 +44,7 @@ const emit = defineEmits<{
       </p>
 
       <div class="row wrap lib-meta">
-        <span v-if="!entry.reviewEnabled" class="tag review-flag off">不进入复习</span>
+        <span v-if="!entry.reviewEnabled" class="tag review-flag off">{{ t('entryCard.notReview') }}</span>
         <template v-if="showSceneRefs !== false">
           <span
             v-for="ref in entry.sceneRefs"
@@ -58,7 +59,7 @@ const emit = defineEmits<{
         </template>
         <span v-if="entry.reviewEnabled && entry.review" class="muted small review-info">
           <Icon name="clock" :size="13" />
-          下次复习 {{ formatDue(entry.review.nextReviewAt) }} · {{ stageLabel(entry.review.stage) }}
+          {{ t('entryCard.nextReview', { due: formatDue(entry.review.nextReviewAt), stage: stageLabel(entry.review.stage) }) }}
         </span>
       </div>
     </div>
@@ -67,19 +68,19 @@ const emit = defineEmits<{
       <button
         v-if="props.sceneId"
         class="icon-btn"
-        title="从当前场景移除"
-        aria-label="从当前场景移除"
+        :title="t('entryCard.removeFromScene')"
+        :aria-label="t('entryCard.removeFromScene')"
         @click="emit('removeScene', entry)"
       >
         <Icon name="x" :size="17" />
       </button>
-      <button class="icon-btn" title="编辑" aria-label="编辑词条" @click="emit('edit', entry)">
+      <button class="icon-btn" :title="t('entryCard.edit')" :aria-label="t('entryCard.edit')" @click="emit('edit', entry)">
         <Icon name="edit" :size="17" />
       </button>
       <button
         class="icon-btn danger"
-        title="删除词条"
-        aria-label="删除词条"
+        :title="t('entryCard.delete')"
+        :aria-label="t('entryCard.delete')"
         @click="emit('remove', entry)"
       >
         <Icon name="trash" :size="17" />

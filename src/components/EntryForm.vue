@@ -4,6 +4,7 @@ import type { Entry, EntryInput, EntryType } from '@shared/types'
 import { api, errorMessage } from '@/lib/api'
 import BaseModal from '@/components/BaseModal.vue'
 import Icon from '@/components/Icon.vue'
+import { t } from '@/i18n'
 
 const props = withDefaults(
   defineProps<{ open: boolean; entry?: Entry | null; defaultReviewEnabled?: boolean }>(),
@@ -24,10 +25,17 @@ const form = reactive({
 const saving = ref(false)
 const error = ref('')
 
-const typeOptions: Array<{ value: EntryType; label: string; hint: string }> = [
-  { value: 'word', label: '单词', hint: '单个词' },
-  { value: 'phrase', label: '短语', hint: '固定搭配' },
-  { value: 'sentence', label: '句子', hint: '整句表达' },
+const typeOptions: Array<{
+  value: EntryType
+  labelKey: 'entryType.word' | 'entryType.phrase' | 'entryType.sentence'
+  hintKey:
+    | 'entryForm.type.wordHint'
+    | 'entryForm.type.phraseHint'
+    | 'entryForm.type.sentenceHint'
+}> = [
+  { value: 'word', labelKey: 'entryType.word', hintKey: 'entryForm.type.wordHint' },
+  { value: 'phrase', labelKey: 'entryType.phrase', hintKey: 'entryForm.type.phraseHint' },
+  { value: 'sentence', labelKey: 'entryType.sentence', hintKey: 'entryForm.type.sentenceHint' },
 ]
 
 function reset() {
@@ -59,7 +67,7 @@ watch(
 
 async function submit() {
   if (!form.text.trim()) {
-    error.value = '请填写英文内容'
+    error.value = t('entryForm.required')
     return
   }
 
@@ -100,13 +108,13 @@ async function submit() {
 <template>
   <BaseModal
     :open="open"
-    :title="entry ? '编辑词条' : '添加词条'"
+    :title="entry ? t('entryForm.editTitle') : t('entryForm.addTitle')"
     width="620px"
     @close="emit('close')"
   >
     <form class="entry-form" @submit.prevent="submit">
       <div class="field">
-        <label>类型</label>
+        <label>{{ t('entryForm.typeLabel') }}</label>
         <div class="type-picker">
           <button
             v-for="option in typeOptions"
@@ -117,41 +125,41 @@ async function submit() {
             :aria-pressed="form.type === option.value"
             @click="form.type = option.value"
           >
-            <strong>{{ option.label }}</strong>
-            <small>{{ option.hint }}</small>
+            <strong>{{ t(option.labelKey) }}</strong>
+            <small>{{ t(option.hintKey) }}</small>
           </button>
         </div>
       </div>
 
       <div class="field">
-        <label for="entry-text">英文内容</label>
+        <label for="entry-text">{{ t('entryForm.text') }}</label>
         <textarea
           id="entry-text"
           v-model="form.text"
           class="textarea"
           rows="2"
-          placeholder="例如：make up for lost time"
+          :placeholder="t('entryForm.textPlaceholder')"
         />
       </div>
 
       <div class="field">
-        <label for="entry-meaning">中文含义</label>
-        <input id="entry-meaning" v-model="form.meaning" class="input" placeholder="简洁的中文释义 / 翻译" />
+        <label for="entry-meaning">{{ t('entryForm.meaning') }}</label>
+        <input id="entry-meaning" v-model="form.meaning" class="input" :placeholder="t('entryForm.meaningPlaceholder')" />
       </div>
 
       <div class="field">
-        <label for="entry-explanation">解释与用法</label>
+        <label for="entry-explanation">{{ t('entryForm.explanation') }}</label>
         <textarea
           id="entry-explanation"
           v-model="form.explanation"
           class="textarea"
           rows="3"
-          placeholder="搭配、语域、易混点、记忆联想……"
+          :placeholder="t('entryForm.explanationPlaceholder')"
         />
       </div>
 
       <div class="field">
-        <label for="entry-examples">例句（每行一条）</label>
+        <label for="entry-examples">{{ t('entryForm.examples') }}</label>
         <textarea
           id="entry-examples"
           v-model="form.examplesText"
@@ -162,38 +170,38 @@ async function submit() {
       </div>
 
       <div class="field">
-        <label for="entry-notes">个人笔记</label>
+        <label for="entry-notes">{{ t('entryForm.notes') }}</label>
         <textarea
           id="entry-notes"
           v-model="form.notes"
           class="textarea"
           rows="2"
-          placeholder="在哪里遇到的？为什么想记下来？"
+          :placeholder="t('entryForm.notesPlaceholder')"
         />
       </div>
 
       <div class="field">
-        <label for="entry-tags">标签（逗号分隔）</label>
-        <input id="entry-tags" v-model="form.tagsText" class="input" placeholder="口语, 商务, 易混" />
+        <label for="entry-tags">{{ t('entryForm.tags') }}</label>
+        <input id="entry-tags" v-model="form.tagsText" class="input" :placeholder="t('entryForm.tagsPlaceholder')" />
       </div>
 
       <label class="check-row">
         <input v-model="form.reviewEnabled" type="checkbox" />
         <span>
-          加入每日复习
-          <small>关闭后仍保存在词库和场景中，但不会出现在复习队列。</small>
+          {{ t('entryForm.reviewEnabled') }}
+          <small>{{ t('entryForm.reviewEnabledHint') }}</small>
         </span>
       </label>
 
       <p v-if="error" class="banner banner-error">{{ error }}</p>
-      <p class="hint">加入复习的词条会立即进入复习队列，并按艾宾浩斯曲线安排下一次复习。</p>
+      <p class="hint">{{ t('entryForm.reviewHint') }}</p>
     </form>
 
     <template #footer>
-      <button class="btn btn-ghost" type="button" @click="emit('close')">取消</button>
+      <button class="btn btn-ghost" type="button" @click="emit('close')">{{ t('common.cancel') }}</button>
       <button class="btn btn-primary" type="button" :disabled="saving" @click="submit">
         <Icon :name="saving ? 'refresh' : 'check'" :size="16" />
-        {{ saving ? '保存中…' : entry ? '保存修改' : '添加词条' }}
+        {{ saving ? t('common.saving') : entry ? t('entryForm.saveChanges') : t('entryForm.add') }}
       </button>
     </template>
   </BaseModal>

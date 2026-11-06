@@ -28,6 +28,7 @@ import type {
   SceneSummary,
   SummaryResult,
 } from '@shared/types'
+import { localizeServerError, t } from '@/i18n'
 
 export class ApiError extends Error {
   status: number
@@ -51,7 +52,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   })
 
   if (!response.ok) {
-    let message = `请求失败（${response.status}）`
+    let message = t('api.requestFailed', { status: response.status })
     let details: unknown
     try {
       const body = await response.json()
@@ -312,17 +313,17 @@ export async function streamChat(
   })
 
   if (!response.ok) {
-    let message = `请求失败（${response.status}）`
+    let message = t('api.requestFailed', { status: response.status })
     try {
       const payload = await response.json()
       if (payload?.error) message = payload.error
     } catch {
       // ignore
     }
-    throw new ApiError(message, response.status)
+    throw new ApiError(localizeServerError(message), response.status)
   }
 
-  if (!response.body) throw new Error('当前浏览器不支持流式响应。')
+  if (!response.body) throw new Error(t('api.streamUnsupported'))
 
   const reader = response.body.getReader()
   const decoder = new TextDecoder()
@@ -348,7 +349,7 @@ export async function streamChat(
         handlers.onDone?.(event)
         break
       case 'error':
-        handlers.onError?.(String(event.error ?? '未知错误'))
+        handlers.onError?.(localizeServerError(String(event.error ?? t('api.unknownError'))))
         break
     }
   }
@@ -370,6 +371,7 @@ export async function streamChat(
 }
 
 export function errorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message
-  return String(error)
+  if (error instanceof ApiError) return localizeServerError(error.message)
+  if (error instanceof Error) return localizeServerError(error.message)
+  return localizeServerError(String(error))
 }
