@@ -12,7 +12,7 @@ db.pragma('synchronous = NORMAL')
 db.pragma('foreign_keys = ON')
 db.pragma('busy_timeout = 5000')
 
-const SCHEMA_VERSION = 4
+const SCHEMA_VERSION = 5
 const schema = readFileSync(new URL('./schema.sql', import.meta.url), 'utf8')
 const migration2 = readFileSync(new URL('./migrations/002_scenes.sql', import.meta.url), 'utf8')
 const migration3 = readFileSync(
@@ -20,6 +20,7 @@ const migration3 = readFileSync(
   'utf8',
 )
 const migration4 = readFileSync(new URL('./migrations/004_scene_chat.sql', import.meta.url), 'utf8')
+const migration5 = readFileSync(new URL('./migrations/005_personas.sql', import.meta.url), 'utf8')
 
 let currentVersion = db.pragma('user_version', { simple: true }) as number
 
@@ -106,5 +107,12 @@ if (currentVersion < 4) {
     }
     db.exec(migration4)
     db.pragma('user_version = 4')
+  })()
+}
+
+if (currentVersion < 5) {
+  db.transaction(() => {
+    db.exec(migration5)
+    db.pragma('user_version = 5')
   })()
 }

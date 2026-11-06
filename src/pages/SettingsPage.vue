@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import type {
   AiBehaviorSettings,
   AiTeachingSettings,
   ExplanationMode,
+  Persona,
+  PersonaInput,
   ReviewSettings,
 } from '@shared/types'
 import Icon from '@/components/Icon.vue'
@@ -34,12 +36,20 @@ const behaviorForm = reactive({
 const teachingForm = reactive<{ explanationMode: ExplanationMode }>({
   explanationMode: 'bilingual',
 })
+const personas = ref<Persona[]>([])
+const selectedPersonaId = ref<number | null>(null)
+const personaPrompt = ref('')
+const personaName = ref('')
+const personaDescription = ref('')
+const creatingPersona = ref(false)
+const newPersona = reactive({ name: '', description: '', prompt: '' })
 const loading = ref(true)
 const saving = ref(false)
 const testing = ref(false)
 const reviewSaving = ref(false)
 const behaviorSaving = ref(false)
 const teachingSaving = ref(false)
+const personaSaving = ref(false)
 const savedReviewText = ref('')
 const error = ref('')
 const notice = ref('')
@@ -49,7 +59,12 @@ const behaviorError = ref('')
 const behaviorNotice = ref('')
 const teachingError = ref('')
 const teachingNotice = ref('')
+const personaError = ref('')
+const personaNotice = ref('')
 const testResult = ref<{ ok: boolean; message: string } | null>(null)
+const selectedPersona = computed(
+  () => personas.value.find((persona) => persona.id === selectedPersonaId.value) ?? null,
+)
 
 const presets = [
   { name: 'OpenAI', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
@@ -66,12 +81,15 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const [settings, review, behavior, teaching] = await Promise.all([
-      api.settings.get(),
-      api.settings.review(),
-      api.settings.aiBehavior(),
-      api.settings.aiTeaching(),
-    ])
+    const [settings, review, behavior, teaching, personaList, personaSetting] =
+      await Promise.all([
+        api.settings.get(),
+        api.settings.review(),
+        api.settings.aiBehavior(),
+        api.settings.aiTeaching(),
+        api.personas.list(),
+        api.settings.aiPersona(),
+      ])
     form.baseUrl = settings.baseUrl
     form.model = settings.model
     form.apiKey = ''
@@ -88,6 +106,14 @@ async function load() {
     behaviorForm.historyLimit = behavior.historyLimit
     behaviorForm.memoryCharBudget = behavior.memoryCharBudget
     teachingForm.explanationMode = teaching.explanationMode
+
+    personas.value = personaList.items
+    const selected =
+      personaList.items.find((persona) => persona.id === personaSetting.personaId) ??
+      personaList.items[0] ??
+      null
+    selectedPersonaId.value = selected?.id ?? null
+    syncPersonaFields(selected)
   } catch (caught) {
     error.value = errorMessage(caught)
   } finally {
@@ -219,6 +245,138 @@ async function saveTeaching() {
     teachingError.value = errorMessage(caught)
   } finally {
     teachingSaving.value = false
+  }
+}
+
+function syncPersonaFields(persona: Persona | null) {
+  personaName.value = persona?.name ?? ''
+  personaDescription.value = persona?.description ?? ''
+  personaPrompt.value = persona?.prompt ?? ''
+}
+
+async function changePersona(id: number) {
+  const persona = personas.value.find((item) => item.id === id)
+  if (!persona) return
+
+  selectedPersonaId.value = persona.id
+  syncPersonaFields(persona)
+  personaError.value = ''
+  personaNotice.value = ''
+  try {
+    await api.settings.updateAiPersona({ personaId: persona.id })
+    personaNotice.value = `已切换到「${persona.name}」。`
+  } catch (caught) {
+    personaError.value = errorMessage(caught)
+  }
+}
+
+function onPersonaChange(event: Event) {
+  const id = Number((event.target as HTMLSelectElement).value)
+  if (Number.isInteger(id) && id > 0) changePersona(id)
+}
+
+async function savePersona() {
+  const persona = selectedPersona.value
+  if (!persona || personaSaving.value) return
+
+  personaSaving.value = true
+  personaError.value = ''
+  personaNotice.value = ''
+  try {
+    const input: Partial<PersonaInput> = { prompt: personaPrompt.value }
+    if (!persona.isDefault) {
+      input.name = personaName.value
+      input.description = personaDescription.value
+    }
+    const updated = await api.personas.update(persona.id, input)
+    personas.value = personas.value.map((item) =>
+      item.id === updated.id ? updated : item,
+    )
+    syncPersonaFields(updated)
+    personaNotice.value = '人格已保存，下一轮对话生效。'
+  } catch (caught) {
+    personaError.value = errorMessage(caught)
+  } finally {
+    personaSaving.value = false
+  }
+}
+
+async function resetPersona() {
+  const persona = selectedPersona.value
+  if (!persona || !persona.isDefault) return
+  if (!window.confirm(`恢复「${persona.name}」的默认提示词？`)) return
+
+  personaSaving.value = true
+  personaError.value = ''
+  personaNotice.value = ''
+  try {
+    const updated = await api.personas.reset(persona.id)
+    personas.value = personas.value.map((item) =>
+      item.id === updated.id ? updated : item,
+    )
+    syncPersonaFields(updated)
+    personaNotice.value = '已恢复默认人格。'
+  } catch (caught) {
+    personaError.value = errorMessage(caught)
+  } finally {
+    personaSaving.value = false
+  }
+}
+
+async function createPersona() {
+  if (!newPersona.name.trim() || !newPersona.prompt.trim()) {
+    personaError.value = '请填写人格名称和提示词。'
+    return
+  }
+
+  personaSaving.value = true
+  personaError.value = ''
+  personaNotice.value = ''
+  try {
+    const created = await api.personas.create({
+      name: newPersona.name,
+      description: newPersona.description || null,
+      prompt: newPersona.prompt,
+    })
+    personas.value = [...personas.value, created]
+    selectedPersonaId.value = created.id
+    syncPersonaFields(created)
+    newPersona.name = ''
+    newPersona.description = ''
+    newPersona.prompt = ''
+    creatingPersona.value = false
+    await changePersona(created.id)
+    personaNotice.value = '人格已创建并切换。'
+  } catch (caught) {
+    personaError.value = errorMessage(caught)
+  } finally {
+    personaSaving.value = false
+  }
+}
+
+async function removePersona() {
+  const persona = selectedPersona.value
+  if (!persona || persona.isDefault) return
+  if (!window.confirm(`删除人格「${persona.name}」？`)) return
+
+  personaSaving.value = true
+  personaError.value = ''
+  personaNotice.value = ''
+  try {
+    await api.personas.remove(persona.id)
+    personas.value = personas.value.filter((item) => item.id !== persona.id)
+    const next = personas.value[0] ?? null
+    if (next) {
+      await changePersona(next.id)
+    } else {
+      selectedPersonaId.value = null
+      syncPersonaFields(null)
+    }
+    personaNotice.value = '人格已删除。'
+  } catch (caught) {
+    personaError.value = errorMessage(caught)
+  } finally {
+    personaSaving.value = false
   }
 }
 
@@ -475,6 +633,151 @@ onMounted(load)
         <button class="btn btn-primary" :disabled="teachingSaving" @click="saveTeaching">
           {{ teachingSaving ? '保存中…' : '保存解释语言' }}
         </button>
+      </div>
+    </section>
+
+    <section class="card settings-card">
+      <div class="card-title">
+        <div>
+          <h2>AI 人格</h2>
+          <p class="hint">
+            人格只影响语气、称呼和互动风格，不改变语言模式和知识准确性。
+          </p>
+        </div>
+        <span class="status-pill ok">
+          {{ selectedPersona?.isDefault ? '默认人格' : '自定义人格' }}
+        </span>
+      </div>
+
+      <p v-if="personaError" class="banner banner-error">{{ personaError }}</p>
+      <p v-if="personaNotice" class="banner banner-ok">{{ personaNotice }}</p>
+
+      <div class="field">
+        <label for="persona-select">当前人格</label>
+        <select
+          id="persona-select"
+          class="input"
+          :value="selectedPersonaId ?? ''"
+          :disabled="loading"
+          @change="onPersonaChange"
+        >
+          <option v-for="persona in personas" :key="persona.id" :value="persona.id">
+            {{ persona.name }}{{ persona.isDefault ? '（默认）' : '' }}
+          </option>
+        </select>
+        <span v-if="selectedPersona?.description" class="hint">
+          {{ selectedPersona.description }}
+        </span>
+      </div>
+
+      <template v-if="selectedPersona">
+        <div v-if="!selectedPersona.isDefault" class="persona-meta">
+          <div class="field">
+            <label for="persona-name">人格名称</label>
+            <input
+              id="persona-name"
+              v-model="personaName"
+              class="input"
+              maxlength="80"
+              :disabled="personaSaving"
+            />
+          </div>
+          <div class="field">
+            <label for="persona-description">人格描述</label>
+            <input
+              id="persona-description"
+              v-model="personaDescription"
+              class="input"
+              maxlength="300"
+              :disabled="personaSaving"
+            />
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="persona-prompt">人格提示词</label>
+          <textarea
+            id="persona-prompt"
+            v-model="personaPrompt"
+            class="input persona-textarea"
+            rows="6"
+            :disabled="personaSaving"
+          />
+          <span class="hint">
+            默认人格只能修改提示词；恢复默认会还原名称、描述和提示词。
+          </span>
+        </div>
+
+        <div class="actions">
+          <button
+            v-if="selectedPersona.isDefault"
+            class="btn btn-ghost"
+            :disabled="personaSaving"
+            @click="resetPersona"
+          >
+            恢复默认
+          </button>
+          <button
+            v-if="!selectedPersona.isDefault"
+            class="btn btn-ghost"
+            :disabled="personaSaving"
+            @click="removePersona"
+          >
+            删除人格
+          </button>
+          <button class="btn btn-primary" :disabled="personaSaving" @click="savePersona">
+            {{ personaSaving ? '保存中…' : '保存人格' }}
+          </button>
+        </div>
+      </template>
+
+      <div class="persona-create">
+        <button
+          v-if="!creatingPersona"
+          class="btn btn-soft btn-sm"
+          @click="creatingPersona = true"
+        >
+          <Icon name="plus" :size="15" /> 新建人格
+        </button>
+        <template v-else>
+          <div class="persona-meta">
+            <div class="field">
+              <label for="new-persona-name">名称</label>
+              <input
+                id="new-persona-name"
+                v-model="newPersona.name"
+                class="input"
+                maxlength="80"
+              />
+            </div>
+            <div class="field">
+              <label for="new-persona-description">描述（可选）</label>
+              <input
+                id="new-persona-description"
+                v-model="newPersona.description"
+                class="input"
+                maxlength="300"
+              />
+            </div>
+          </div>
+          <div class="field">
+            <label for="new-persona-prompt">提示词</label>
+            <textarea
+              id="new-persona-prompt"
+              v-model="newPersona.prompt"
+              class="input persona-textarea"
+              rows="5"
+            />
+          </div>
+          <div class="actions">
+            <button class="btn btn-ghost" :disabled="personaSaving" @click="creatingPersona = false">
+              取消
+            </button>
+            <button class="btn btn-primary" :disabled="personaSaving" @click="createPersona">
+              {{ personaSaving ? '创建中…' : '创建并切换' }}
+            </button>
+          </div>
+        </template>
       </div>
     </section>
 
@@ -762,8 +1065,26 @@ onMounted(load)
   flex: 0 0 auto;
   color: var(--accent-strong);
 }
+.persona-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.persona-textarea {
+  min-height: 120px;
+  resize: vertical;
+  line-height: 1.6;
+}
+.persona-create {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
 @media (max-width: 620px) {
   .theme-options {
+    grid-template-columns: 1fr;
+  }
+  .persona-meta {
     grid-template-columns: 1fr;
   }
 }

@@ -13,6 +13,7 @@ import errorsRoutes from './routes/errors'
 import examplesRoutes from './routes/examples'
 import importRoutes from './routes/import'
 import libraryRoutes from './routes/library'
+import personasRoutes from './routes/personas'
 import reviewRoutes from './routes/review'
 import scenesRoutes from './routes/scenes'
 import settingsRoutes from './routes/settings'
@@ -41,6 +42,7 @@ app.route('/', libraryRoutes)
 app.route('/', importRoutes)
 app.route('/', errorsRoutes)
 app.route('/', examplesRoutes)
+app.route('/', personasRoutes)
 
 app.onError((err, c) => {
   if (err instanceof ZodError) {

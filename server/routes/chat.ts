@@ -9,6 +9,7 @@ import { db } from '../db'
 import { getAiBehaviorSettings } from '../lib/ai-behavior'
 import { getAiTeachingSettings } from '../lib/ai-teaching'
 import { topActiveErrors } from '../lib/errors'
+import { getSelectedPersona } from '../lib/personas'
 import { mapChatMessage, mapChatSession, mapEntry } from '../lib/mappers'
 import { buildSearchFilter, ENTRY_SELECT } from '../lib/queries'
 import { dayRange, nowIso } from '../lib/time'
@@ -179,6 +180,7 @@ function buildTurns(sessionId: number, userMessage: string): ChatTurn[] {
   const { date } = dayRange()
   const behavior = getAiBehaviorSettings()
   const teaching = getAiTeachingSettings()
+  const persona = getSelectedPersona()
   const session = getSession(sessionId)
   const sceneId = session?.scene_id ?? null
   const scene = sceneId ? getSceneContext(sceneId) : null
@@ -194,6 +196,9 @@ function buildTurns(sessionId: number, userMessage: string): ChatTurn[] {
           memoryCharBudget: behavior.memoryCharBudget,
           scene,
           explanationMode: teaching.explanationMode,
+          persona: persona
+            ? { id: persona.id, name: persona.name, prompt: persona.prompt }
+            : null,
         },
       ),
     },

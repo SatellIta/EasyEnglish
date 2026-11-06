@@ -293,6 +293,30 @@ export interface AiTeachingSettings {
   explanationMode: ExplanationMode
 }
 
+/** AI 人格：只影响语气、称呼和互动风格，不改变语言模式与知识准确性 */
+export interface Persona {
+  id: number
+  /** 默认人格的稳定 key；自定义人格为 null */
+  key: string | null
+  name: string
+  description: string | null
+  prompt: string
+  isDefault: boolean
+  sortOrder: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface PersonaInput {
+  name: string
+  description?: string | null
+  prompt: string
+}
+
+export interface AiPersonaSettings {
+  personaId: number | null
+}
+
 export interface ChatSession {
   id: number
   title: string | null

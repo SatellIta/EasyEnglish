@@ -13,6 +13,12 @@ export interface ScenePromptContext {
   sections: string[]
 }
 
+export interface PersonaPromptContext {
+  id: number
+  name: string
+  prompt: string
+}
+
 function truncate(text: string, max: number): string {
   const clean = text.replace(/\s+/g, ' ').trim()
   return clean.length > max ? `${clean.slice(0, max)}…` : clean
@@ -105,6 +111,14 @@ You are talking to a Chinese-speaking learner, but this session is English-only.
 - Default to explaining in Chinese; keep the target English content in English. Do not translate whole paragraphs unless the learner asks.
 - Chinese glosses in the learner memory may be used naturally in explanations.
 - This layer only controls the explanation language. Persona, learner preferences, scene practice and error reminders still apply.`
+}
+
+function buildPersonaLayer(persona: PersonaPromptContext | null): string {
+  if (!persona) return ''
+  return `## 人格层：${persona.name}
+以下人格只影响语气、称呼和互动风格，不改变语言模式、事实准确性、纠错规则和输出格式。
+如果本轮是 English-only 模式，人格描述中的中文只供你理解，输出仍必须全部使用英文。
+${persona.prompt}`
 }
 
 function buildTaskLayer(): string {
@@ -201,14 +215,17 @@ export function buildSystemPrompt(
     memoryCharBudget?: number
     scene?: ScenePromptContext | null
     explanationMode?: ExplanationMode
+    persona?: PersonaPromptContext | null
   } = {},
 ): string {
   const mode = options.explanationMode ?? 'bilingual'
   const scene = options.scene ?? null
+  const persona = options.persona ?? null
   const errors = options.errors ?? []
 
   const layers = [
     buildLanguageLayer(mode),
+    buildPersonaLayer(persona),
     buildTaskLayer(),
     buildSceneLayer(scene, mode),
     buildRulesLayer(mode),

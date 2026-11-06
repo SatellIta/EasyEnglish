@@ -1,5 +1,6 @@
 import type {
   AiBehaviorSettings,
+  AiPersonaSettings,
   AiSettings,
   AiTeachingSettings,
   BulkCreateResult,
@@ -16,6 +17,8 @@ import type {
   LearnerError,
   LearnerErrorStatus,
   LibraryOverview,
+  Persona,
+  PersonaInput,
   ReviewSettings,
   ReviewState,
   ReviewStats,
@@ -135,6 +138,24 @@ export const api = {
       }),
     remove: (id: number) =>
       request<{ ok: boolean }>(`/errors/${id}`, { method: 'DELETE' }),
+  },
+
+  personas: {
+    list: () => request<{ items: Persona[] }>('/personas'),
+    create: (input: PersonaInput) =>
+      request<Persona>('/personas', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+    update: (id: number, input: Partial<PersonaInput>) =>
+      request<Persona>(`/personas/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(input),
+      }),
+    remove: (id: number) =>
+      request<{ ok: boolean }>(`/personas/${id}`, { method: 'DELETE' }),
+    reset: (id: number) =>
+      request<Persona>(`/personas/${id}/reset`, { method: 'POST' }),
   },
 
   library: {
@@ -258,6 +279,12 @@ export const api = {
     aiTeaching: () => request<AiTeachingSettings>('/settings/ai-teaching'),
     updateAiTeaching: (input: AiTeachingSettings) =>
       request<AiTeachingSettings>('/settings/ai-teaching', {
+        method: 'PUT',
+        body: JSON.stringify(input),
+      }),
+    aiPersona: () => request<AiPersonaSettings>('/settings/ai-persona'),
+    updateAiPersona: (input: AiPersonaSettings) =>
+      request<AiPersonaSettings>('/settings/ai-persona', {
         method: 'PUT',
         body: JSON.stringify(input),
       }),

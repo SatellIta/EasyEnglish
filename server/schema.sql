@@ -133,6 +133,21 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_learner_errors_pattern
 CREATE INDEX IF NOT EXISTS idx_learner_errors_status_seen
   ON learner_errors(status, last_seen_at DESC);
 
+-- AI 人格：默认人格 key 固定，自定义人格 key 为 NULL。
+CREATE TABLE IF NOT EXISTS personas (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  key TEXT UNIQUE,
+  name TEXT NOT NULL,
+  description TEXT,
+  prompt TEXT NOT NULL,
+  is_default INTEGER NOT NULL DEFAULT 0,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_personas_order ON personas(is_default DESC, sort_order ASC, id ASC);
+
 -- 全文检索：trigram 分词对中英文子串搜索都友好。
 CREATE VIRTUAL TABLE IF NOT EXISTS entries_fts USING fts5(
   text,
