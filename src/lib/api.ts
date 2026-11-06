@@ -1,5 +1,8 @@
 import type {
+  AiBehaviorSettings,
+  AiPersonaSettings,
   AiSettings,
+  AiTeachingSettings,
   BulkCreateResult,
   ChatMessage,
   ChatSession,
@@ -13,7 +16,11 @@ import type {
   ImportCommitItem,
   ImportCommitResult,
   ImportPreview,
+  LearnerError,
+  LearnerErrorStatus,
   LibraryOverview,
+  Persona,
+  PersonaInput,
   ReviewSettings,
   ReviewState,
   ReviewStats,
@@ -23,6 +30,7 @@ import type {
   SceneSummary,
   SummaryResult,
 } from '@shared/types'
+import { localizeServerError, t } from '@/i18n'
 
 export class ApiError extends Error {
   status: number
@@ -46,7 +54,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   })
 
   if (!response.ok) {
-    let message = `请求失败（${response.status}）`
+    let message = t('api.requestFailed', { status: response.status })
     let details: unknown
     try {
       const body = await response.json()
@@ -136,6 +144,46 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ entries, skipDuplicates: options.skipDuplicates }),
       }),
+    generateExamples: (id: number, count = 3) =>
+      request<{
+        entry: Entry
+        added: number
+        examples: Array<{ en: string; zh: string }>
+        message?: string
+      }>(`/entries/${id}/examples`, {
+        method: 'POST',
+        body: JSON.stringify({ count }),
+      }),
+  },
+
+  errors: {
+    list: (status?: LearnerErrorStatus, limit = 20) =>
+      request<{ items: LearnerError[] }>(`/errors${toQuery({ status, limit })}`),
+    update: (id: number, status: LearnerErrorStatus) =>
+      request<LearnerError>(`/errors/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status }),
+      }),
+    remove: (id: number) =>
+      request<{ ok: boolean }>(`/errors/${id}`, { method: 'DELETE' }),
+  },
+
+  personas: {
+    list: () => request<{ items: Persona[] }>('/personas'),
+    create: (input: PersonaInput) =>
+      request<Persona>('/personas', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+    update: (id: number, input: Partial<PersonaInput>) =>
+      request<Persona>(`/personas/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(input),
+      }),
+    remove: (id: number) =>
+      request<{ ok: boolean }>(`/personas/${id}`, { method: 'DELETE' }),
+    reset: (id: number) =>
+      request<Persona>(`/personas/${id}/reset`, { method: 'POST' }),
   },
 
   library: {
@@ -215,10 +263,10 @@ export const api = {
 
   chat: {
     sessions: () => request<{ items: ChatSession[] }>('/chat/sessions'),
-    createSession: (title?: string) =>
+    createSession: (input: { title?: string; sceneId?: number } = {}) =>
       request<ChatSession>('/chat/sessions', {
         method: 'POST',
-        body: JSON.stringify(title ? { title } : {}),
+        body: JSON.stringify(input),
       }),
     messages: (id: number) =>
       request<{ items: ChatMessage[] }>(`/chat/sessions/${id}/messages`),
@@ -259,6 +307,24 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify(input),
       }),
+    aiBehavior: () => request<AiBehaviorSettings>('/settings/ai-behavior'),
+    updateAiBehavior: (input: Partial<AiBehaviorSettings>) =>
+      request<AiBehaviorSettings>('/settings/ai-behavior', {
+        method: 'PUT',
+        body: JSON.stringify(input),
+      }),
+    aiTeaching: () => request<AiTeachingSettings>('/settings/ai-teaching'),
+    updateAiTeaching: (input: AiTeachingSettings) =>
+      request<AiTeachingSettings>('/settings/ai-teaching', {
+        method: 'PUT',
+        body: JSON.stringify(input),
+      }),
+    aiPersona: () => request<AiPersonaSettings>('/settings/ai-persona'),
+    updateAiPersona: (input: AiPersonaSettings) =>
+      request<AiPersonaSettings>('/settings/ai-persona', {
+        method: 'PUT',
+        body: JSON.stringify(input),
+      }),
   },
 }
 
@@ -283,17 +349,17 @@ export async function streamChat(
   })
 
   if (!response.ok) {
-    let message = `请求失败（${response.status}）`
+    let message = t('api.requestFailed', { status: response.status })
     try {
       const payload = await response.json()
       if (payload?.error) message = payload.error
     } catch {
       // ignore
     }
-    throw new ApiError(message, response.status)
+    throw new ApiError(localizeServerError(message), response.status)
   }
 
-  if (!response.body) throw new Error('当前浏览器不支持流式响应。')
+  if (!response.body) throw new Error(t('api.streamUnsupported'))
 
   const reader = response.body.getReader()
   const decoder = new TextDecoder()
@@ -319,7 +385,7 @@ export async function streamChat(
         handlers.onDone?.(event)
         break
       case 'error':
-        handlers.onError?.(String(event.error ?? '未知错误'))
+        handlers.onError?.(localizeServerError(String(event.error ?? t('api.unknownError'))))
         break
     }
   }
@@ -341,6 +407,7 @@ export async function streamChat(
 }
 
 export function errorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message
-  return String(error)
+  if (error instanceof ApiError) return localizeServerError(error.message)
+  if (error instanceof Error) return localizeServerError(error.message)
+  return localizeServerError(String(error))
 }

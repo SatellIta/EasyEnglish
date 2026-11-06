@@ -4,6 +4,7 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import type { ChatMessage, ChatSession } from '@shared/types'
 import Icon from '@/components/Icon.vue'
 import MarkdownView from '@/components/MarkdownView.vue'
+import { t } from '@/i18n'
 import { api, errorMessage, streamChat } from '@/lib/api'
 import { formatRelativeTime, truncate } from '@/lib/format'
 import { useAppStore } from '@/stores/app'
@@ -27,21 +28,25 @@ const composing = ref(false)
 const messageList = ref<HTMLElement | null>(null)
 let controller: AbortController | null = null
 
-const suggestions = [
-  'affect 和 effect 到底怎么区分？',
-  '用简单英语解释：The ball is in your court.',
-  '给我 5 个和 travel 有关的自然搭配',
-  'in / on / at 表地点时怎么选？',
-]
+const suggestionKeys = [
+  'chat.suggestion.effect',
+  'chat.suggestion.ball',
+  'chat.suggestion.travel',
+  'chat.suggestion.prepositions',
+] as const
 
 const activeTitle = computed(() => {
-  if (!activeSessionId.value) return '新对话'
+  if (!activeSessionId.value) return t('chat.new')
   const session = sessions.value.find((item) => item.id === activeSessionId.value)
-  return session?.title || '新对话'
+  return session?.title || t('chat.new')
 })
 
+const activeSession = computed(
+  () => sessions.value.find((item) => item.id === activeSessionId.value) ?? null,
+)
+
 const composerPlaceholder = computed(() =>
-  streaming.value ? 'AI 正在回答…' : '问一个英语问题，或把不认识的句子贴进来…',
+  streaming.value ? t('chat.streamingPlaceholder') : t('chat.placeholder'),
 )
 
 const organizing = computed(() => summaryStore.running)
@@ -93,7 +98,7 @@ function newChat() {
 }
 
 async function removeSession(id: number) {
-  if (!window.confirm('删除这个对话？此操作不可恢复。')) return
+  if (!window.confirm(t('chat.deleteConfirm'))) return
   try {
     await api.chat.removeSession(id)
     if (activeSessionId.value === id) newChat()
@@ -165,7 +170,7 @@ async function send() {
         onError: (message) => {
           error.value = message
           streaming.value = false
-          if (!assistant.content) assistant.content = '（回答中断）'
+          if (!assistant.content) assistant.content = t('chat.interrupted')
         },
       },
       controller.signal,
@@ -222,16 +227,19 @@ onMounted(async () => {
         <button
           class="icon-btn chat-menu-btn"
           type="button"
-          title="显示对话列表"
-          aria-label="显示对话列表"
+          :title="t('chat.showSessions')"
+          :aria-label="t('chat.showSessions')"
           @click="showSessions = !showSessions"
         >
           <Icon name="menu" :size="19" />
         </button>
         <div class="chat-title-copy">
           <h1>{{ activeTitle }}</h1>
-          <p class="muted small">
-            {{ store.totalEntries }} 条词句记忆 · AI 会参考你学过的内容
+          <p v-if="activeSession?.sceneId" class="muted small">
+            {{ t('chat.sceneSubtitle', { scene: activeSession.sceneName ?? '' }) }}
+          </p>
+          <p v-else class="muted small">
+            {{ t('chat.memorySubtitle', { count: store.totalEntries }) }}
           </p>
         </div>
       </div>
@@ -242,7 +250,7 @@ onMounted(async () => {
         @click="organizeToday"
       >
         <Icon :name="organizing ? 'refresh' : 'sparkles'" :size="15" />
-        {{ organizing ? '整理中…' : '整理今天' }}
+        {{ organizing ? t('chat.organizing') : t('chat.organizeToday') }}
       </button>
     </header>
 
@@ -251,9 +259,9 @@ onMounted(async () => {
     <div class="chat-layout">
       <aside class="sessions card" :class="{ open: showSessions }">
         <div class="sessions-head">
-          <strong>对话</strong>
+          <strong>{{ t('chat.sessions') }}</strong>
           <button class="btn btn-soft btn-sm" @click="newChat">
-            <Icon name="plus" :size="15" /> 新对话
+            <Icon name="plus" :size="15" /> {{ t('chat.newChat') }}
           </button>
         </div>
 
@@ -265,52 +273,62 @@ onMounted(async () => {
             :class="{ active: session.id === activeSessionId }"
           >
             <button class="session-button" @click="selectSession(session.id)">
-              <span class="session-title">{{ session.title || '新对话' }}</span>
+              <span class="session-title">
+                <span class="session-title-text">{{ session.title || t('chat.new') }}</span>
+                <span v-if="session.sceneId" class="tag scene-session-tag">{{ t('chat.sceneTag') }}</span>
+              </span>
               <span v-if="session.preview" class="session-preview">
                 {{ truncate(session.preview, 42) }}
               </span>
               <span class="session-meta">
-                {{ session.messageCount }} 条 · {{ formatRelativeTime(session.updatedAt) }}
+                {{ t('chat.sessionMeta', { count: session.messageCount, time: formatRelativeTime(session.updatedAt) }) }}
               </span>
             </button>
             <button
               class="icon-btn session-delete"
-              title="删除对话"
-              aria-label="删除对话"
+              :title="t('chat.deleteSession')"
+              :aria-label="t('chat.deleteSession')"
               @click.stop="removeSession(session.id)"
             >
               <Icon name="trash" :size="15" />
             </button>
           </li>
         </ul>
-        <p v-else class="empty small">还没有对话</p>
+        <p v-else class="empty small">{{ t('chat.noSessions') }}</p>
       </aside>
 
       <section class="conversation card">
         <div ref="messageList" class="messages">
-          <div v-if="loadingMessages" class="empty">正在加载对话…</div>
+          <div v-if="loadingMessages" class="empty">{{ t('chat.loadingMessages') }}</div>
 
           <div v-else-if="!messages.length" class="chat-welcome">
             <div class="welcome-mark"><Icon name="sparkles" :size="26" /></div>
-            <h2>开箱即用的英语助手</h2>
-            <p>
-              可以问词义、辨析、语法和地道表达。AI 会参考你记录过的
-              {{ store.totalEntries }} 条词句，在学习时帮你联想复习。
-            </p>
+            <template v-if="activeSession?.sceneId">
+              <h2>{{ t('chat.sceneWelcomeTitle', { scene: activeSession.sceneName ?? '' }) }}</h2>
+              <p>
+                {{ t('chat.sceneWelcomeText', { scene: activeSession.sceneName ?? '' }) }}
+              </p>
+            </template>
+            <template v-else>
+              <h2>{{ t('chat.welcomeTitle') }}</h2>
+              <p>
+                {{ t('chat.welcomeText', { count: store.totalEntries }) }}
+              </p>
+            </template>
             <div class="suggestions">
               <button
-                v-for="suggestion in suggestions"
-                :key="suggestion"
+                v-for="suggestionKey in suggestionKeys"
+                :key="suggestionKey"
                 class="suggestion"
-                @click="input = suggestion; send()"
+                @click="input = t(suggestionKey); send()"
               >
-                {{ suggestion }}
+                {{ t(suggestionKey) }}
               </button>
             </div>
             <p v-if="store.settings && !store.settings.configured" class="banner banner-info">
-              AI 还没配置。去
-              <RouterLink to="/settings" class="link">设置</RouterLink>
-              填写模型和 API Key。
+              {{ t('chat.aiNotConfiguredPrefix') }}
+              <RouterLink to="/settings" class="link">{{ t('nav.settings') }}</RouterLink>
+              {{ t('chat.aiNotConfiguredSuffix') }}
             </p>
           </div>
 
@@ -320,7 +338,7 @@ onMounted(async () => {
             class="message"
             :class="message.role"
           >
-            <div class="message-role">{{ message.role === 'user' ? '你' : 'EasyEnglish' }}</div>
+            <div class="message-role">{{ message.role === 'user' ? t('chat.roleUser') : 'EasyEnglish' }}</div>
             <div class="message-bubble">
               <MarkdownView v-if="message.role === 'assistant'" :content="message.content || '…'" />
               <p v-else class="user-text">{{ message.content }}</p>
@@ -337,24 +355,24 @@ onMounted(async () => {
             v-model="input"
             class="composer-input"
             rows="2"
-            aria-label="输入英语问题"
+            :aria-label="t('chat.inputLabel')"
             :placeholder="composerPlaceholder"
             @compositionstart="composing = true"
             @compositionend="composing = false"
             @keydown.enter="onComposerEnter"
           />
           <div class="composer-actions">
-            <span class="hint">Enter 发送 · Shift+Enter 换行</span>
+            <span class="hint">{{ t('chat.composerHint') }}</span>
             <div class="row">
               <button v-if="streaming" class="btn btn-ghost btn-sm" @click="stop">
-                <Icon name="stop" :size="15" /> 停止
+                <Icon name="stop" :size="15" /> {{ t('chat.stop') }}
               </button>
               <button
                 class="btn btn-primary btn-sm"
                 :disabled="!input.trim() || streaming"
                 @click="send"
               >
-                <Icon name="send" :size="15" /> 发送
+                <Icon name="send" :size="15" /> {{ t('chat.send') }}
               </button>
             </div>
           </div>
@@ -453,11 +471,24 @@ onMounted(async () => {
   text-align: left;
 }
 .session-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-weight: 600;
   font-size: 13px;
   overflow: hidden;
+}
+.session-title-text {
+  min-width: 0;
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.scene-session-tag {
+  flex: 0 0 auto;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
 }
 .session-preview,
 .session-meta {

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { EntryType, ImportItem } from '@shared/types'
 import TypeBadge from '@/components/TypeBadge.vue'
+import { entryTypeLabel, t } from '@/i18n'
 
 const props = defineProps<{
   item: ImportItem
@@ -10,11 +11,6 @@ const props = defineProps<{
 const emit = defineEmits<{ toggle: [id: string] }>()
 
 const types: EntryType[] = ['word', 'phrase', 'sentence']
-const labels: Record<EntryType, string> = {
-  word: '单词',
-  phrase: '短语',
-  sentence: '句子',
-}
 </script>
 
 <template>
@@ -22,14 +18,14 @@ const labels: Record<EntryType, string> = {
     <input
       type="checkbox"
       :checked="selected"
-      :aria-label="`选择 ${props.item.text}`"
+      :aria-label="t('import.item.select', { text: props.item.text })"
       @change="emit('toggle', props.item.id)"
     />
     <div class="item-main">
       <div class="row wrap item-title">
         <TypeBadge :type="props.item.type" />
         <strong>{{ props.item.text }}</strong>
-        <span v-if="props.item.duplicate" class="tag duplicate-tag">已存在</span>
+        <span v-if="props.item.duplicate" class="tag duplicate-tag">{{ t('import.item.exists') }}</span>
         <span v-if="showScenePath && props.item.section" class="tag">
           {{ props.item.section }}
         </span>
@@ -41,10 +37,10 @@ const labels: Record<EntryType, string> = {
       <p v-if="props.item.explanation" class="item-explain">
         {{ props.item.explanation }}
       </p>
-      <p v-if="props.item.notes" class="item-notes">笔记：{{ props.item.notes }}</p>
+      <p v-if="props.item.notes" class="item-notes">{{ t('import.item.notes', { notes: props.item.notes }) }}</p>
     </div>
-    <select v-model="props.item.type" class="select item-type" aria-label="词条类型">
-      <option v-for="type in types" :key="type" :value="type">{{ labels[type] }}</option>
+    <select v-model="props.item.type" class="select item-type" :aria-label="t('import.item.type')">
+      <option v-for="type in types" :key="type" :value="type">{{ entryTypeLabel(type) }}</option>
     </select>
   </div>
 </template>

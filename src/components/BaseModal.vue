@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, watch } from 'vue'
 import Icon from '@/components/Icon.vue'
+import { t } from '@/i18n'
 
 const props = withDefaults(defineProps<{ open: boolean; title?: string; width?: string }>(), {
   width: '560px',
@@ -37,7 +38,7 @@ onBeforeUnmount(() => {
         <div class="modal-card" :style="{ maxWidth: width }" role="dialog" aria-modal="true">
           <header class="modal-head">
             <h2>{{ title }}</h2>
-            <button class="icon-btn" type="button" aria-label="关闭" @click="emit('close')">
+            <button class="icon-btn" type="button" :aria-label="t('common.close')" @click="emit('close')">
               <Icon name="x" :size="18" />
             </button>
           </header>

@@ -8,9 +8,12 @@ import type {
   ImportPreview,
 } from '@shared/types'
 import importFormatHelp from '@/assets/import-format.md?raw'
+import importFormatHelpEn from '@/assets/import-format.en.md?raw'
 import BaseModal from '@/components/BaseModal.vue'
 import Icon from '@/components/Icon.vue'
 import ImportItemRow from '@/components/import/ImportItemRow.vue'
+import { locale, t } from '@/i18n'
+import type { MessageKey } from '@/i18n/messages'
 import MarkdownView from '@/components/MarkdownView.vue'
 import { api, errorMessage } from '@/lib/api'
 import { useAppStore } from '@/stores/app'
@@ -54,17 +57,20 @@ const expanded = ref<Set<string>>(new Set())
 const sceneReview = ref(false)
 const commitResult = ref<ImportCommitResult | null>(null)
 const helpOpen = ref(false)
+const helpContent = computed(() =>
+  locale.value === 'en' ? importFormatHelpEn : importFormatHelp,
+)
 
-const categoryLabels: Record<string, string> = {
-  words: '单词',
-  word: '单词',
-  collocations: '短语 / 搭配',
-  collocation: '短语 / 搭配',
-  sentences: '句子',
-  sentence: '句子',
-  scenery: '场景',
-  scene: '场景',
-  other: '其他',
+const categoryKeys: Record<string, MessageKey> = {
+  words: 'import.category.words',
+  word: 'import.category.words',
+  collocations: 'import.category.collocations',
+  collocation: 'import.category.collocations',
+  sentences: 'import.category.sentences',
+  sentence: 'import.category.sentences',
+  scenery: 'import.category.scenery',
+  scene: 'import.category.scenery',
+  other: 'import.category.other',
 }
 
 const selectedItems = computed(() =>
@@ -82,7 +88,7 @@ const entryGroups = computed<EntryGroup[]>(() => {
     if (item.scene) continue
     const group = item.group?.trim() || ''
     const key = `${item.category}::${group}`
-    const label = categoryLabels[item.category] ?? item.category
+    const label = t(categoryKeys[item.category] ?? 'import.category.other')
     const title = group ? `${label} · ${group}` : label
     let entry = map.get(key)
     if (!entry) {
@@ -106,7 +112,7 @@ const sceneGroups = computed<SceneGroup[]>(() => {
     }
     scene.items.push(item)
 
-    const sectionName = item.section?.trim() || '未分组'
+    const sectionName = item.section?.trim() || t('import.ungrouped')
     let section = scene.sections.find((value) => value.name === sectionName)
     if (!section) {
       section = { key: `${item.scene}::${sectionName}`, name: sectionName, items: [], subsections: [] }
@@ -206,7 +212,7 @@ async function onFile(event: Event) {
   const file = input.files?.[0]
   if (!file) return
   if (file.size > 2_000_000) {
-    error.value = '文件超过 2 MB，请拆分后再导入。'
+    error.value = t('import.fileTooLarge')
     input.value = ''
     return
   }
@@ -225,7 +231,7 @@ async function onFile(event: Event) {
 
 async function parse() {
   if (!markdown.value.trim()) {
-    error.value = '请先粘贴或上传 Markdown 内容。'
+    error.value = t('import.empty')
     return
   }
   parsing.value = true
@@ -301,19 +307,18 @@ function reset() {
     <header class="page-head">
       <div>
         <RouterLink to="/library" class="link back-link">
-          <Icon name="chevron-left" :size="14" /> 返回词库
+          <Icon name="chevron-left" :size="14" /> {{ t('import.back') }}
         </RouterLink>
-        <h1>导入 Markdown</h1>
+        <h1>{{ t('import.title') }}</h1>
         <p>
-          识别 # words / # collocations / # sentences / # Scenery。# Scenery 下 H2
-          是场景，H3 是单词/短语/句子分类；表格只取前三列。
+          {{ t('import.subtitle') }}
         </p>
       </div>
       <button
         class="icon-btn"
         type="button"
-        title="Markdown 格式说明"
-        aria-label="Markdown 格式说明"
+        :title="t('import.helpTitle')"
+        :aria-label="t('import.helpTitle')"
         @click="helpOpen = true"
       >
         <Icon name="help" :size="18" />
@@ -325,12 +330,12 @@ function reset() {
     <section class="card source-card">
       <div class="source-head">
         <div>
-          <h2>1. 选择或粘贴笔记</h2>
-          <p class="hint">支持 .md / .markdown / 纯文本，单次最大 2 MB。</p>
+          <h2>{{ t('import.step1') }}</h2>
+          <p class="hint">{{ t('import.step1Hint') }}</p>
         </div>
         <div class="source-actions">
           <label class="btn btn-ghost file-button">
-            <Icon name="upload" :size="16" /> 选择文件
+            <Icon name="upload" :size="16" /> {{ t('import.chooseFile') }}
             <input
               class="file-input"
               type="file"
@@ -339,7 +344,7 @@ function reset() {
             />
           </label>
           <button v-if="markdown || preview" class="btn btn-ghost" type="button" @click="reset">
-            <Icon name="x" :size="15" /> 清空
+            <Icon name="x" :size="15" /> {{ t('import.clear') }}
           </button>
         </div>
       </div>
@@ -352,33 +357,13 @@ function reset() {
         v-model="markdown"
         class="textarea source-input"
         rows="12"
-        placeholder="# words
-
-cheap-looking
-index finger / middle finger / ring finger
-
-# sentences
-
-That really got me.
-
-# Scenery
-
-## Bank
-
-### 单词
-
-Deposit money
-- I'd like to deposit $500 into my savings account.
-
-| English | 含义 | 补充 |
-| --- | --- | --- |
-| Deposit money | 存钱 | 办理存款 |"
+        :placeholder="t('import.placeholder')"
       />
 
       <div class="actions">
         <button class="btn btn-primary" :disabled="parsing || !markdown.trim()" @click="parse">
           <Icon :name="parsing ? 'refresh' : 'search'" :size="16" />
-          {{ parsing ? '解析中…' : '解析预览' }}
+          {{ parsing ? t('import.parsing') : t('import.parsePreview') }}
         </button>
       </div>
     </section>
@@ -387,32 +372,32 @@ Deposit money
       <section class="import-stats">
         <div class="stat-card card">
           <strong>{{ preview.stats.total }}</strong>
-          <span>识别词条</span>
+          <span>{{ t('import.statEntries') }}</span>
         </div>
         <div class="stat-card card">
           <strong>{{ preview.stats.word }}</strong>
-          <span>单词</span>
+          <span>{{ t('import.statWords') }}</span>
         </div>
         <div class="stat-card card">
           <strong>{{ preview.stats.phrase }}</strong>
-          <span>短语</span>
+          <span>{{ t('import.statPhrases') }}</span>
         </div>
         <div class="stat-card card">
           <strong>{{ preview.stats.sentence }}</strong>
-          <span>句子</span>
+          <span>{{ t('import.statSentences') }}</span>
         </div>
         <div class="stat-card card">
           <strong>{{ preview.stats.scenes }}</strong>
-          <span>场景</span>
+          <span>{{ t('import.statScenes') }}</span>
         </div>
         <div class="stat-card card" :class="{ warn: preview.stats.duplicates > 0 }">
           <strong>{{ preview.stats.duplicates }}</strong>
-          <span>疑似重复</span>
+          <span>{{ t('import.statDuplicates') }}</span>
         </div>
       </section>
 
       <details v-if="preview.warnings.length" class="card warnings">
-        <summary>{{ preview.warnings.length }} 条解析提示</summary>
+        <summary>{{ t('import.warnings', { count: preview.warnings.length }) }}</summary>
         <ul>
           <li v-for="(warning, index) in preview.warnings" :key="index">{{ warning }}</li>
         </ul>
@@ -420,11 +405,11 @@ Deposit money
 
       <section class="card import-controls">
         <div class="control-buttons">
-          <button class="btn btn-ghost btn-sm" @click="selectAll">全选</button>
-          <button class="btn btn-ghost btn-sm" @click="selectNone">全不选</button>
-          <button class="btn btn-ghost btn-sm" @click="selectNonDuplicates">仅选新词条</button>
-          <button class="btn btn-ghost btn-sm" @click="expandAll">展开全部</button>
-          <button class="btn btn-ghost btn-sm" @click="collapseAll">收起全部</button>
+          <button class="btn btn-ghost btn-sm" @click="selectAll">{{ t('import.selectAll') }}</button>
+          <button class="btn btn-ghost btn-sm" @click="selectNone">{{ t('import.selectNone') }}</button>
+          <button class="btn btn-ghost btn-sm" @click="selectNonDuplicates">{{ t('import.selectNew') }}</button>
+          <button class="btn btn-ghost btn-sm" @click="expandAll">{{ t('import.expandAll') }}</button>
+          <button class="btn btn-ghost btn-sm" @click="collapseAll">{{ t('import.collapseAll') }}</button>
         </div>
         <label class="check-row">
           <input
@@ -432,11 +417,11 @@ Deposit money
             :checked="sceneReview"
             @change="onSceneReviewChange"
           />
-          场景词条也加入每日复习
+          {{ t('import.sceneReview') }}
         </label>
         <span class="selected-count">
-          已选 <strong>{{ selectedCount }}</strong> / {{ preview.stats.total }} 条
-          <span v-if="selectedSceneCount"> · 场景 {{ selectedSceneCount }} 条</span>
+          {{ t('import.selectedSummary', { selected: selectedCount, total: preview.stats.total }) }}
+          <span v-if="selectedSceneCount">{{ t('import.selectedScenes', { count: selectedSceneCount }) }}</span>
         </span>
       </section>
 
@@ -462,7 +447,7 @@ Deposit money
             </span>
           </button>
           <button class="btn btn-ghost btn-sm" @click="toggleGroup(group.items)">
-            {{ allSelected(group.items) ? '取消本组' : '全选本组' }}
+            {{ allSelected(group.items) ? t('import.unselectGroup') : t('import.selectGroup') }}
           </button>
         </header>
         <div v-if="isExpanded(`entry:${group.key}`)" class="group-items">
@@ -499,7 +484,7 @@ Deposit money
             </span>
           </button>
           <button class="btn btn-ghost btn-sm" @click="toggleGroup(scene.items)">
-            {{ allSelected(scene.items) ? '取消本场景' : '全选本场景' }}
+            {{ allSelected(scene.items) ? t('import.unselectScene') : t('import.selectScene') }}
           </button>
         </header>
 
@@ -529,26 +514,26 @@ Deposit money
       <section v-if="commitResult" class="card result-card">
         <div class="result-mark"><Icon name="check" :size="24" /></div>
         <div>
-          <h3>导入完成</h3>
+          <h3>{{ t('import.doneTitle') }}</h3>
           <p>
-            新建 {{ commitResult.created }} 条
-            <span v-if="commitResult.skipped"> · 跳过 {{ commitResult.skipped }} 条重复</span>
+            {{ t('import.created', { count: commitResult.created }) }}
+            <span v-if="commitResult.skipped">{{ t('import.skipped', { count: commitResult.skipped }) }}</span>
             <span v-if="commitResult.scenes.length">
-              · 场景 {{ commitResult.scenes.join('、') }}
+              {{ t('import.scenes', { names: commitResult.scenes.join(', ') }) }}
             </span>
           </p>
           <div class="result-actions">
-            <RouterLink to="/library" class="btn btn-primary">去词库看看</RouterLink>
-            <button class="btn btn-ghost" @click="reset">再导入一份</button>
+            <RouterLink to="/library" class="btn btn-primary">{{ t('import.goLibrary') }}</RouterLink>
+            <button class="btn btn-ghost" @click="reset">{{ t('import.again') }}</button>
           </div>
         </div>
       </section>
 
       <div v-else class="commit-bar card">
         <div>
-          <strong>已选 {{ selectedCount }} 条</strong>
+          <strong>{{ t('import.selectedStrong', { count: selectedCount }) }}</strong>
           <span v-if="selectedSceneCount" class="muted small">
-            · 其中场景词条 {{ selectedSceneCount }} 条
+            {{ t('import.selectedSceneDetail', { count: selectedSceneCount }) }}
           </span>
         </div>
         <button
@@ -557,21 +542,21 @@ Deposit money
           @click="commit"
         >
           <Icon :name="committing ? 'refresh' : 'check'" :size="16" />
-          {{ committing ? '导入中…' : '导入选中词条' }}
+          {{ committing ? t('import.committing') : t('import.commit') }}
         </button>
       </div>
     </template>
 
     <BaseModal
       :open="helpOpen"
-      title="Markdown 格式说明"
+      :title="t('import.helpTitle')"
       width="760px"
       @close="helpOpen = false"
     >
-      <MarkdownView :content="importFormatHelp" />
+      <MarkdownView :content="helpContent" />
       <template #footer>
         <button class="btn btn-ghost" type="button" @click="helpOpen = false">
-          关闭
+          {{ t('common.close') }}
         </button>
       </template>
     </BaseModal>

@@ -12,8 +12,11 @@
           document.documentElement.dataset.theme = theme === 'swiss' ? 'swiss' : 'neumorphism'
           var meta = document.querySelector('meta[name="theme-color"]')
           if (meta && theme === 'swiss') meta.setAttribute('content', '#ffffff')
+          var locale = localStorage.getItem('easyenglish.locale')
+          document.documentElement.lang = locale === 'en' ? 'en' : 'zh-CN'
         } catch (error) {
           document.documentElement.dataset.theme = 'neumorphism'
+          document.documentElement.lang = 'zh-CN'
         }
       })()
     </script>

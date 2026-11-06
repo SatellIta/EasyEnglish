@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import type { Entry, EntryType } from '@shared/types'
-import { ENTRY_TYPE_LABELS } from '@shared/types'
 import EntryCard from '@/components/EntryCard.vue'
 import Icon from '@/components/Icon.vue'
+import { entryTypeLabel, t } from '@/i18n'
 import { api, errorMessage } from '@/lib/api'
 
 const props = defineProps<{ query: string; refreshToken: number }>()
@@ -26,6 +26,14 @@ const expanded = ref<Set<EntryType>>(new Set())
 const error = ref('')
 
 const total = computed(() => types.reduce((sum, type) => sum + groups[type].total, 0))
+const summaryText = computed(() =>
+  props.query.trim()
+    ? t('library.typeView.summaryQuery', {
+        query: props.query.trim(),
+        total: total.value,
+      })
+    : t('library.typeView.summary', { total: total.value }),
+)
 
 function isExpanded(type: EntryType): boolean {
   return expanded.value.has(type)
@@ -99,19 +107,17 @@ onMounted(load)
   <div class="type-view">
     <div class="section-head">
       <div>
-        <h2>按词条类型</h2>
-        <p class="hint">
-          {{ query ? `“${query}” · ` : '' }}共 {{ total }} 条，按记录时间从新到旧排列。
-        </p>
+        <h2>{{ t('library.typeView.title') }}</h2>
+        <p class="hint">{{ summaryText }}</p>
       </div>
     </div>
 
     <p v-if="error" class="banner banner-error">{{ error }}</p>
 
-    <p v-if="types.every((type) => groups[type].loading)" class="empty">加载中…</p>
+    <p v-if="types.every((type) => groups[type].loading)" class="empty">{{ t('common.loading') }}</p>
     <div v-else-if="total === 0" class="empty card">
-      <h3>没有符合条件的词条</h3>
-      <p>换个关键词，或去日期视图看看最近学了什么。</p>
+      <h3>{{ t('library.typeView.emptyTitle') }}</h3>
+      <p>{{ t('library.typeView.emptyHint') }}</p>
     </div>
 
     <template v-else>
@@ -133,11 +139,11 @@ onMounted(load)
               :size="16"
             />
             <span class="type-dot" :class="`dot-${type}`" aria-hidden="true" />
-            <span class="type-name">{{ ENTRY_TYPE_LABELS[type] }}</span>
+            <span class="type-name">{{ entryTypeLabel(type) }}</span>
             <span class="type-count">{{ groups[type].total }}</span>
           </span>
           <span v-if="!isExpanded(type) && groups[type].loading" class="type-preview">
-            加载中…
+            {{ t('common.loading') }}
           </span>
           <span
             v-else-if="!isExpanded(type) && previewText(type)"
@@ -148,9 +154,9 @@ onMounted(load)
         </button>
 
         <template v-if="isExpanded(type)">
-          <p v-if="groups[type].loading" class="empty">加载中…</p>
+          <p v-if="groups[type].loading" class="empty">{{ t('common.loading') }}</p>
           <p v-else-if="!groups[type].items.length" class="empty type-empty">
-            这个分类下暂时没有词条。
+            {{ t('library.typeView.emptyGroup') }}
           </p>
           <div v-else class="type-list">
             <EntryCard
@@ -166,7 +172,7 @@ onMounted(load)
               class="btn btn-ghost btn-sm show-more"
               @click="showMore(type)"
             >
-              显示更多（还有 {{ remaining(type) }} 条）
+              {{ t('library.typeView.showMore', { count: remaining(type) }) }}
             </button>
           </div>
         </template>

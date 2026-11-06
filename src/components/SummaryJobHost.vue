@@ -4,13 +4,14 @@ import BaseModal from '@/components/BaseModal.vue'
 import Icon from '@/components/Icon.vue'
 import MarkdownView from '@/components/MarkdownView.vue'
 import TypeBadge from '@/components/TypeBadge.vue'
+import { t } from '@/i18n'
 import { useSummaryStore } from '@/stores/summary'
 
 const store = useSummaryStore()
 const selected = ref<Set<number>>(new Set())
 
 const modalTitle = computed(() =>
-  store.status === 'error' ? '整理失败' : '今日学习整理',
+  store.status === 'error' ? t('summary.job.errorTitle') : t('summary.job.title'),
 )
 const resultEntries = computed(() => store.result?.entries ?? [])
 const selectedEntries = computed(() =>
@@ -61,7 +62,7 @@ async function addSelected() {
 <template>
   <div v-if="store.running" class="job-pill running" role="status" aria-live="polite">
     <span class="spinner" aria-hidden="true" />
-    AI 正在整理今日学习…
+    {{ t('summary.job.running') }}
   </div>
 
   <button
@@ -75,7 +76,7 @@ async function addSelected() {
     @click="store.reopen()"
   >
     <Icon :name="store.status === 'error' ? 'info' : 'sparkles'" :size="15" />
-    {{ store.status === 'error' ? '整理失败，点击查看' : '今日总结已生成，点击查看' }}
+    {{ store.status === 'error' ? t('summary.job.errorPill') : t('summary.job.donePill') }}
   </button>
 
   <BaseModal
@@ -87,7 +88,7 @@ async function addSelected() {
     <div v-if="store.status === 'error'" class="job-body">
       <p class="banner banner-error">{{ store.error }}</p>
       <p class="hint">
-        整理请求在后台失败了。可以重试；已经生成并保存的旧总结不会受影响。
+        {{ t('summary.job.errorHint') }}
       </p>
     </div>
 
@@ -97,17 +98,17 @@ async function addSelected() {
       <section v-if="resultEntries.length" class="candidates">
         <div class="candidates-head">
           <div>
-            <strong>值得加入复习的词条</strong>
+            <strong>{{ t('summary.job.candidates') }}</strong>
             <p class="hint">
-              默认不选已存在于词库的条目；加入时会再次按英文内容查重。
+              {{ t('summary.job.candidatesHint') }}
             </p>
           </div>
           <div class="row">
             <button class="btn btn-ghost btn-sm" type="button" @click="selectAll">
-              全选
+              {{ t('summary.job.selectAll') }}
             </button>
             <button class="btn btn-ghost btn-sm" type="button" @click="selectNone">
-              全不选
+              {{ t('summary.job.selectNone') }}
             </button>
           </div>
         </div>
@@ -116,10 +117,10 @@ async function addSelected() {
           v-if="resultEntries.length && duplicateCount === resultEntries.length"
           class="banner banner-info"
         >
-          这些候选词条都已经在词库中，因此没有新增内容。重复词条不会再次进入复习队列。
+          {{ t('summary.job.allDuplicate') }}
         </p>
         <p v-else-if="duplicateCount" class="hint duplicate-hint">
-          其中 {{ duplicateCount }} 条已在词库中，默认跳过。
+          {{ t('summary.job.duplicateHint', { count: duplicateCount }) }}
         </p>
 
         <ul class="candidate-list">
@@ -140,13 +141,31 @@ async function addSelected() {
                   {{ entry.explanation }}
                 </span>
               </span>
-              <span v-if="entry.duplicate" class="tag">已在词库</span>
+              <span
+                v-if="entry.sceneSuggestion && entry.sceneSuggestion.action !== 'none'"
+                class="tag"
+              >
+                {{
+                  entry.sceneSuggestion.action === 'new'
+                    ? t('summary.job.suggestNew')
+                    : t('summary.job.suggestExisting')
+                }}：{{ entry.sceneSuggestion.sceneName }}
+              </span>
+              <span
+                v-if="entry.sceneSuggestion && entry.sceneSuggestion.action !== 'none' && !entry.duplicate"
+                class="scene-accept"
+                @click.stop
+              >
+                <input v-model="entry.sceneAccepted" type="checkbox" @click.stop />
+                {{ t('summary.job.sceneAccept') }}
+              </span>
+              <span v-if="entry.duplicate" class="tag">{{ t('summary.job.exists') }}</span>
             </label>
           </li>
         </ul>
       </section>
 
-      <p v-else class="empty">这次没有抽取到需要加入词库的新词条。</p>
+      <p v-else class="empty">{{ t('summary.job.empty') }}</p>
 
       <p
         v-if="store.addNotice"
@@ -166,10 +185,10 @@ async function addSelected() {
         :disabled="store.running"
         @click="store.generate()"
       >
-        <Icon name="refresh" :size="16" /> 重试
+        <Icon name="refresh" :size="16" /> {{ t('common.retry') }}
       </button>
       <button class="btn btn-ghost" type="button" @click="store.dismiss()">
-        {{ selectedEntries.length ? '稍后' : '关闭' }}
+        {{ selectedEntries.length ? t('summary.job.later') : t('common.close') }}
       </button>
       <button
         v-if="store.status === 'done' && selectedEntries.length"
@@ -179,7 +198,7 @@ async function addSelected() {
         @click="addSelected"
       >
         <Icon :name="store.adding ? 'refresh' : 'plus'" :size="16" />
-        {{ store.adding ? '加入中…' : `加入复习（${selectedEntries.length}）` }}
+        {{ store.adding ? t('summary.job.adding') : t('summary.job.add', { count: selectedEntries.length }) }}
       </button>
     </template>
   </BaseModal>
@@ -253,6 +272,18 @@ button.job-pill:hover {
 }
 .duplicate-hint {
   margin-top: 10px;
+}
+.scene-accept {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  font-size: 11.5px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.scene-accept input {
+  margin: 0;
 }
 .candidate-list {
   list-style: none;

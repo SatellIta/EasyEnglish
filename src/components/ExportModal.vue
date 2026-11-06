@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import type { EntryType, ExportOptions } from '@shared/types'
-import { ENTRY_TYPE_LABELS } from '@shared/types'
 import BaseModal from '@/components/BaseModal.vue'
 import Icon from '@/components/Icon.vue'
+import { entryTypeLabel, t } from '@/i18n'
 import { api, errorMessage } from '@/lib/api'
 
 const props = defineProps<{ open: boolean }>()
@@ -113,7 +113,10 @@ async function download() {
     anchor.click()
     anchor.remove()
     window.setTimeout(() => URL.revokeObjectURL(url), 1000)
-    notice.value = `已导出 ${effectiveGroupCount.value} 个分组，约 ${selectedCount.value} 条词条。`
+    notice.value = t('export.done', {
+      groups: effectiveGroupCount.value,
+      count: selectedCount.value,
+    })
   } catch (caught) {
     error.value = errorMessage(caught)
   } finally {
@@ -130,34 +133,33 @@ watch(
 </script>
 
 <template>
-  <BaseModal :open="open" title="导出 Markdown" width="680px" @close="emit('close')">
+  <BaseModal :open="open" :title="t('export.title')" width="680px" @close="emit('close')">
     <div class="export-body">
       <p class="hint">
-        选择要导出的分组。常规词条只包含未归入场景的内容；场景词条按场景导出。
-        同一词条属于多个场景时，会在每个场景中分别导出。导出不包含复习进度。
+        {{ t('export.description') }}
       </p>
 
       <p v-if="error" class="banner banner-error">{{ error }}</p>
       <p v-if="notice" class="banner banner-ok">{{ notice }}</p>
 
-      <p v-if="loading" class="empty">正在读取导出分组…</p>
+      <p v-if="loading" class="empty">{{ t('export.loading') }}</p>
 
       <template v-else-if="options">
         <div class="export-toolbar">
-          <span class="muted small">已选 {{ selectedGroupCount }} 组 · 约 {{ selectedCount }} 条</span>
+          <span class="muted small">{{ t('export.selectedGroups', { groups: selectedGroupCount, count: selectedCount }) }}</span>
           <div class="row">
             <button class="btn btn-ghost btn-sm" type="button" @click="selectAll">
-              全选
+              {{ t('export.selectAll') }}
             </button>
             <button class="btn btn-ghost btn-sm" type="button" @click="selectNone">
-              全不选
+              {{ t('export.selectNone') }}
             </button>
           </div>
         </div>
 
         <section class="export-section">
-          <h3>常规词条</h3>
-          <p class="hint">这些词条还没有归入任何场景。</p>
+          <h3>{{ t('export.regular') }}</h3>
+          <p class="hint">{{ t('export.regularHint') }}</p>
           <div class="export-list">
             <label v-for="type in types" :key="type" class="export-row">
               <input
@@ -165,15 +167,15 @@ watch(
                 :checked="selectedTypes.has(type)"
                 @change="toggleType(type)"
               />
-              <span class="export-name">{{ ENTRY_TYPE_LABELS[type] }}</span>
+              <span class="export-name">{{ entryTypeLabel(type) }}</span>
               <span class="export-count">{{ options.types[type] }}</span>
             </label>
           </div>
         </section>
 
         <section class="export-section">
-          <h3>场景</h3>
-          <p v-if="!options.scenes.length" class="hint">还没有场景。</p>
+          <h3>{{ t('export.scenes') }}</h3>
+          <p v-if="!options.scenes.length" class="hint">{{ t('export.noScenes') }}</p>
           <div v-else class="export-list scene-export-list">
             <label v-for="scene in options.scenes" :key="scene.id" class="export-row">
               <input
@@ -187,17 +189,12 @@ watch(
           </div>
         </section>
 
-        <p class="hint">
-          导出格式：常规词条使用 <code># words</code> / <code># collocations</code> /
-          <code># sentences</code>；场景使用 <code># Scenery</code> →
-          <code>## 场景名</code> → <code>### 单词/短语/句子</code>。
-          表格的「补充」列会合并解释、例句、笔记和标签。
-        </p>
+        <p class="hint">{{ t('export.formatHint') }}</p>
       </template>
     </div>
 
     <template #footer>
-      <button class="btn btn-ghost" type="button" @click="emit('close')">取消</button>
+      <button class="btn btn-ghost" type="button" @click="emit('close')">{{ t('export.cancel') }}</button>
       <button
         class="btn btn-primary"
         type="button"
@@ -205,7 +202,7 @@ watch(
         @click="download"
       >
         <Icon :name="exporting ? 'refresh' : 'download'" :size="16" />
-        {{ exporting ? '导出中…' : `导出 Markdown（${selectedCount} 条）` }}
+        {{ exporting ? t('export.exporting') : t('export.submit', { count: selectedCount }) }}
       </button>
     </template>
   </BaseModal>

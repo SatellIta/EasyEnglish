@@ -1,10 +1,12 @@
 import type { Entry } from '../../shared/types'
 import { db } from '../db'
 import { mapEntry } from './mappers'
+import { normalizeEntryText } from './text'
 
 export const ENTRY_COLUMNS = `
   e.id, e.type, e.text, e.meaning, e.explanation, e.examples, e.notes, e.tags,
-  e.source, e.review_enabled, e.created_at, e.updated_at,
+  e.source, e.review_enabled, e.error_rate, e.error_samples,
+  e.source_session_id, e.source_message_id, e.created_at, e.updated_at,
   (
     SELECT json_group_array(json_object(
       'sceneId', s.id,
@@ -49,6 +51,16 @@ export const SCENE_ENTRY_SELECT = `
 
 export function getEntryById(id: number): Entry | null {
   const row = db.prepare(`${ENTRY_SELECT} WHERE e.id = ?`).get(id)
+  return row ? mapEntry(row) : null
+}
+
+/** 按归一化英文内容查找已有词条（去重只看文本，不看类型）。 */
+export function findDuplicateEntry(_type: Entry['type'], text: string): Entry | null {
+  const normalized = normalizeEntryText(text)
+  if (!normalized) return null
+  const row = db
+    .prepare(`${ENTRY_SELECT} WHERE e.normalized_text = ? LIMIT 1`)
+    .get(normalized)
   return row ? mapEntry(row) : null
 }
 

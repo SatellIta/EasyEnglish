@@ -3,6 +3,7 @@ import { reactive, ref, watch } from 'vue'
 import type { Scene, SceneSummary } from '@shared/types'
 import BaseModal from '@/components/BaseModal.vue'
 import Icon from '@/components/Icon.vue'
+import { t } from '@/i18n'
 import { api, errorMessage } from '@/lib/api'
 
 const props = defineProps<{ open: boolean; scene?: SceneSummary | null }>()
@@ -24,7 +25,7 @@ watch(
 
 async function submit() {
   if (!form.name.trim()) {
-    error.value = '请填写场景名称'
+    error.value = t('scene.form.nameRequired')
     return
   }
   saving.value = true
@@ -50,29 +51,29 @@ async function submit() {
 <template>
   <BaseModal
     :open="open"
-    :title="scene ? '编辑场景' : '新建场景'"
+    :title="scene ? t('scene.form.edit') : t('scene.form.new')"
     width="520px"
     @close="emit('close')"
   >
     <form class="scene-form" @submit.prevent="submit">
       <div class="field">
-        <label for="scene-name">场景名称</label>
+        <label for="scene-name">{{ t('scene.form.name') }}</label>
         <input
           id="scene-name"
           v-model="form.name"
           class="input"
-          placeholder="例如：银行、厨房、电影"
+          :placeholder="t('scene.form.namePlaceholder')"
           maxlength="60"
         />
       </div>
       <div class="field">
-        <label for="scene-description">描述（可选）</label>
+        <label for="scene-description">{{ t('scene.form.description') }}</label>
         <textarea
           id="scene-description"
           v-model="form.description"
           class="textarea"
           rows="3"
-          placeholder="这个场景下你想记住哪些表达？"
+          :placeholder="t('scene.form.descriptionPlaceholder')"
           maxlength="500"
         />
       </div>
@@ -80,10 +81,10 @@ async function submit() {
     </form>
 
     <template #footer>
-      <button class="btn btn-ghost" type="button" @click="emit('close')">取消</button>
+      <button class="btn btn-ghost" type="button" @click="emit('close')">{{ t('common.cancel') }}</button>
       <button class="btn btn-primary" type="button" :disabled="saving" @click="submit">
         <Icon :name="saving ? 'refresh' : 'check'" :size="16" />
-        {{ saving ? '保存中…' : scene ? '保存修改' : '创建场景' }}
+        {{ saving ? t('common.saving') : scene ? t('scene.form.saveChanges') : t('scene.form.create') }}
       </button>
     </template>
   </BaseModal>

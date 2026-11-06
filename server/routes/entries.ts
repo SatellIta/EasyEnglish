@@ -6,11 +6,12 @@ import { db } from '../db'
 import {
   entryKey,
   findExistingEntryByText,
-  loadExistingEntryKeys,
+  loadExistingEntryKeyMap,
 } from '../lib/dedupe'
 import { insertEntry } from '../lib/entry-store'
 import { mapEntry } from '../lib/mappers'
 import { buildSearchFilter, ENTRY_SELECT, getEntryById } from '../lib/queries'
+import { normalizeEntryText } from '../lib/text'
 import { nowIso } from '../lib/time'
 
 const app = new Hono()
@@ -25,6 +26,8 @@ const entryInput = z.object({
   tags: z.array(z.string().trim().min(1).max(50)).max(50).optional(),
   source: z.string().trim().max(50).optional(),
   reviewEnabled: z.boolean().optional(),
+  sourceSessionId: z.number().int().positive().nullish(),
+  sourceMessageId: z.number().int().positive().nullish(),
 })
 
 const updateInput = entryInput.partial()
@@ -113,20 +116,22 @@ app.post('/api/entries', async (c) => {
 
 app.post('/api/entries/bulk', async (c) => {
   const { entries, skipDuplicates = true } = bulkInput.parse(await c.req.json())
-  const seen = new Set<string>()
   const created: Entry[] = []
   const duplicates: BulkCreateResult['duplicates'] = []
 
   db.transaction(() => {
-    const existing = skipDuplicates ? loadExistingEntryKeys() : new Set<string>()
+    const existing = skipDuplicates ? loadExistingEntryKeyMap() : new Map<string, number>()
+    const seen = new Map<string, number>()
     for (const input of entries) {
       const key = entryKey(input.text)
-      if (skipDuplicates && (existing.has(key) || seen.has(key))) {
-        duplicates.push({ type: input.type, text: input.text })
+      const existingId = existing.get(key) ?? seen.get(key)
+      if (skipDuplicates && existingId !== undefined) {
+        duplicates.push({ type: input.type, text: input.text, existingEntryId: existingId })
         continue
       }
-      seen.add(key)
-      created.push(insertEntry(input))
+      const entry = insertEntry(input)
+      seen.set(key, entry.id)
+      created.push(entry)
     }
   })()
 
@@ -173,7 +178,10 @@ app.patch('/api/entries/:id', async (c) => {
   }
 
   if (input.type !== undefined) set('type', input.type)
-  if (input.text !== undefined) set('text', input.text)
+  if (input.text !== undefined) {
+    set('text', input.text)
+    set('normalized_text', normalizeEntryText(input.text))
+  }
   if (input.meaning !== undefined) set('meaning', input.meaning || null)
   if (input.explanation !== undefined) set('explanation', input.explanation || null)
   if (input.examples !== undefined) set('examples', JSON.stringify(input.examples))
@@ -181,6 +189,8 @@ app.patch('/api/entries/:id', async (c) => {
   if (input.tags !== undefined) set('tags', JSON.stringify(input.tags))
   if (input.source !== undefined) set('source', input.source)
   if (input.reviewEnabled !== undefined) set('review_enabled', input.reviewEnabled ? 1 : 0)
+  if (input.sourceSessionId !== undefined) set('source_session_id', input.sourceSessionId)
+  if (input.sourceMessageId !== undefined) set('source_message_id', input.sourceMessageId)
 
   if (!fields.length) return c.json(getEntryById(id))
   set('updated_at', nowIso())

@@ -2,11 +2,14 @@ import type { Entry, EntryInput } from '../../shared/types'
 import { db } from '../db'
 import { getEntryById } from './queries'
 import { initialSchedule } from './scheduler'
+import { normalizeEntryText } from './text'
 import { nowIso } from './time'
 
 export interface InsertEntryOptions {
   source?: string
   reviewEnabled?: boolean
+  sourceSessionId?: number | null
+  sourceMessageId?: number | null
 }
 
 /**
@@ -20,8 +23,9 @@ export function insertEntry(input: EntryInput, options: InsertEntryOptions = {})
   const info = db
     .prepare(
       `INSERT INTO entries
-        (type, text, meaning, explanation, examples, notes, tags, source, review_enabled, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (type, text, meaning, explanation, examples, notes, tags, source, review_enabled,
+         normalized_text, source_session_id, source_message_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       input.type,
@@ -33,6 +37,9 @@ export function insertEntry(input: EntryInput, options: InsertEntryOptions = {})
       JSON.stringify(input.tags ?? []),
       options.source ?? input.source ?? 'manual',
       reviewEnabled ? 1 : 0,
+      normalizeEntryText(input.text),
+      options.sourceSessionId ?? input.sourceSessionId ?? null,
+      options.sourceMessageId ?? input.sourceMessageId ?? null,
       now,
       now,
     )

@@ -1,7 +1,21 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
-import type { ReviewSettings } from '@shared/types'
+import { computed, onMounted, reactive, ref } from 'vue'
+import type {
+  AiBehaviorSettings,
+  AiTeachingSettings,
+  ExplanationMode,
+  Persona,
+  PersonaInput,
+  ReviewSettings,
+} from '@shared/types'
 import Icon from '@/components/Icon.vue'
+import {
+  locale,
+  personaDescription as personaDisplayDescription,
+  personaName as personaDisplayName,
+  setLocale,
+  t,
+} from '@/i18n'
 import { api, errorMessage } from '@/lib/api'
 import { useAppStore } from '@/stores/app'
 import { THEMES, useThemeStore } from '@/stores/theme'
@@ -18,37 +32,83 @@ const form = reactive({
 const reviewForm = reactive({
   intervalsText: '',
   forgotRetryMinutes: 10,
+  errorRateRecentWeight: 0.35,
+  errorRateIntervalPenalty: 0.6,
 })
+const behaviorForm = reactive({
+  memoryLimit: 12,
+  historyLimit: 20,
+  memoryCharBudget: 2400,
+})
+const teachingForm = reactive<{ explanationMode: ExplanationMode }>({
+  explanationMode: 'bilingual',
+})
+const personas = ref<Persona[]>([])
+const selectedPersonaId = ref<number | null>(null)
+const personaPrompt = ref('')
+const personaName = ref('')
+const personaDescription = ref('')
+const creatingPersona = ref(false)
+const newPersona = reactive({ name: '', description: '', prompt: '' })
 const loading = ref(true)
 const saving = ref(false)
 const testing = ref(false)
 const reviewSaving = ref(false)
+const behaviorSaving = ref(false)
+const teachingSaving = ref(false)
+const personaSaving = ref(false)
 const savedReviewText = ref('')
 const error = ref('')
 const notice = ref('')
 const reviewError = ref('')
 const reviewNotice = ref('')
+const behaviorError = ref('')
+const behaviorNotice = ref('')
+const teachingError = ref('')
+const teachingNotice = ref('')
+const personaError = ref('')
+const personaNotice = ref('')
 const testResult = ref<{ ok: boolean; message: string } | null>(null)
+const selectedPersona = computed(
+  () => personas.value.find((persona) => persona.id === selectedPersonaId.value) ?? null,
+)
 
 const presets = [
-  { name: 'OpenAI', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
-  { name: 'DeepSeek', baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-chat' },
   {
-    name: '通义千问',
+    labelKey: 'settings.ai.presetOpenAI' as const,
+    baseUrl: 'https://api.openai.com/v1',
+    model: 'gpt-4o-mini',
+  },
+  {
+    labelKey: 'settings.ai.presetDeepSeek' as const,
+    baseUrl: 'https://api.deepseek.com/v1',
+    model: 'deepseek-chat',
+  },
+  {
+    labelKey: 'settings.ai.presetQwen' as const,
     baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
     model: 'qwen-plus',
   },
-  { name: 'Ollama 本地', baseUrl: 'http://localhost:11434/v1', model: 'qwen2.5:7b' },
+  {
+    labelKey: 'settings.ai.presetOllama' as const,
+    baseUrl: 'http://localhost:11434/v1',
+    model: 'qwen2.5:7b',
+  },
 ]
 
 async function load() {
   loading.value = true
   error.value = ''
   try {
-    const [settings, review] = await Promise.all([
-      api.settings.get(),
-      api.settings.review(),
-    ])
+    const [settings, review, behavior, teaching, personaList, personaSetting] =
+      await Promise.all([
+        api.settings.get(),
+        api.settings.review(),
+        api.settings.aiBehavior(),
+        api.settings.aiTeaching(),
+        api.personas.list(),
+        api.settings.aiPersona(),
+      ])
     form.baseUrl = settings.baseUrl
     form.model = settings.model
     form.apiKey = ''
@@ -57,7 +117,26 @@ async function load() {
 
     reviewForm.intervalsText = review.intervalsDays.join(', ')
     reviewForm.forgotRetryMinutes = review.forgotRetryMinutes
-    savedReviewText.value = `${review.intervalsDays.join(' / ')} 天 · 重试 ${review.forgotRetryMinutes} 分钟`
+    reviewForm.errorRateRecentWeight = review.errorRateRecentWeight
+    reviewForm.errorRateIntervalPenalty = review.errorRateIntervalPenalty
+    savedReviewText.value = t('settings.review.summary', {
+      intervals: review.intervalsDays.join(' / '),
+      retry: review.forgotRetryMinutes,
+      weight: review.errorRateRecentWeight,
+    })
+
+    behaviorForm.memoryLimit = behavior.memoryLimit
+    behaviorForm.historyLimit = behavior.historyLimit
+    behaviorForm.memoryCharBudget = behavior.memoryCharBudget
+    teachingForm.explanationMode = teaching.explanationMode
+
+    personas.value = personaList.items
+    const selected =
+      personaList.items.find((persona) => persona.id === personaSetting.personaId) ??
+      personaList.items[0] ??
+      null
+    selectedPersonaId.value = selected?.id ?? null
+    syncPersonaFields(selected)
   } catch (caught) {
     error.value = errorMessage(caught)
   } finally {
@@ -68,7 +147,7 @@ async function load() {
 function applyPreset(preset: (typeof presets)[number]) {
   form.baseUrl = preset.baseUrl
   form.model = preset.model
-  notice.value = `已填入 ${preset.name} 的地址，保存前请确认模型名可用。`
+  notice.value = t('settings.ai.presetApplied', { name: t(preset.labelKey) })
 }
 
 async function save() {
@@ -85,7 +164,7 @@ async function save() {
     store.settings = settings
     form.apiKey = ''
     form.clearApiKey = false
-    notice.value = '设置已保存。'
+    notice.value = t('settings.ai.saved')
   } catch (caught) {
     error.value = errorMessage(caught)
   } finally {
@@ -106,9 +185,12 @@ async function test() {
     testResult.value = result.ok
       ? {
           ok: true,
-          message: `连接成功，模型 ${result.model} 返回：${result.reply || 'OK'}`,
+          message: t('settings.ai.testSuccess', {
+            model: result.model ?? '',
+            reply: result.reply || 'OK',
+          }),
         }
-      : { ok: false, message: result.error || '连接失败' }
+      : { ok: false, message: result.error || t('settings.ai.testFailed') }
   } catch (caught) {
     testResult.value = { ok: false, message: errorMessage(caught) }
   } finally {
@@ -126,24 +208,219 @@ async function saveReview() {
       .map((value) => Number(value))
       .filter((value) => Number.isFinite(value) && value > 0)
 
-    if (!intervals.length) throw new Error('请至少填写一个大于 0 的复习间隔')
+    if (!intervals.length) throw new Error(t('settings.review.invalidIntervals'))
     const retry = Number(reviewForm.forgotRetryMinutes)
     if (!Number.isFinite(retry) || retry <= 0) {
-      throw new Error('遗忘后重试窗口必须大于 0 分钟')
+      throw new Error(t('settings.review.invalidRetry'))
     }
 
     const saved: ReviewSettings = await api.settings.updateReview({
       intervalsDays: intervals,
       forgotRetryMinutes: retry,
+      errorRateRecentWeight: Number(reviewForm.errorRateRecentWeight),
+      errorRateIntervalPenalty: Number(reviewForm.errorRateIntervalPenalty),
     })
     reviewForm.intervalsText = saved.intervalsDays.join(', ')
     reviewForm.forgotRetryMinutes = saved.forgotRetryMinutes
-    savedReviewText.value = `${saved.intervalsDays.join(' / ')} 天 · 重试 ${saved.forgotRetryMinutes} 分钟`
-    reviewNotice.value = '遗忘曲线已保存，新的安排会应用于之后的复习。'
+    reviewForm.errorRateRecentWeight = saved.errorRateRecentWeight
+    reviewForm.errorRateIntervalPenalty = saved.errorRateIntervalPenalty
+    savedReviewText.value = t('settings.review.summary', {
+      intervals: saved.intervalsDays.join(' / '),
+      retry: saved.forgotRetryMinutes,
+      weight: saved.errorRateRecentWeight,
+    })
+    reviewNotice.value = t('settings.review.saved')
   } catch (caught) {
     reviewError.value = errorMessage(caught)
   } finally {
     reviewSaving.value = false
+  }
+}
+
+async function saveBehavior() {
+  behaviorSaving.value = true
+  behaviorError.value = ''
+  behaviorNotice.value = ''
+  try {
+    const saved: AiBehaviorSettings = await api.settings.updateAiBehavior({
+      memoryLimit: Number(behaviorForm.memoryLimit),
+      historyLimit: Number(behaviorForm.historyLimit),
+      memoryCharBudget: Number(behaviorForm.memoryCharBudget),
+    })
+    behaviorForm.memoryLimit = saved.memoryLimit
+    behaviorForm.historyLimit = saved.historyLimit
+    behaviorForm.memoryCharBudget = saved.memoryCharBudget
+    behaviorNotice.value = t('settings.context.saved')
+  } catch (caught) {
+    behaviorError.value = errorMessage(caught)
+  } finally {
+    behaviorSaving.value = false
+  }
+}
+
+async function saveTeaching() {
+  teachingSaving.value = true
+  teachingError.value = ''
+  teachingNotice.value = ''
+  try {
+    const saved: AiTeachingSettings = await api.settings.updateAiTeaching({
+      explanationMode: teachingForm.explanationMode,
+    })
+    teachingForm.explanationMode = saved.explanationMode
+    teachingNotice.value =
+      saved.explanationMode === 'english'
+        ? t('settings.teaching.savedEnglish')
+        : t('settings.teaching.savedBilingual')
+  } catch (caught) {
+    teachingError.value = errorMessage(caught)
+  } finally {
+    teachingSaving.value = false
+  }
+}
+
+function syncPersonaFields(persona: Persona | null) {
+  personaName.value = persona?.name ?? ''
+  personaDescription.value = persona?.description ?? ''
+  personaPrompt.value = persona?.prompt ?? ''
+}
+
+async function changePersona(id: number) {
+  const persona = personas.value.find((item) => item.id === id)
+  if (!persona) return
+
+  selectedPersonaId.value = persona.id
+  syncPersonaFields(persona)
+  personaError.value = ''
+  personaNotice.value = ''
+  try {
+    await api.settings.updateAiPersona({ personaId: persona.id })
+    personaNotice.value = t('settings.persona.switched', {
+      name: personaDisplayName(persona),
+    })
+  } catch (caught) {
+    personaError.value = errorMessage(caught)
+  }
+}
+
+function onPersonaChange(event: Event) {
+  const id = Number((event.target as HTMLSelectElement).value)
+  if (Number.isInteger(id) && id > 0) changePersona(id)
+}
+
+async function savePersona() {
+  const persona = selectedPersona.value
+  if (!persona || personaSaving.value) return
+
+  personaSaving.value = true
+  personaError.value = ''
+  personaNotice.value = ''
+  try {
+    const input: Partial<PersonaInput> = { prompt: personaPrompt.value }
+    if (!persona.isDefault) {
+      input.name = personaName.value
+      input.description = personaDescription.value
+    }
+    const updated = await api.personas.update(persona.id, input)
+    personas.value = personas.value.map((item) =>
+      item.id === updated.id ? updated : item,
+    )
+    syncPersonaFields(updated)
+    personaNotice.value = t('settings.persona.saved')
+  } catch (caught) {
+    personaError.value = errorMessage(caught)
+  } finally {
+    personaSaving.value = false
+  }
+}
+
+async function resetPersona() {
+  const persona = selectedPersona.value
+  if (!persona || !persona.isDefault) return
+  if (
+    !window.confirm(
+      t('settings.persona.resetConfirm', { name: personaDisplayName(persona) }),
+    )
+  ) {
+    return
+  }
+
+  personaSaving.value = true
+  personaError.value = ''
+  personaNotice.value = ''
+  try {
+    const updated = await api.personas.reset(persona.id)
+    personas.value = personas.value.map((item) =>
+      item.id === updated.id ? updated : item,
+    )
+    syncPersonaFields(updated)
+    personaNotice.value = t('settings.persona.resetDone')
+  } catch (caught) {
+    personaError.value = errorMessage(caught)
+  } finally {
+    personaSaving.value = false
+  }
+}
+
+async function createPersona() {
+  if (!newPersona.name.trim() || !newPersona.prompt.trim()) {
+    personaError.value = t('settings.persona.invalid')
+    return
+  }
+
+  personaSaving.value = true
+  personaError.value = ''
+  personaNotice.value = ''
+  try {
+    const created = await api.personas.create({
+      name: newPersona.name,
+      description: newPersona.description || null,
+      prompt: newPersona.prompt,
+    })
+    personas.value = [...personas.value, created]
+    selectedPersonaId.value = created.id
+    syncPersonaFields(created)
+    newPersona.name = ''
+    newPersona.description = ''
+    newPersona.prompt = ''
+    creatingPersona.value = false
+    await changePersona(created.id)
+    personaNotice.value = t('settings.persona.created')
+  } catch (caught) {
+    personaError.value = errorMessage(caught)
+  } finally {
+    personaSaving.value = false
+  }
+}
+
+async function removePersona() {
+  const persona = selectedPersona.value
+  if (!persona || persona.isDefault) return
+  if (
+    !window.confirm(
+      t('settings.persona.deleteConfirm', { name: personaDisplayName(persona) }),
+    )
+  ) {
+    return
+  }
+
+  personaSaving.value = true
+  personaError.value = ''
+  personaNotice.value = ''
+  try {
+    await api.personas.remove(persona.id)
+    personas.value = personas.value.filter((item) => item.id !== persona.id)
+    const next = personas.value[0] ?? null
+    if (next) {
+      await changePersona(next.id)
+    } else {
+      selectedPersonaId.value = null
+      syncPersonaFields(null)
+    }
+    personaNotice.value = t('settings.persona.deleted')
+  } catch (caught) {
+    personaError.value = errorMessage(caught)
+  } finally {
+    personaSaving.value = false
   }
 }
 
@@ -154,8 +431,8 @@ onMounted(load)
   <div class="page settings-page">
     <header class="page-head">
       <div>
-        <h1>设置</h1>
-        <p>配置 AI 接入、遗忘曲线与界面主题，数据全部保存在本机。</p>
+        <h1>{{ t('settings.title') }}</h1>
+        <p>{{ t('settings.subtitle') }}</p>
       </div>
     </header>
 
@@ -165,11 +442,11 @@ onMounted(load)
     <section class="card settings-card">
       <div class="card-title">
         <div>
-          <h2>外观</h2>
-          <p class="hint">切换后立即生效，偏好保存在当前浏览器。</p>
+          <h2>{{ t('settings.appearance.title') }}</h2>
+          <p class="hint">{{ t('settings.appearance.hint') }}</p>
         </div>
         <span class="status-pill ok">
-          {{ themeStore.theme === 'swiss' ? '瑞士国际' : '新拟物派' }}
+          {{ t(themeStore.theme === 'swiss' ? 'theme.swiss.name' : 'theme.neumorphism.name') }}
         </span>
       </div>
 
@@ -185,8 +462,8 @@ onMounted(load)
         >
           <span class="theme-swatch" :class="`swatch-${option.id}`" aria-hidden="true" />
           <span class="theme-copy">
-            <strong>{{ option.name }}</strong>
-            <small>{{ option.description }}</small>
+            <strong>{{ t(option.nameKey) }}</strong>
+            <small>{{ t(option.descriptionKey) }}</small>
           </span>
           <Icon
             v-if="themeStore.theme === option.id"
@@ -201,8 +478,59 @@ onMounted(load)
     <section class="card settings-card">
       <div class="card-title">
         <div>
-          <h2>遗忘曲线</h2>
-          <p class="hint">控制每个复习阶段之间的窗口长度。</p>
+          <h2>{{ t('settings.language.title') }}</h2>
+          <p class="hint">{{ t('settings.language.hint') }}</p>
+        </div>
+        <span class="status-pill ok">
+          {{ locale === 'en' ? t('settings.language.en') : t('settings.language.zh') }}
+        </span>
+      </div>
+
+      <div class="theme-options">
+        <button
+          class="theme-option"
+          :class="{ active: locale === 'zh' }"
+          type="button"
+          :aria-pressed="locale === 'zh'"
+          @click="setLocale('zh')"
+        >
+          <span class="theme-copy">
+            <strong>{{ t('settings.language.zh') }}</strong>
+            <small>{{ t('settings.language.zhDesc') }}</small>
+          </span>
+          <Icon
+            v-if="locale === 'zh'"
+            class="theme-check"
+            name="check"
+            :size="17"
+          />
+        </button>
+        <button
+          class="theme-option"
+          :class="{ active: locale === 'en' }"
+          type="button"
+          :aria-pressed="locale === 'en'"
+          @click="setLocale('en')"
+        >
+          <span class="theme-copy">
+            <strong>{{ t('settings.language.en') }}</strong>
+            <small>{{ t('settings.language.enDesc') }}</small>
+          </span>
+          <Icon
+            v-if="locale === 'en'"
+            class="theme-check"
+            name="check"
+            :size="17"
+          />
+        </button>
+      </div>
+    </section>
+
+    <section class="card settings-card">
+      <div class="card-title">
+        <div>
+          <h2>{{ t('settings.review.title') }}</h2>
+          <p class="hint">{{ t('settings.review.hint') }}</p>
         </div>
       </div>
 
@@ -210,7 +538,7 @@ onMounted(load)
       <p v-if="reviewNotice" class="banner banner-ok">{{ reviewNotice }}</p>
 
       <div class="field">
-        <label for="review-intervals">复习间隔（天）</label>
+        <label for="review-intervals">{{ t('settings.review.intervals') }}</label>
         <input
           id="review-intervals"
           v-model="reviewForm.intervalsText"
@@ -219,12 +547,12 @@ onMounted(load)
           :disabled="loading"
         />
         <span class="hint">
-          用逗号分隔。第 N 次选择「记得」后，按第 N 个间隔安排下一次复习；走完最后一个间隔后视为已掌握。
+          {{ t('settings.review.intervalsHint') }}
         </span>
       </div>
 
       <div class="field">
-        <label for="review-retry">遗忘后重试窗口（分钟）</label>
+        <label for="review-retry">{{ t('settings.review.retry') }}</label>
         <input
           id="review-retry"
           v-model.number="reviewForm.forgotRetryMinutes"
@@ -235,13 +563,47 @@ onMounted(load)
           :disabled="loading"
         />
         <span class="hint">
-          选择「不记得」后，词条会在该时间后重新进入复习队列。默认 10 分钟。
+          {{ t('settings.review.retryHint') }}
+        </span>
+      </div>
+
+      <div class="field">
+        <label for="review-error-weight">{{ t('settings.review.errorWeight') }}</label>
+        <input
+          id="review-error-weight"
+          v-model.number="reviewForm.errorRateRecentWeight"
+          type="number"
+          min="0"
+          max="1"
+          step="0.05"
+          class="input"
+          :disabled="loading"
+        />
+        <span class="hint">
+          {{ t('settings.review.errorWeightHint') }}
+        </span>
+      </div>
+
+      <div class="field">
+        <label for="review-error-penalty">{{ t('settings.review.errorPenalty') }}</label>
+        <input
+          id="review-error-penalty"
+          v-model.number="reviewForm.errorRateIntervalPenalty"
+          type="number"
+          min="0"
+          max="1"
+          step="0.05"
+          class="input"
+          :disabled="loading"
+        />
+        <span class="hint">
+          {{ t('settings.review.errorPenaltyHint') }}
         </span>
       </div>
 
       <div class="actions">
         <button class="btn btn-primary" :disabled="reviewSaving" @click="saveReview">
-          {{ reviewSaving ? '保存中…' : '保存遗忘曲线' }}
+          {{ reviewSaving ? t('common.saving') : t('settings.review.save') }}
         </button>
       </div>
     </section>
@@ -249,28 +611,296 @@ onMounted(load)
     <section class="card settings-card">
       <div class="card-title">
         <div>
-          <h2>AI 接入</h2>
-          <p class="hint">支持 OpenAI / DeepSeek / 通义千问 / Ollama 等兼容接口。</p>
+          <h2>{{ t('settings.context.title') }}</h2>
+          <p class="hint">{{ t('settings.context.hint') }}</p>
+        </div>
+      </div>
+
+      <p v-if="behaviorError" class="banner banner-error">{{ behaviorError }}</p>
+      <p v-if="behaviorNotice" class="banner banner-ok">{{ behaviorNotice }}</p>
+
+      <div class="field">
+        <label for="memory-limit">{{ t('settings.context.memoryLimit') }}</label>
+        <input
+          id="memory-limit"
+          v-model.number="behaviorForm.memoryLimit"
+          type="number"
+          min="1"
+          max="30"
+          class="input"
+          :disabled="loading"
+        />
+        <span class="hint">{{ t('settings.context.memoryLimitHint') }}</span>
+      </div>
+
+      <div class="field">
+        <label for="memory-budget">{{ t('settings.context.charBudget') }}</label>
+        <input
+          id="memory-budget"
+          v-model.number="behaviorForm.memoryCharBudget"
+          type="number"
+          min="200"
+          max="12000"
+          step="100"
+          class="input"
+          :disabled="loading"
+        />
+        <span class="hint">{{ t('settings.context.charBudgetHint') }}</span>
+      </div>
+
+      <div class="field">
+        <label for="history-limit">{{ t('settings.context.historyLimit') }}</label>
+        <input
+          id="history-limit"
+          v-model.number="behaviorForm.historyLimit"
+          type="number"
+          min="2"
+          max="50"
+          class="input"
+          :disabled="loading"
+        />
+        <span class="hint">{{ t('settings.context.historyLimitHint') }}</span>
+      </div>
+
+      <div class="actions">
+        <button class="btn btn-primary" :disabled="behaviorSaving" @click="saveBehavior">
+          {{ behaviorSaving ? t('common.saving') : t('settings.context.save') }}
+        </button>
+      </div>
+    </section>
+
+    <section class="card settings-card">
+      <div class="card-title">
+        <div>
+          <h2>{{ t('settings.teaching.title') }}</h2>
+          <p class="hint">
+            {{ t('settings.teaching.hint') }}
+          </p>
+        </div>
+        <span class="status-pill ok">
+          {{ teachingForm.explanationMode === 'english' ? t('settings.teaching.english') : t('settings.teaching.bilingual') }}
+        </span>
+      </div>
+
+      <p v-if="teachingError" class="banner banner-error">{{ teachingError }}</p>
+      <p v-if="teachingNotice" class="banner banner-ok">{{ teachingNotice }}</p>
+
+      <div class="theme-options">
+        <button
+          class="theme-option"
+          :class="{ active: teachingForm.explanationMode === 'bilingual' }"
+          type="button"
+          :aria-pressed="teachingForm.explanationMode === 'bilingual'"
+          @click="teachingForm.explanationMode = 'bilingual'"
+        >
+          <span class="theme-copy">
+            <strong>{{ t('settings.teaching.bilingual') }}</strong>
+            <small>{{ t('settings.teaching.bilingualDesc') }}</small>
+          </span>
+          <Icon
+            v-if="teachingForm.explanationMode === 'bilingual'"
+            class="theme-check"
+            name="check"
+            :size="17"
+          />
+        </button>
+        <button
+          class="theme-option"
+          :class="{ active: teachingForm.explanationMode === 'english' }"
+          type="button"
+          :aria-pressed="teachingForm.explanationMode === 'english'"
+          @click="teachingForm.explanationMode = 'english'"
+        >
+          <span class="theme-copy">
+            <strong>{{ t('settings.teaching.english') }}</strong>
+            <small>{{ t('settings.teaching.englishDesc') }}</small>
+          </span>
+          <Icon
+            v-if="teachingForm.explanationMode === 'english'"
+            class="theme-check"
+            name="check"
+            :size="17"
+          />
+        </button>
+      </div>
+
+      <div class="actions">
+        <button class="btn btn-primary" :disabled="teachingSaving" @click="saveTeaching">
+          {{ teachingSaving ? t('common.saving') : t('settings.teaching.save') }}
+        </button>
+      </div>
+    </section>
+
+    <section class="card settings-card">
+      <div class="card-title">
+        <div>
+          <h2>{{ t('settings.persona.title') }}</h2>
+          <p class="hint">
+            {{ t('settings.persona.hint') }}
+          </p>
+        </div>
+        <span class="status-pill ok">
+          {{ selectedPersona?.isDefault ? t('persona.defaultTag') : t('persona.customTag') }}
+        </span>
+      </div>
+
+      <p v-if="personaError" class="banner banner-error">{{ personaError }}</p>
+      <p v-if="personaNotice" class="banner banner-ok">{{ personaNotice }}</p>
+
+      <div class="field">
+        <label for="persona-select">{{ t('settings.persona.current') }}</label>
+        <select
+          id="persona-select"
+          class="input"
+          :value="selectedPersonaId ?? ''"
+          :disabled="loading"
+          @change="onPersonaChange"
+        >
+          <option v-for="persona in personas" :key="persona.id" :value="persona.id">
+            {{ personaDisplayName(persona) }}{{ persona.isDefault ? ` · ${t('persona.defaultTag')}` : '' }}
+          </option>
+        </select>
+        <span v-if="selectedPersona?.description" class="hint">
+          {{ personaDisplayDescription(selectedPersona) }}
+        </span>
+      </div>
+
+      <template v-if="selectedPersona">
+        <div v-if="!selectedPersona.isDefault" class="persona-meta">
+          <div class="field">
+            <label for="persona-name">{{ t('settings.persona.name') }}</label>
+            <input
+              id="persona-name"
+              v-model="personaName"
+              class="input"
+              maxlength="80"
+              :disabled="personaSaving"
+            />
+          </div>
+          <div class="field">
+            <label for="persona-description">{{ t('settings.persona.description') }}</label>
+            <input
+              id="persona-description"
+              v-model="personaDescription"
+              class="input"
+              maxlength="300"
+              :disabled="personaSaving"
+            />
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="persona-prompt">{{ t('settings.persona.prompt') }}</label>
+          <textarea
+            id="persona-prompt"
+            v-model="personaPrompt"
+            class="input persona-textarea"
+            rows="6"
+            :disabled="personaSaving"
+          />
+          <span class="hint">
+            {{ t('settings.persona.promptHint') }}
+          </span>
+        </div>
+
+        <div class="actions">
+          <button
+            v-if="selectedPersona.isDefault"
+            class="btn btn-ghost"
+            :disabled="personaSaving"
+            @click="resetPersona"
+          >
+            {{ t('settings.persona.reset') }}
+          </button>
+          <button
+            v-if="!selectedPersona.isDefault"
+            class="btn btn-ghost"
+            :disabled="personaSaving"
+            @click="removePersona"
+          >
+            {{ t('settings.persona.delete') }}
+          </button>
+          <button class="btn btn-primary" :disabled="personaSaving" @click="savePersona">
+            {{ personaSaving ? t('common.saving') : t('settings.persona.save') }}
+          </button>
+        </div>
+      </template>
+
+      <div class="persona-create">
+        <button
+          v-if="!creatingPersona"
+          class="btn btn-soft btn-sm"
+          @click="creatingPersona = true"
+        >
+          <Icon name="plus" :size="15" /> {{ t('settings.persona.new') }}
+        </button>
+        <template v-else>
+          <div class="persona-meta">
+            <div class="field">
+              <label for="new-persona-name">{{ t('settings.persona.newName') }}</label>
+              <input
+                id="new-persona-name"
+                v-model="newPersona.name"
+                class="input"
+                maxlength="80"
+              />
+            </div>
+            <div class="field">
+              <label for="new-persona-description">{{ t('settings.persona.newDescription') }}</label>
+              <input
+                id="new-persona-description"
+                v-model="newPersona.description"
+                class="input"
+                maxlength="300"
+              />
+            </div>
+          </div>
+          <div class="field">
+            <label for="new-persona-prompt">{{ t('settings.persona.newPrompt') }}</label>
+            <textarea
+              id="new-persona-prompt"
+              v-model="newPersona.prompt"
+              class="input persona-textarea"
+              rows="5"
+            />
+          </div>
+          <div class="actions">
+            <button class="btn btn-ghost" :disabled="personaSaving" @click="creatingPersona = false">
+              {{ t('common.cancel') }}
+            </button>
+            <button class="btn btn-primary" :disabled="personaSaving" @click="createPersona">
+              {{ personaSaving ? t('common.saving') : t('settings.persona.create') }}
+            </button>
+          </div>
+        </template>
+      </div>
+    </section>
+
+    <section class="card settings-card">
+      <div class="card-title">
+        <div>
+          <h2>{{ t('settings.ai.title') }}</h2>
+          <p class="hint">{{ t('settings.ai.hint') }}</p>
         </div>
         <span
           class="status-pill"
           :class="store.settings?.configured ? 'ok' : 'warn'"
         >
-          {{ store.settings?.configured ? '已配置' : '未配置' }}
+          {{ store.settings?.configured ? t('settings.ai.configured') : t('settings.ai.notConfigured') }}
         </span>
       </div>
 
       <div class="field">
-        <label>快捷预设</label>
+        <label>{{ t('settings.ai.presets') }}</label>
         <div class="presets">
           <button
             v-for="preset in presets"
-            :key="preset.name"
+            :key="preset.labelKey"
             class="preset"
             type="button"
             @click="applyPreset(preset)"
           >
-            {{ preset.name }}
+            {{ t(preset.labelKey) }}
           </button>
         </div>
       </div>
@@ -287,7 +917,7 @@ onMounted(load)
       </div>
 
       <div class="field">
-        <label for="model">模型</label>
+        <label for="model">{{ t('settings.ai.model') }}</label>
         <input
           id="model"
           v-model="form.model"
@@ -306,7 +936,7 @@ onMounted(load)
           <option value="qwen2.5:7b" />
           <option value="llama3.1" />
         </datalist>
-        <span class="hint">可从常见模型中选择，也可以直接输入自定义模型名。</span>
+        <span class="hint">{{ t('settings.ai.modelHint') }}</span>
       </div>
 
       <div class="field">
@@ -318,7 +948,7 @@ onMounted(load)
           class="input"
           :placeholder="
             store.settings?.hasApiKey
-              ? `已保存 ${store.settings.apiKeyMasked}，留空表示不修改`
+              ? t('settings.ai.apiKeySaved', { masked: store.settings.apiKeyMasked ?? '' })
               : 'sk-...'
           "
           :disabled="loading || form.clearApiKey"
@@ -326,21 +956,21 @@ onMounted(load)
         />
         <label v-if="store.settings?.hasApiKey" class="check-row">
           <input v-model="form.clearApiKey" type="checkbox" />
-          清除已保存的 API Key
+          {{ t('settings.ai.clearApiKey') }}
         </label>
         <span class="hint">
-          本地 Ollama 等无需鉴权的服务可以留空；Key 仅保存在本机数据库。
+          {{ t('settings.ai.apiKeyHint') }}
         </span>
       </div>
 
       <div class="actions">
         <button class="btn btn-ghost" :disabled="testing" @click="test">
           <Icon :name="testing ? 'refresh' : 'layers'" :size="16" />
-          {{ testing ? '测试中…' : '测试连接' }}
+          {{ testing ? t('settings.ai.testing') : t('settings.ai.test') }}
         </button>
         <button class="btn btn-primary" :disabled="saving" @click="save">
           <Icon :name="saving ? 'refresh' : 'check'" :size="16" />
-          {{ saving ? '保存中…' : '保存设置' }}
+          {{ saving ? t('common.saving') : t('settings.ai.save') }}
         </button>
       </div>
 
@@ -351,25 +981,25 @@ onMounted(load)
 
     <section class="card info-card">
       <div class="card-title">
-        <h2>本地数据</h2>
+        <h2>{{ t('settings.local.title') }}</h2>
         <Icon name="info" :size="18" />
       </div>
       <ul class="info-list">
         <li>
-          <span>数据库</span>
+          <span>{{ t('settings.local.database') }}</span>
           <code>data/easy-english.db</code>
         </li>
         <li>
-          <span>配置来源</span>
-          <code>{{ store.settings?.source === 'env' ? '环境变量' : store.settings?.source === 'settings' ? '设置页' : '默认值' }}</code>
+          <span>{{ t('settings.local.source') }}</span>
+          <code>{{ store.settings?.source === 'env' ? t('settings.local.env') : store.settings?.source === 'settings' ? t('settings.local.settings') : t('settings.local.default') }}</code>
         </li>
         <li>
-          <span>复习配置</span>
-          <code>{{ savedReviewText || '未读取' }}</code>
+          <span>{{ t('settings.local.review') }}</span>
+          <code>{{ savedReviewText || t('settings.local.notRead') }}</code>
         </li>
       </ul>
       <p class="hint">
-        备份时复制整个 <code>data/</code> 目录即可；所有词条、对话和总结都在这一个 SQLite 文件里。
+        {{ t('settings.local.backupHint') }}
       </p>
     </section>
   </div>
@@ -530,8 +1160,26 @@ onMounted(load)
   flex: 0 0 auto;
   color: var(--accent-strong);
 }
+.persona-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.persona-textarea {
+  min-height: 120px;
+  resize: vertical;
+  line-height: 1.6;
+}
+.persona-create {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
 @media (max-width: 620px) {
   .theme-options {
+    grid-template-columns: 1fr;
+  }
+  .persona-meta {
     grid-template-columns: 1fr;
   }
 }

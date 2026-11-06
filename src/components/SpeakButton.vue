@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref } from 'vue'
 import Icon from '@/components/Icon.vue'
+import { t } from '@/i18n'
 import { speak, speechSupported, stopSpeaking } from '@/lib/speech'
 
 const props = defineProps<{ text: string; size?: number }>()
@@ -10,8 +11,8 @@ const failed = ref(false)
 const supported = speechSupported()
 
 const label = computed(() => {
-  if (!supported || failed.value) return '当前浏览器无法朗读'
-  return speaking.value ? '停止朗读' : '朗读英文'
+  if (!supported || failed.value) return t('speak.unsupported')
+  return speaking.value ? t('speak.stop') : t('speak.speak')
 })
 
 function onClick() {

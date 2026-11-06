@@ -2,12 +2,19 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import type { Entry, EntryType } from '@shared/types'
-import { ENTRY_TYPE_LABELS } from '@shared/types'
 import Icon from '@/components/Icon.vue'
 import SpeakButton from '@/components/SpeakButton.vue'
 import TypeBadge from '@/components/TypeBadge.vue'
+import { entryTypeLabel, t } from '@/i18n'
 import { api, errorMessage } from '@/lib/api'
 import { stageLabel } from '@/lib/format'
+import {
+  comparePronunciation,
+  speechRecognitionSupported,
+  startRecognition,
+  type PronunciationResult,
+} from '@/lib/pronunciation'
+import { speak, stopSpeaking } from '@/lib/speech'
 import { useAppStore } from '@/stores/app'
 
 type Phase = 'setup' | 'session' | 'done'
@@ -25,6 +32,14 @@ const forgot = ref(0)
 const loading = ref(false)
 const error = ref('')
 const retryMinutes = ref(10)
+const generatingExamples = ref(false)
+const exampleNotice = ref('')
+const shadowing = ref(false)
+const shadowingResult = ref<PronunciationResult | null>(null)
+const shadowingError = ref('')
+const recognitionSupported = speechRecognitionSupported()
+let recognitionController: { stop: () => void } | null = null
+let shadowingToken = 0
 
 const allTypes: EntryType[] = ['word', 'phrase', 'sentence']
 const current = computed(() => queue.value[index.value] ?? null)
@@ -56,8 +71,10 @@ async function start() {
     remembered.value = 0
     forgot.value = 0
     revealed.value = false
+    exampleNotice.value = ''
+    resetShadowing()
     if (!queue.value.length) {
-      error.value = '当前筛选下没有到期的复习内容。可以先去词库添加，或者稍后再来。'
+      error.value = t('review.noDue')
       return
     }
     phase.value = 'session'
@@ -75,7 +92,8 @@ async function rate(rating: 'remembered' | 'forgot') {
   loading.value = true
   error.value = ''
   try {
-    await api.review.rate(entry.id, rating)
+    const result = await api.review.rate(entry.id, rating)
+    if (current.value && result.entry) Object.assign(current.value, result.entry)
     if (rating === 'remembered') {
       remembered.value += 1
       advance()
@@ -91,8 +109,97 @@ async function rate(rating: 'remembered' | 'forgot') {
   }
 }
 
+async function generateExamples() {
+  const entry = current.value
+  if (!entry || generatingExamples.value) return
+
+  generatingExamples.value = true
+  error.value = ''
+  exampleNotice.value = ''
+  try {
+    const result = await api.entries.generateExamples(entry.id, 3)
+    if (current.value && result.entry) Object.assign(current.value, result.entry)
+    exampleNotice.value = result.added
+      ? t('review.examplesAdded', { count: result.added })
+      : result.message || t('review.noExamples')
+  } catch (caught) {
+    error.value = errorMessage(caught)
+  } finally {
+    generatingExamples.value = false
+  }
+}
+
+function resetShadowing() {
+  shadowingToken += 1
+  recognitionController?.stop()
+  recognitionController = null
+  stopSpeaking()
+  shadowing.value = false
+  shadowingResult.value = null
+  shadowingError.value = ''
+}
+
+function stopShadowing() {
+  resetShadowing()
+}
+
+function startShadowing() {
+  const entry = current.value
+  if (!entry || shadowing.value) return
+  if (!recognitionSupported) {
+    shadowingError.value = t('pronunciation.unsupported')
+    return
+  }
+
+  shadowingError.value = ''
+  shadowingResult.value = null
+  shadowing.value = true
+  const token = ++shadowingToken
+  stopSpeaking()
+
+  const begin = () => {
+    if (token !== shadowingToken) return
+    const controller = startRecognition({
+      onError: (message) => {
+        if (token !== shadowingToken) return
+        shadowingError.value = message
+      },
+      onEnd: (transcript) => {
+        if (token !== shadowingToken) return
+        recognitionController = null
+        shadowing.value = false
+        if (transcript.trim()) {
+          shadowingResult.value = comparePronunciation(entry.text, transcript)
+        }
+      },
+    })
+
+    if (!controller) {
+      shadowing.value = false
+      shadowingError.value = t('pronunciation.cannotStart')
+      return
+    }
+    recognitionController = controller
+  }
+
+  const ok = speak(entry.text, {
+    onEnd: begin,
+    onError: () => {
+      if (token !== shadowingToken) return
+      shadowing.value = false
+      shadowingError.value = t('review.speakFailed')
+    },
+  })
+  if (!ok) {
+    shadowing.value = false
+    shadowingError.value = t('review.speechUnsupported')
+  }
+}
+
 function advance() {
   revealed.value = false
+  exampleNotice.value = ''
+  resetShadowing()
   if (index.value + 1 >= queue.value.length) {
     phase.value = 'done'
   } else {
@@ -105,6 +212,8 @@ function exit() {
   queue.value = []
   index.value = 0
   revealed.value = false
+  exampleNotice.value = ''
+  resetShadowing()
   store.refreshStats().catch(() => {})
 }
 
@@ -139,6 +248,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeydown)
+  resetShadowing()
 })
 </script>
 
@@ -146,8 +256,8 @@ onBeforeUnmount(() => {
   <div class="page">
     <header class="page-head">
       <div>
-        <h1>复习</h1>
-        <p>先看英文，主动回忆。记得就跳过，不记得再展开答案。</p>
+        <h1>{{ t('review.title') }}</h1>
+        <p>{{ t('review.subtitle') }}</p>
       </div>
     </header>
 
@@ -155,7 +265,7 @@ onBeforeUnmount(() => {
 
     <template v-if="phase === 'setup'">
       <section class="card setup-card">
-        <h2>选择要复习的类型</h2>
+        <h2>{{ t('review.selectTypes') }}</h2>
         <div class="type-filters">
           <button
             v-for="type in allTypes"
@@ -165,7 +275,7 @@ onBeforeUnmount(() => {
             :aria-pressed="selectedTypes.includes(type)"
             @click="toggleType(type)"
           >
-            <span>{{ ENTRY_TYPE_LABELS[type] }}</span>
+            <span>{{ entryTypeLabel(type) }}</span>
             <strong>{{ dueCount(type) }}</strong>
           </button>
         </div>
@@ -173,15 +283,15 @@ onBeforeUnmount(() => {
         <div class="setup-summary">
           <div>
             <strong>{{ store.dueTotal }}</strong>
-            <span>当前到期</span>
+            <span>{{ t('review.dueNow') }}</span>
           </div>
           <div>
             <strong>{{ store.stats?.reviewedToday ?? 0 }}</strong>
-            <span>今日已复习</span>
+            <span>{{ t('review.reviewedToday') }}</span>
           </div>
           <div>
             <strong>{{ store.stats?.streakDays ?? 0 }}</strong>
-            <span>连续天数</span>
+            <span>{{ t('review.streak') }}</span>
           </div>
         </div>
 
@@ -191,16 +301,16 @@ onBeforeUnmount(() => {
           @click="start"
         >
           <Icon :name="loading ? 'refresh' : 'review'" :size="18" />
-          {{ loading ? '加载中…' : '开始复习' }}
+          {{ loading ? t('common.loading') : t('review.start') }}
         </button>
-        <p class="hint">进入复习后：按 1 表示记得，按 2 表示不记得；展开答案后按空格继续。</p>
+        <p class="hint">{{ t('review.startHint') }}</p>
       </section>
     </template>
 
     <template v-else-if="phase === 'session' && current">
       <div class="review-bar">
         <button class="btn btn-ghost btn-sm" @click="exit">
-          <Icon name="chevron-left" :size="15" /> 退出
+          <Icon name="chevron-left" :size="15" /> {{ t('review.exit') }}
         </button>
         <div class="progress-track">
           <div class="progress-fill" :style="{ width: `${progress}%` }" />
@@ -212,21 +322,63 @@ onBeforeUnmount(() => {
         <div class="review-meta">
           <TypeBadge :type="current.type" />
           <span class="muted small">{{ stageLabel(current.review?.stage ?? 0) }}</span>
+          <span v-if="current.errorRate >= 0.05" class="tag-soft">
+            {{ t('review.errorRate', { rate: Math.round(current.errorRate * 100) }) }}
+          </span>
+          <RouterLink
+            v-if="current.sourceSessionId"
+            :to="`/chat/${current.sourceSessionId}`"
+            class="source-link"
+          >
+            {{ t('review.fromChat') }}
+          </RouterLink>
           <SpeakButton :text="current.text" :size="20" />
+          <button
+            class="icon-btn"
+            :class="{ speaking: shadowing }"
+            type="button"
+            :title="
+              !recognitionSupported
+                ? t('review.shadowUnsupported')
+                : shadowing
+                  ? t('review.shadowStop')
+                  : t('review.shadowTitle')
+            "
+            :aria-label="t('review.shadowTitle')"
+            :aria-pressed="shadowing"
+            :disabled="!recognitionSupported"
+            @click="shadowing ? stopShadowing() : startShadowing()"
+          >
+            <Icon :name="shadowing ? 'stop' : 'mic'" :size="20" />
+          </button>
         </div>
 
         <p class="review-text" :class="{ sentence: current.type === 'sentence' }">
           {{ current.text }}
         </p>
 
+        <div v-if="shadowing || shadowingResult || shadowingError" class="shadowing-box">
+          <p v-if="shadowing" class="hint">{{ t('review.shadowListening') }}</p>
+          <p v-else-if="shadowingError" class="hint">{{ shadowingError }}</p>
+          <template v-else-if="shadowingResult">
+            <div class="row between wrap">
+              <strong>{{ t('review.shadowScore', { score: shadowingResult.score }) }}</strong>
+              <span class="muted small">
+                {{ t('review.shadowWords', { matched: shadowingResult.matchedWords, total: shadowingResult.totalWords }) }}
+              </span>
+            </div>
+            <p class="hint">{{ t('review.shadowHeard', { text: shadowingResult.transcript }) }}</p>
+          </template>
+        </div>
+
         <template v-if="!revealed">
-          <p class="recall-prompt">你记得它的意思吗？</p>
+          <p class="recall-prompt">{{ t('review.recallPrompt') }}</p>
           <div class="recall-actions">
             <button class="btn btn-primary btn-lg" :disabled="loading" @click="rate('remembered')">
-              <Icon name="check" :size="18" /> 记得
+              <Icon name="check" :size="18" /> {{ t('review.remembered') }}
             </button>
             <button class="btn btn-ghost btn-lg" :disabled="loading" @click="rate('forgot')">
-              <Icon name="refresh" :size="18" /> 不记得
+              <Icon name="refresh" :size="18" /> {{ t('review.forgot') }}
             </button>
           </div>
         </template>
@@ -234,23 +386,35 @@ onBeforeUnmount(() => {
         <template v-else>
           <div class="reveal">
             <div v-if="current.meaning" class="reveal-block">
-              <h3>含义</h3>
+              <h3>{{ t('review.meaning') }}</h3>
               <p>{{ current.meaning }}</p>
             </div>
             <div v-if="current.explanation" class="reveal-block">
-              <h3>解释与用法</h3>
+              <h3>{{ t('review.explanation') }}</h3>
               <p class="pre-wrap">{{ current.explanation }}</p>
             </div>
-            <div v-if="current.examples.length" class="reveal-block">
-              <h3>例句</h3>
-              <ul>
+            <div class="reveal-block">
+              <div class="row between wrap example-head">
+                <h3>{{ t('review.examples') }}</h3>
+                <button
+                  class="btn btn-ghost btn-sm"
+                  :disabled="generatingExamples"
+                  @click="generateExamples"
+                >
+                  <Icon :name="generatingExamples ? 'refresh' : 'sparkles'" :size="14" />
+                  {{ generatingExamples ? t('review.generatingExamples') : t('review.generateExamples') }}
+                </button>
+              </div>
+              <ul v-if="current.examples.length">
                 <li v-for="(example, exampleIndex) in current.examples" :key="exampleIndex">
                   {{ example }}
                 </li>
               </ul>
+              <p v-else class="hint">{{ t('review.noExamplesHint') }}</p>
+              <p v-if="exampleNotice" class="hint example-notice">{{ exampleNotice }}</p>
             </div>
             <div v-if="current.notes" class="reveal-block">
-              <h3>我的笔记</h3>
+              <h3>{{ t('review.notes') }}</h3>
               <p class="pre-wrap">{{ current.notes }}</p>
             </div>
             <div v-if="current.tags.length" class="reveal-tags">
@@ -259,28 +423,28 @@ onBeforeUnmount(() => {
           </div>
 
           <button class="btn btn-primary btn-lg" :disabled="loading" @click="advance">
-            继续 <Icon name="arrow-right" :size="18" />
+            {{ t('review.continue') }} <Icon name="arrow-right" :size="18" />
           </button>
-          <p class="hint">按空格继续 · 这个词条会在 {{ retryMinutes }} 分钟后再次出现</p>
+          <p class="hint">{{ t('review.continueHint', { minutes: retryMinutes }) }}</p>
         </template>
       </section>
 
       <div class="review-stats">
-        <span class="ok">记得 {{ remembered }}</span>
-        <span class="bad">不记得 {{ forgot }}</span>
+        <span class="ok">{{ t('review.rememberedCount', { count: remembered }) }}</span>
+        <span class="bad">{{ t('review.forgotCount', { count: forgot }) }}</span>
       </div>
     </template>
 
     <template v-else-if="phase === 'done'">
       <section class="card done-card">
         <div class="done-mark"><Icon name="check" :size="30" /></div>
-        <h2>这一轮复习完成</h2>
+        <h2>{{ t('review.doneTitle') }}</h2>
         <p class="muted">
-          共 {{ queue.length }} 条 · 记得 {{ remembered }} · 不记得 {{ forgot }}
+          {{ t('review.doneSummary', { total: queue.length, remembered, forgot }) }}
         </p>
         <div class="done-actions">
-          <button class="btn btn-primary" @click="start">再来一轮</button>
-          <button class="btn btn-ghost" @click="router.push('/today')">回到今日</button>
+          <button class="btn btn-primary" @click="start">{{ t('review.again') }}</button>
+          <button class="btn btn-ghost" @click="router.push('/today')">{{ t('review.backToday') }}</button>
         </div>
       </section>
     </template>
@@ -388,6 +552,38 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.tag-soft {
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-size: 11px;
+  font-weight: 600;
+}
+.source-link {
+  font-size: 12px;
+  color: var(--accent-strong);
+}
+.icon-btn.speaking {
+  color: var(--accent-strong);
+  box-shadow: var(--shadow-pressed);
+}
+.shadowing-box {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  box-shadow: var(--shadow-inset-sm);
+  text-align: left;
+}
+.shadowing-box strong {
+  color: var(--accent-strong);
+}
+.shadowing-box .hint {
+  margin: 4px 0 0;
 }
 .review-text {
   margin: 0;
@@ -421,6 +617,16 @@ onBeforeUnmount(() => {
   gap: 20px;
   text-align: left;
   padding-top: 8px;
+}
+.example-head {
+  align-items: center;
+  margin-bottom: 6px;
+}
+.example-head h3 {
+  margin-bottom: 0;
+}
+.example-notice {
+  margin-top: 6px;
 }
 .reveal-block h3 {
   margin: 0 0 6px;

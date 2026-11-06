@@ -1,23 +1,13 @@
 import type { DraftEntry, EntryType } from '../../shared/types'
 import { db } from '../db'
+import { normalizeEntryText } from './text'
+
+export { normalizeEntryText }
 
 /**
  * 词条去重只看主要英文内容，不把类型、释义、解释、例句、标签算进去。
- * - 忽略大小写、首尾空白和多余空格
- * - 忽略首尾引号
- * - 忽略结尾的句号/问号/感叹号，避免 "You're gorgeous." 和 "You're gorgeous" 重复
+ * normalizeEntryText 负责大小写、空白、首尾引号和结尾标点的归一化。
  */
-export function normalizeEntryText(text: string): string {
-  return text
-    .trim()
-    .replace(/^["“”'‘’]+/, '')
-    .replace(/["“”'‘’]+$/, '')
-    .replace(/\s+/g, ' ')
-    .replace(/[.!?。！？]+$/u, '')
-    .trim()
-    .toLowerCase()
-}
-
 export function entryKey(text: string): string {
   return normalizeEntryText(text)
 }
@@ -54,9 +44,17 @@ export function findExistingEntryByText(
     : null
 }
 
+/** 已有词条的 key → id 映射，用于批量入库时报告重复项来源。 */
+export function loadExistingEntryKeyMap(): Map<string, number> {
+  const rows = db.prepare('SELECT id, text FROM entries').all() as Array<{
+    id: number
+    text: string
+  }>
+  return new Map(rows.map((row) => [entryKey(row.text), row.id]))
+}
+
 export function loadExistingEntryKeys(): Set<string> {
-  const rows = db.prepare('SELECT text FROM entries').all() as Array<{ text: string }>
-  return new Set(rows.map((row) => entryKey(row.text)))
+  return new Set(loadExistingEntryKeyMap().keys())
 }
 
 /**
@@ -65,13 +63,14 @@ export function loadExistingEntryKeys(): Set<string> {
  */
 export function markDraftDuplicates(
   entries: DraftEntry[],
-  existing: Set<string> = loadExistingEntryKeys(),
+  existing: Map<string, number> = loadExistingEntryKeyMap(),
 ): DraftEntry[] {
   const seen = new Set<string>()
   return entries.map((entry) => {
     const key = entryKey(entry.text)
-    const duplicate = existing.has(key) || seen.has(key)
+    const existingEntryId = existing.get(key) ?? null
+    const duplicate = existingEntryId !== null || seen.has(key)
     seen.add(key)
-    return { ...entry, duplicate }
+    return { ...entry, duplicate, existingEntryId }
   })
 }

@@ -1,18 +1,24 @@
+import { locale, t } from '@/i18n'
+
+function intlLocale(): string {
+  return locale.value === 'en' ? 'en-US' : 'zh-CN'
+}
+
 export function formatRelativeTime(iso: string): string {
   const date = new Date(iso)
   const diff = date.getTime() - Date.now()
   const abs = Math.abs(diff)
-  const rtf = new Intl.RelativeTimeFormat('zh-CN', { numeric: 'auto' })
+  const rtf = new Intl.RelativeTimeFormat(intlLocale(), { numeric: 'auto' })
 
-  if (abs < 45_000) return '刚刚'
+  if (abs < 45_000) return t('format.justNow')
   if (abs < 3_600_000) return rtf.format(Math.round(diff / 60_000), 'minute')
   if (abs < 86_400_000) return rtf.format(Math.round(diff / 3_600_000), 'hour')
   if (abs < 30 * 86_400_000) return rtf.format(Math.round(diff / 86_400_000), 'day')
-  return date.toLocaleDateString('zh-CN')
+  return date.toLocaleDateString(intlLocale())
 }
 
 export function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString('zh-CN', {
+  return new Date(iso).toLocaleString(intlLocale(), {
     month: 'numeric',
     day: 'numeric',
     hour: '2-digit',
@@ -21,12 +27,12 @@ export function formatDateTime(iso: string): string {
 }
 
 export function formatDue(iso: string): string {
-  if (new Date(iso).getTime() <= Date.now()) return '现在'
+  if (new Date(iso).getTime() <= Date.now()) return t('format.now')
   return formatRelativeTime(iso)
 }
 
 export function todayLongLabel(date = new Date()): string {
-  return new Intl.DateTimeFormat('zh-CN', {
+  return new Intl.DateTimeFormat(intlLocale(), {
     month: 'long',
     day: 'numeric',
     weekday: 'long',
@@ -38,8 +44,8 @@ export function startOfTodayIso(date = new Date()): string {
 }
 
 export function stageLabel(stage: number): string {
-  if (stage <= 0) return '新词'
-  return `第 ${stage} 阶段`
+  if (stage <= 0) return t('stage.new')
+  return t('stage.nth', { stage })
 }
 
 export function truncate(text: string, max = 120): string {

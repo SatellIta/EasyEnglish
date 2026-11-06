@@ -4,6 +4,7 @@ import type { Entry } from '@shared/types'
 import BaseModal from '@/components/BaseModal.vue'
 import Icon from '@/components/Icon.vue'
 import TypeBadge from '@/components/TypeBadge.vue'
+import { t } from '@/i18n'
 import { api, errorMessage } from '@/lib/api'
 import { truncate } from '@/lib/format'
 
@@ -80,22 +81,22 @@ watch(q, () => {
 </script>
 
 <template>
-  <BaseModal :open="open" title="从词库添加到场景" width="640px" @close="emit('close')">
+  <BaseModal :open="open" :title="t('scene.picker.title')" width="640px" @close="emit('close')">
     <div class="picker">
       <div class="search-box">
         <Icon name="search" :size="17" />
         <input
           v-model="q"
           class="search-input"
-          aria-label="搜索要加入场景的词条"
-          placeholder="搜索英文、中文释义或笔记…"
+          :aria-label="t('scene.picker.searchLabel')"
+          :placeholder="t('scene.picker.searchPlaceholder')"
         />
       </div>
 
       <p v-if="error" class="banner banner-error">{{ error }}</p>
-      <p v-if="loading && !entries.length" class="empty">加载中…</p>
+      <p v-if="loading && !entries.length" class="empty">{{ t('common.loading') }}</p>
       <p v-else-if="!available.length" class="empty">
-        {{ q ? '没有匹配的词条。' : '词库里还没有可添加的词条。' }}
+        {{ q ? t('scene.picker.emptyQuery') : t('scene.picker.empty') }}
       </p>
 
       <div v-else class="picker-list">
@@ -115,14 +116,14 @@ watch(q, () => {
               {{ truncate(entry.explanation, 100) }}
             </small>
           </span>
-          <span v-if="!entry.reviewEnabled" class="tag">不复习</span>
+          <span v-if="!entry.reviewEnabled" class="tag">{{ t('scene.picker.notReview') }}</span>
         </label>
       </div>
-      <p class="hint">最多显示 100 条匹配结果；可以先用搜索缩小范围。</p>
+      <p class="hint">{{ t('scene.picker.hint') }}</p>
     </div>
 
     <template #footer>
-      <button class="btn btn-ghost" type="button" @click="emit('close')">取消</button>
+      <button class="btn btn-ghost" type="button" @click="emit('close')">{{ t('common.cancel') }}</button>
       <button
         class="btn btn-primary"
         type="button"
@@ -130,7 +131,7 @@ watch(q, () => {
         @click="submit"
       >
         <Icon :name="saving ? 'refresh' : 'plus'" :size="16" />
-        {{ saving ? '添加中…' : `添加 ${count} 条` }}
+        {{ saving ? t('scene.picker.adding') : t('scene.picker.add', { count }) }}
       </button>
     </template>
   </BaseModal>

@@ -27,7 +27,7 @@ app.get('/api/review/queue', (c) => {
       `${ENTRY_SELECT}
        WHERE r.next_review_at IS NOT NULL AND r.next_review_at <= ?
          AND e.review_enabled = 1 ${typeSql}
-       ORDER BY r.next_review_at ASC, e.id ASC
+       ORDER BY r.next_review_at ASC, e.error_rate DESC, e.id ASC
        LIMIT ?`,
     )
     .all(now, ...types, limit)
@@ -114,14 +114,30 @@ app.post('/api/review/:id/rate', async (c) => {
   if (!Number.isInteger(id) || id <= 0) return c.json({ error: '无效的词条 ID' }, 400)
 
   const body = rateInput.parse(await c.req.json())
-  const state = db.prepare('SELECT * FROM review_states WHERE entry_id = ?').get(id) as
-    | { stage: number; lapses: number }
+  const state = db
+    .prepare(
+      `SELECT r.stage, r.lapses, e.error_rate, e.error_samples
+       FROM review_states r
+       JOIN entries e ON e.id = r.entry_id
+       WHERE r.entry_id = ?`,
+    )
+    .get(id) as
+    | { stage: number; lapses: number; error_rate: number; error_samples: number }
     | undefined
 
   if (!state) return c.json({ error: '词条不存在' }, 404)
 
   const now = new Date()
-  const next = nextSchedule({ stage: state.stage, lapses: state.lapses }, body.rating, now)
+  const next = nextSchedule(
+    {
+      stage: state.stage,
+      lapses: state.lapses,
+      errorRate: state.error_rate,
+      errorSamples: state.error_samples,
+    },
+    body.rating,
+    now,
+  )
 
   db.transaction(() => {
     db.prepare(
@@ -136,6 +152,13 @@ app.post('/api/review/:id/rate', async (c) => {
       now.toISOString(),
       next.lapses,
       next.status,
+      id,
+    )
+
+    // 错误率存到 entries 上，既属于词条数据，也方便 AI 上下文按错误率排序。
+    db.prepare('UPDATE entries SET error_rate = ?, error_samples = ? WHERE id = ?').run(
+      next.errorRate,
+      next.errorSamples,
       id,
     )
 

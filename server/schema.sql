@@ -9,6 +9,13 @@ CREATE TABLE IF NOT EXISTS entries (
   tags TEXT NOT NULL DEFAULT '[]',
   source TEXT NOT NULL DEFAULT 'manual',
   review_enabled INTEGER NOT NULL DEFAULT 1,
+  -- 近期加权错误率（0..1）与参与计算的样本数
+  error_rate REAL NOT NULL DEFAULT 0,
+  error_samples INTEGER NOT NULL DEFAULT 0,
+  -- 去重用的归一化文本；来源对话用于词条溯源
+  normalized_text TEXT,
+  source_session_id INTEGER,
+  source_message_id INTEGER,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
@@ -16,6 +23,8 @@ CREATE TABLE IF NOT EXISTS entries (
 CREATE INDEX IF NOT EXISTS idx_entries_type ON entries(type);
 CREATE INDEX IF NOT EXISTS idx_entries_created_at ON entries(created_at);
 CREATE INDEX IF NOT EXISTS idx_entries_review_enabled ON entries(review_enabled);
+CREATE INDEX IF NOT EXISTS idx_entries_normalized ON entries(type, normalized_text);
+CREATE INDEX IF NOT EXISTS idx_entries_error_rate ON entries(error_rate);
 
 -- 场景：用户自定义的联想记忆空间。场景成员不改变复习调度，
 -- 是否进入每日复习由 entries.review_enabled 决定。
@@ -72,9 +81,13 @@ CREATE INDEX IF NOT EXISTS idx_review_logs_time ON review_logs(reviewed_at);
 CREATE TABLE IF NOT EXISTS chat_sessions (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   title TEXT,
+  -- 场景练习会话绑定的场景；普通对话为 NULL
+  scene_id INTEGER,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
+
+CREATE INDEX IF NOT EXISTS idx_chat_sessions_scene ON chat_sessions(scene_id);
 
 CREATE TABLE IF NOT EXISTS chat_messages (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -99,6 +112,41 @@ CREATE TABLE IF NOT EXISTS settings (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
+
+-- 反复错误档案：AI 从对话/总结中抽取，按 pattern 去重累加。
+CREATE TABLE IF NOT EXISTS learner_errors (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  pattern TEXT NOT NULL COLLATE NOCASE,
+  category TEXT NOT NULL DEFAULT 'other',
+  explanation TEXT,
+  correction TEXT,
+  example TEXT,
+  occurrences INTEGER NOT NULL DEFAULT 1,
+  first_seen_at TEXT NOT NULL,
+  last_seen_at TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'resolved', 'ignored'))
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_learner_errors_pattern
+  ON learner_errors(pattern COLLATE NOCASE);
+
+CREATE INDEX IF NOT EXISTS idx_learner_errors_status_seen
+  ON learner_errors(status, last_seen_at DESC);
+
+-- AI 人格：默认人格 key 固定，自定义人格 key 为 NULL。
+CREATE TABLE IF NOT EXISTS personas (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  key TEXT UNIQUE,
+  name TEXT NOT NULL,
+  description TEXT,
+  prompt TEXT NOT NULL,
+  is_default INTEGER NOT NULL DEFAULT 0,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_personas_order ON personas(is_default DESC, sort_order ASC, id ASC);
 
 -- 全文检索：trigram 分词对中英文子串搜索都友好。
 CREATE VIRTUAL TABLE IF NOT EXISTS entries_fts USING fts5(
