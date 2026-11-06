@@ -2,6 +2,7 @@
 import { onMounted, watch } from 'vue'
 import { RouterLink, RouterView, useRoute } from 'vue-router'
 import Icon from '@/components/Icon.vue'
+import SummaryJobHost from '@/components/SummaryJobHost.vue'
 import { useAppStore } from '@/stores/app'
 import { useThemeStore } from '@/stores/theme'
 
@@ -97,6 +98,8 @@ watch(
     <main class="main">
       <RouterView />
     </main>
+
+    <SummaryJobHost />
   </div>
 </template>
 

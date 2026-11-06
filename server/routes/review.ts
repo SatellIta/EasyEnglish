@@ -25,7 +25,8 @@ app.get('/api/review/queue', (c) => {
   const rows = db
     .prepare(
       `${ENTRY_SELECT}
-       WHERE r.next_review_at IS NOT NULL AND r.next_review_at <= ? ${typeSql}
+       WHERE r.next_review_at IS NOT NULL AND r.next_review_at <= ?
+         AND e.review_enabled = 1 ${typeSql}
        ORDER BY r.next_review_at ASC, e.id ASC
        LIMIT ?`,
     )
@@ -43,7 +44,7 @@ app.get('/api/review/stats', (c) => {
       `SELECT e.type AS type, COUNT(*) AS n
        FROM entries e
        JOIN review_states r ON r.entry_id = e.id
-       WHERE r.next_review_at <= ?
+       WHERE r.next_review_at <= ? AND e.review_enabled = 1
        GROUP BY e.type`,
     )
     .all(now) as Array<{ type: Entry['type']; n: number }>
@@ -73,7 +74,16 @@ app.get('/api/review/stats', (c) => {
 
   const totalEntries = Number((db.prepare('SELECT COUNT(*) AS n FROM entries').get() as { n: number }).n)
   const mastered = Number(
-    (db.prepare("SELECT COUNT(*) AS n FROM review_states WHERE status = 'mastered'").get() as { n: number }).n,
+    (
+      db
+        .prepare(
+          `SELECT COUNT(*) AS n
+           FROM review_states r
+           JOIN entries e ON e.id = r.entry_id
+           WHERE r.status = 'mastered' AND e.review_enabled = 1`,
+        )
+        .get() as { n: number }
+    ).n,
   )
 
   const dayRows = db

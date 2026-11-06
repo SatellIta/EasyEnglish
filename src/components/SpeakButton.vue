@@ -1,16 +1,67 @@
 <script setup lang="ts">
+import { computed, onBeforeUnmount, ref } from 'vue'
 import Icon from '@/components/Icon.vue'
-import { speak } from '@/lib/speech'
+import { speak, speechSupported, stopSpeaking } from '@/lib/speech'
 
 const props = defineProps<{ text: string; size?: number }>()
 
+const speaking = ref(false)
+const failed = ref(false)
+const supported = speechSupported()
+
+const label = computed(() => {
+  if (!supported || failed.value) return '当前浏览器无法朗读'
+  return speaking.value ? '停止朗读' : '朗读英文'
+})
+
 function onClick() {
-  speak(props.text)
+  if (speaking.value) {
+    stopSpeaking()
+    speaking.value = false
+    return
+  }
+
+  failed.value = false
+  const ok = speak(props.text, {
+    onStart: () => {
+      speaking.value = true
+    },
+    onEnd: () => {
+      speaking.value = false
+    },
+    onError: () => {
+      speaking.value = false
+      failed.value = true
+    },
+  })
+  if (!ok) failed.value = true
 }
+
+onBeforeUnmount(() => {
+  if (speaking.value) stopSpeaking()
+})
 </script>
 
 <template>
-  <button class="icon-btn" type="button" title="朗读" aria-label="朗读英文" @click.stop="onClick">
-    <Icon name="volume" :size="size ?? 18" />
+  <button
+    class="icon-btn"
+    :class="{ speaking, failed: !supported || failed }"
+    type="button"
+    :title="label"
+    :aria-label="label"
+    :aria-pressed="speaking"
+    @click.stop="onClick"
+  >
+    <Icon :name="speaking ? 'stop' : 'volume'" :size="size ?? 18" />
   </button>
 </template>
+
+<style scoped>
+.icon-btn.speaking {
+  color: var(--accent-strong);
+  box-shadow: var(--shadow-pressed);
+}
+.icon-btn.failed {
+  color: var(--muted);
+}
+</style>

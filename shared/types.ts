@@ -18,6 +18,13 @@ export interface ReviewState {
   status: ReviewStatus
 }
 
+export interface SceneRef {
+  sceneId: number
+  sceneName: string
+  section: string | null
+  subsection: string | null
+}
+
 export interface Entry {
   id: number
   type: EntryType
@@ -28,6 +35,10 @@ export interface Entry {
   notes: string | null
   tags: string[]
   source: string
+  /** 是否进入每日复习队列；场景导入的词条默认不进入 */
+  reviewEnabled: boolean
+  /** 该词条所属的场景（一个词条可以出现在多个场景里） */
+  sceneRefs: SceneRef[]
   createdAt: string
   updatedAt: string
   review?: ReviewState
@@ -41,6 +52,8 @@ export interface DraftEntry {
   examples?: string[]
   notes?: string | null
   tags?: string[]
+  /** 预览/总结生成时，词库里或本批次内已存在同类型同文本 */
+  duplicate?: boolean
 }
 
 /** 新建 / 编辑词条的请求体 */
@@ -52,6 +65,120 @@ export interface EntryInput {
   examples?: string[]
   notes?: string | null
   tags?: string[]
+  /** 是否进入每日复习，默认 true */
+  reviewEnabled?: boolean
+  /** 来源标记，默认 manual */
+  source?: string
+}
+
+export interface Scene {
+  id: number
+  name: string
+  description: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface SceneCounts {
+  total: number
+  word: number
+  phrase: number
+  sentence: number
+}
+
+export interface SceneSummary extends Scene {
+  counts: SceneCounts
+}
+
+export interface SceneEntry {
+  entry: Entry
+  section: string | null
+  subsection: string | null
+  addedAt: string
+  position: number
+}
+
+export interface SceneDetail {
+  scene: SceneSummary
+  items: SceneEntry[]
+}
+
+export interface SceneInput {
+  name: string
+  description?: string | null
+}
+
+export interface LibraryDateGroup extends SceneCounts {
+  /** 本地日期 YYYY-MM-DD */
+  date: string
+}
+
+export interface LibraryOverview {
+  dates: LibraryDateGroup[]
+  types: SceneCounts
+  scenes: SceneSummary[]
+}
+
+/** Markdown 预览中的一条候选词条 */
+export interface ImportItem {
+  id: string
+  type: EntryType
+  text: string
+  meaning: string | null
+  explanation: string | null
+  examples: string[]
+  notes: string | null
+  tags: string[]
+  /** 一级标题，例如 words / collocations / sentences / Scenery */
+  category: string
+  /** 二三级标题路径，用于普通词条分组 */
+  group: string | null
+  /** 场景名；普通词条为 null */
+  scene: string | null
+  /** 场景内 H3 小节 */
+  section: string | null
+  /** 场景内加粗小标题或引导语 */
+  subsection: string | null
+  /** 是否进入每日复习 */
+  reviewEnabled: boolean
+  /** 数据库中或本批次前面已有同类型同文本 */
+  duplicate: boolean
+}
+
+export interface ImportPreviewStats {
+  total: number
+  word: number
+  phrase: number
+  sentence: number
+  scenes: number
+  duplicates: number
+}
+
+export interface ImportPreview {
+  items: ImportItem[]
+  stats: ImportPreviewStats
+  warnings: string[]
+}
+
+export interface ImportCommitItem {
+  type: EntryType
+  text: string
+  meaning?: string | null
+  explanation?: string | null
+  examples?: string[]
+  notes?: string | null
+  tags?: string[]
+  scene?: string | null
+  section?: string | null
+  subsection?: string | null
+  reviewEnabled?: boolean
+}
+
+export interface ImportCommitResult {
+  created: number
+  skipped: number
+  scenes: string[]
+  entryIds: number[]
 }
 
 export interface ListResponse<T> {
@@ -59,6 +186,13 @@ export interface ListResponse<T> {
   total: number
   limit: number
   offset: number
+}
+
+export interface BulkCreateResult {
+  entries: Entry[]
+  count: number
+  skipped: number
+  duplicates: Array<{ type: EntryType; text: string }>
 }
 
 export interface ReviewStats {

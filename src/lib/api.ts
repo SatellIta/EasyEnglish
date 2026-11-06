@@ -1,5 +1,6 @@
 import type {
   AiSettings,
+  BulkCreateResult,
   ChatMessage,
   ChatSession,
   DailySummary,
@@ -7,9 +8,17 @@ import type {
   Entry,
   EntryInput,
   EntryType,
+  ImportCommitItem,
+  ImportCommitResult,
+  ImportPreview,
+  LibraryOverview,
   ReviewSettings,
   ReviewState,
   ReviewStats,
+  Scene,
+  SceneDetail,
+  SceneInput,
+  SceneSummary,
   SummaryResult,
 } from '@shared/types'
 
@@ -92,10 +101,66 @@ export const api = {
     update: (id: number, input: Partial<EntryInput>) =>
       request<Entry>(`/entries/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
     remove: (id: number) => request<{ ok: boolean }>(`/entries/${id}`, { method: 'DELETE' }),
-    bulkCreate: (entries: EntryInput[]) =>
-      request<{ entries: Entry[]; count: number }>('/entries/bulk', {
+    bulkCreate: (
+      entries: EntryInput[],
+      options: { skipDuplicates?: boolean } = {},
+    ) =>
+      request<BulkCreateResult>('/entries/bulk', {
         method: 'POST',
-        body: JSON.stringify({ entries }),
+        body: JSON.stringify({ entries, skipDuplicates: options.skipDuplicates }),
+      }),
+  },
+
+  library: {
+    overview: () => request<LibraryOverview>('/library/overview'),
+    date: (
+      date: string,
+      params: { type?: EntryType; q?: string; limit?: number } = {},
+    ) =>
+      request<{ date: string; items: Entry[]; total: number; limit: number }>(
+        `/library/date/${date}${toQuery({
+          type: params.type,
+          q: params.q,
+          limit: params.limit,
+        })}`,
+      ),
+  },
+
+  scenes: {
+    list: () => request<{ items: SceneSummary[] }>('/scenes'),
+    detail: (id: number) => request<SceneDetail>(`/scenes/${id}`),
+    create: (input: SceneInput) =>
+      request<Scene>('/scenes', { method: 'POST', body: JSON.stringify(input) }),
+    update: (id: number, input: Partial<SceneInput>) =>
+      request<Scene>(`/scenes/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
+    remove: (id: number) => request<{ ok: boolean }>(`/scenes/${id}`, { method: 'DELETE' }),
+    addEntries: (
+      id: number,
+      entryIds: number[],
+      section?: string | null,
+      subsection?: string | null,
+    ) =>
+      request<{ added: number; skipped: number; scene: SceneSummary }>(
+        `/scenes/${id}/entries`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ entryIds, section, subsection }),
+        },
+      ),
+    removeEntry: (id: number, entryId: number) =>
+      request<{ ok: boolean }>(`/scenes/${id}/entries/${entryId}`, { method: 'DELETE' }),
+  },
+
+  imports: {
+    previewMarkdown: (markdown: string, filename?: string) =>
+      request<ImportPreview>('/import/markdown/preview', {
+        method: 'POST',
+        body: JSON.stringify({ markdown, filename }),
+      }),
+    commitMarkdown: (items: ImportCommitItem[]) =>
+      request<ImportCommitResult>('/import/markdown/commit', {
+        method: 'POST',
+        body: JSON.stringify({ items }),
       }),
   },
 

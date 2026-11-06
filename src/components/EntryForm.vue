@@ -5,7 +5,10 @@ import { api, errorMessage } from '@/lib/api'
 import BaseModal from '@/components/BaseModal.vue'
 import Icon from '@/components/Icon.vue'
 
-const props = defineProps<{ open: boolean; entry?: Entry | null }>()
+const props = withDefaults(
+  defineProps<{ open: boolean; entry?: Entry | null; defaultReviewEnabled?: boolean }>(),
+  { defaultReviewEnabled: true },
+)
 const emit = defineEmits<{ close: []; saved: [entry: Entry] }>()
 
 const form = reactive({
@@ -16,6 +19,7 @@ const form = reactive({
   examplesText: '',
   notes: '',
   tagsText: '',
+  reviewEnabled: true,
 })
 const saving = ref(false)
 const error = ref('')
@@ -35,6 +39,7 @@ function reset() {
   form.examplesText = (entry?.examples ?? []).join('\n')
   form.notes = entry?.notes ?? ''
   form.tagsText = (entry?.tags ?? []).join(', ')
+  form.reviewEnabled = entry?.reviewEnabled ?? props.defaultReviewEnabled
   error.value = ''
 }
 
@@ -75,6 +80,7 @@ async function submit() {
       .split(/[,，]/)
       .map((tag) => tag.trim())
       .filter(Boolean),
+    reviewEnabled: form.reviewEnabled,
   }
 
   try {
@@ -171,8 +177,16 @@ async function submit() {
         <input id="entry-tags" v-model="form.tagsText" class="input" placeholder="口语, 商务, 易混" />
       </div>
 
+      <label class="check-row">
+        <input v-model="form.reviewEnabled" type="checkbox" />
+        <span>
+          加入每日复习
+          <small>关闭后仍保存在词库和场景中，但不会出现在复习队列。</small>
+        </span>
+      </label>
+
       <p v-if="error" class="banner banner-error">{{ error }}</p>
-      <p class="hint">保存后会立即进入复习队列，并按艾宾浩斯曲线安排下一次复习。</p>
+      <p class="hint">加入复习的词条会立即进入复习队列，并按艾宾浩斯曲线安排下一次复习。</p>
     </form>
 
     <template #footer>
@@ -226,5 +240,29 @@ async function submit() {
 }
 .type-option.active small {
   color: var(--accent-strong);
+}
+.check-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--ink-soft);
+  font-weight: 500;
+  cursor: pointer;
+}
+.check-row input {
+  margin-top: 3px;
+  flex: 0 0 auto;
+}
+.check-row span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.check-row small {
+  font-size: 11.5px;
+  color: var(--muted);
+  font-weight: 400;
+  line-height: 1.5;
 }
 </style>

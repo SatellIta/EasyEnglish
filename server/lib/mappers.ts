@@ -6,6 +6,11 @@ import type {
   Entry,
   ReviewState,
   ReviewStatus,
+  Scene,
+  SceneCounts,
+  SceneEntry,
+  SceneRef,
+  SceneSummary,
 } from '../../shared/types'
 
 export function parseStringArray(value: unknown): string[] {
@@ -13,6 +18,24 @@ export function parseStringArray(value: unknown): string[] {
   try {
     const parsed = JSON.parse(value)
     return Array.isArray(parsed) ? parsed.filter((item) => typeof item === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+export function parseSceneRefs(value: unknown): SceneRef[] {
+  if (typeof value !== 'string' || !value) return []
+  try {
+    const parsed = JSON.parse(value)
+    if (!Array.isArray(parsed)) return []
+    return parsed
+      .filter((item) => item && typeof item.sceneId === 'number' && typeof item.sceneName === 'string')
+      .map((item) => ({
+        sceneId: item.sceneId,
+        sceneName: item.sceneName,
+        section: item.section ?? null,
+        subsection: item.subsection ?? null,
+      }))
   } catch {
     return []
   }
@@ -43,9 +66,47 @@ export function mapEntry(row: any): Entry {
     notes: row.notes ?? null,
     tags: parseStringArray(row.tags),
     source: row.source,
+    reviewEnabled: row.review_enabled !== 0,
+    sceneRefs: parseSceneRefs(row.scene_refs),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     review: mapReviewState(row),
+  }
+}
+
+export function mapScene(row: any): Scene {
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description ?? null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
+}
+
+export function mapSceneCounts(row: any): SceneCounts {
+  return {
+    total: Number(row.total ?? 0),
+    word: Number(row.word ?? 0),
+    phrase: Number(row.phrase ?? 0),
+    sentence: Number(row.sentence ?? 0),
+  }
+}
+
+export function mapSceneSummary(row: any): SceneSummary {
+  return {
+    ...mapScene(row),
+    counts: mapSceneCounts(row),
+  }
+}
+
+export function mapSceneEntry(row: any): SceneEntry {
+  return {
+    entry: mapEntry(row),
+    section: row.se_section ?? null,
+    subsection: row.se_subsection ?? null,
+    addedAt: row.se_added_at,
+    position: Number(row.se_position ?? 0),
   }
 }
 

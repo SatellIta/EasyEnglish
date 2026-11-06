@@ -1,10 +1,11 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
-import type { Entry } from '../../shared/types'
+import type { BulkCreateResult, Entry } from '../../shared/types'
 import { db } from '../db'
+import { entryKey, loadExistingEntryKeys } from '../lib/dedupe'
+import { insertEntry } from '../lib/entry-store'
 import { mapEntry } from '../lib/mappers'
 import { buildSearchFilter, ENTRY_SELECT, getEntryById } from '../lib/queries'
-import { initialSchedule } from '../lib/scheduler'
 import { nowIso } from '../lib/time'
 
 const app = new Hono()
@@ -18,40 +19,15 @@ const entryInput = z.object({
   notes: z.string().trim().max(8000).nullish(),
   tags: z.array(z.string().trim().min(1).max(50)).max(50).optional(),
   source: z.string().trim().max(50).optional(),
+  reviewEnabled: z.boolean().optional(),
 })
 
 const updateInput = entryInput.partial()
-const bulkInput = z.object({ entries: z.array(entryInput).min(1).max(50) })
-
-function insertEntry(input: z.infer<typeof entryInput>): Entry {
-  const now = nowIso()
-  const info = db
-    .prepare(
-      `INSERT INTO entries (type, text, meaning, explanation, examples, notes, tags, source, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    )
-    .run(
-      input.type,
-      input.text,
-      input.meaning ?? null,
-      input.explanation ?? null,
-      JSON.stringify(input.examples ?? []),
-      input.notes ?? null,
-      JSON.stringify(input.tags ?? []),
-      input.source ?? 'manual',
-      now,
-      now,
-    )
-
-  const id = Number(info.lastInsertRowid)
-  const schedule = initialSchedule(new Date(now))
-  db.prepare(
-    `INSERT INTO review_states (entry_id, stage, interval_days, next_review_at, lapses, total_reviews, status)
-     VALUES (?, ?, ?, ?, ?, 0, ?)`,
-  ).run(id, schedule.stage, schedule.intervalDays, schedule.nextReviewAt, schedule.lapses, schedule.status)
-
-  return getEntryById(id) as Entry
-}
+const bulkInput = z.object({
+  entries: z.array(entryInput).min(1).max(50),
+  /** 默认 true：跳过词库中和本批次内已存在的同类型同文本词条 */
+  skipDuplicates: z.boolean().optional(),
+})
 
 app.get('/api/entries', (c) => {
   const rawTypes = c.req.query('types') ?? c.req.query('type') ?? ''
@@ -121,9 +97,31 @@ app.post('/api/entries', async (c) => {
 })
 
 app.post('/api/entries/bulk', async (c) => {
-  const { entries } = bulkInput.parse(await c.req.json())
-  const created = db.transaction(() => entries.map((input) => insertEntry(input)))()
-  return c.json({ entries: created, count: created.length }, 201)
+  const { entries, skipDuplicates = true } = bulkInput.parse(await c.req.json())
+  const seen = new Set<string>()
+  const created: Entry[] = []
+  const duplicates: BulkCreateResult['duplicates'] = []
+
+  db.transaction(() => {
+    const existing = skipDuplicates ? loadExistingEntryKeys() : new Set<string>()
+    for (const input of entries) {
+      const key = entryKey(input.type, input.text)
+      if (skipDuplicates && (existing.has(key) || seen.has(key))) {
+        duplicates.push({ type: input.type, text: input.text })
+        continue
+      }
+      seen.add(key)
+      created.push(insertEntry(input))
+    }
+  })()
+
+  const result: BulkCreateResult = {
+    entries: created,
+    count: created.length,
+    skipped: duplicates.length,
+    duplicates,
+  }
+  return c.json(result, 201)
 })
 
 app.get('/api/entries/:id', (c) => {
@@ -155,6 +153,7 @@ app.patch('/api/entries/:id', async (c) => {
   if (input.notes !== undefined) set('notes', input.notes || null)
   if (input.tags !== undefined) set('tags', JSON.stringify(input.tags))
   if (input.source !== undefined) set('source', input.source)
+  if (input.reviewEnabled !== undefined) set('review_enabled', input.reviewEnabled ? 1 : 0)
 
   if (!fields.length) return c.json(getEntryById(id))
   set('updated_at', nowIso())

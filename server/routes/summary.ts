@@ -5,6 +5,7 @@ import { completeChat } from '../ai/client'
 import { getAiConfig, isConfigured } from '../ai/config'
 import { buildSummaryUserPrompt, SUMMARY_SYSTEM_PROMPT } from '../ai/prompts'
 import { db } from '../db'
+import { markDraftDuplicates } from '../lib/dedupe'
 import { mapDailySummary, mapEntry } from '../lib/mappers'
 import { ENTRY_SELECT } from '../lib/queries'
 import { dayRange, nowIso } from '../lib/time'
@@ -55,7 +56,16 @@ function parseSummary(raw: string): { summary: string; entries: DraftEntry[] } {
 app.get('/api/summary/today', (c) => {
   const { date } = dayRange()
   const row = db.prepare('SELECT * FROM daily_summaries WHERE date = ?').get(date)
-  return c.json({ date, summary: row ? mapDailySummary(row) : null })
+  if (!row) return c.json({ date, summary: null })
+  const saved = mapDailySummary(row)
+  return c.json({
+    date,
+    summary: {
+      ...saved,
+      // 重新核对当前词库，避免保存后新增词条导致重复标记过期。
+      entries: markDraftDuplicates(saved.entries),
+    },
+  })
 })
 
 app.post('/api/summary/today/generate', async (c) => {
@@ -108,6 +118,7 @@ app.post('/api/summary/today/generate', async (c) => {
     )
 
     const parsed = parseSummary(raw)
+    const candidates = markDraftDuplicates(parsed.entries)
     const now = nowIso()
     db.prepare(
       `INSERT INTO daily_summaries (date, content, entries, created_at, updated_at)
@@ -116,12 +127,12 @@ app.post('/api/summary/today/generate', async (c) => {
          content = excluded.content,
          entries = excluded.entries,
          updated_at = excluded.updated_at`,
-    ).run(date, parsed.summary, JSON.stringify(parsed.entries), now, now)
+    ).run(date, parsed.summary, JSON.stringify(candidates), now, now)
 
     const result: SummaryResult = {
       date,
       summary: parsed.summary,
-      entries: parsed.entries,
+      entries: candidates,
       saved: true,
     }
     return c.json(result)

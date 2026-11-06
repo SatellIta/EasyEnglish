@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import type { DailySummary, DraftEntry, Entry } from '@shared/types'
 import Icon from '@/components/Icon.vue'
@@ -15,8 +15,10 @@ import {
   truncate,
 } from '@/lib/format'
 import { useAppStore } from '@/stores/app'
+import { useSummaryStore } from '@/stores/summary'
 
 const store = useAppStore()
+const summaryStore = useSummaryStore()
 const route = useRoute()
 const router = useRouter()
 
@@ -24,10 +26,18 @@ const entries = ref<Entry[]>([])
 const summary = ref<DailySummary | null>(null)
 const summaryEntries = ref<DraftEntry[]>([])
 const loading = ref(true)
-const generating = ref(false)
-const adding = ref(false)
 const error = ref('')
 const notice = ref('')
+const noticeKind = ref<'ok' | 'info'>('ok')
+
+const generating = computed(() => summaryStore.running)
+const adding = computed(() => summaryStore.adding)
+const newSummaryCount = computed(
+  () => summaryEntries.value.filter((entry) => !entry.duplicate).length,
+)
+const existingSummaryCount = computed(
+  () => summaryEntries.value.length - newSummaryCount.value,
+)
 
 const dateLabel = todayLongLabel()
 
@@ -51,49 +61,40 @@ async function load() {
 }
 
 async function generateSummary() {
-  if (generating.value) return
-  generating.value = true
   error.value = ''
   notice.value = ''
-  try {
-    const result = await api.summary.generate()
+  const result = await summaryStore.generate()
+  if (result) {
     summary.value = {
-      id: 0,
+      id: summary.value?.id ?? 0,
       date: result.date,
       content: result.summary,
       entries: result.entries,
-      createdAt: new Date().toISOString(),
+      createdAt: summary.value?.createdAt ?? new Date().toISOString(),
     }
     summaryEntries.value = result.entries
+    noticeKind.value = 'ok'
     notice.value = '今日总结已生成并保存。'
-  } catch (caught) {
-    error.value = errorMessage(caught)
-  } finally {
-    generating.value = false
+  } else if (summaryStore.error) {
+    error.value = summaryStore.error
   }
 }
 
 async function addSummaryEntries() {
   if (!summaryEntries.value.length || adding.value) return
-  adding.value = true
   error.value = ''
-  try {
-    const result = await api.entries.bulkCreate(
-      summaryEntries.value.map((entry) => ({
-        type: entry.type,
-        text: entry.text,
-        meaning: entry.meaning ?? null,
-        explanation: entry.explanation ?? null,
-        source: 'summary',
-      })),
-    )
-    notice.value = `已加入词库 ${result.count} 条，并进入复习队列。`
-    summaryEntries.value = []
-    await load()
-  } catch (caught) {
-    error.value = errorMessage(caught)
-  } finally {
-    adding.value = false
+  notice.value = ''
+  const result = await summaryStore.addEntries(summaryEntries.value)
+  if (result) {
+    notice.value = summaryStore.addNotice
+    noticeKind.value = summaryStore.addNoticeKind
+    // 本地先标成已存在；全局刷新后服务端也会重新标重。
+    summaryEntries.value = summaryEntries.value.map((entry) => ({
+      ...entry,
+      duplicate: true,
+    }))
+  } else if (summaryStore.addError) {
+    error.value = summaryStore.addError
   }
 }
 
@@ -102,6 +103,28 @@ async function handleSummarizeQuery() {
   await router.replace({ query: {} })
   await generateSummary()
 }
+
+watch(
+  () => summaryStore.result,
+  (result) => {
+    if (!result) return
+    summary.value = {
+      id: summary.value?.id ?? 0,
+      date: result.date,
+      content: result.summary,
+      entries: result.entries,
+      createdAt: summary.value?.createdAt ?? new Date().toISOString(),
+    }
+    summaryEntries.value = result.entries
+  },
+)
+
+watch(
+  () => summaryStore.revision,
+  () => {
+    load().catch(() => {})
+  },
+)
 
 onMounted(async () => {
   await load()
@@ -130,7 +153,13 @@ watch(
     </header>
 
     <p v-if="error" class="banner banner-error">{{ error }}</p>
-    <p v-if="notice" class="banner banner-ok">{{ notice }}</p>
+    <p
+      v-if="notice"
+      class="banner"
+      :class="noticeKind === 'info' ? 'banner-info' : 'banner-ok'"
+    >
+      {{ notice }}
+    </p>
 
     <section class="hero">
       <div class="hero-copy">
@@ -235,16 +264,36 @@ watch(
           <div v-if="summaryEntries.length" class="suggested">
             <div class="row between wrap">
               <strong>值得加入词库</strong>
-              <button class="btn btn-soft btn-sm" :disabled="adding" @click="addSummaryEntries">
-                <Icon name="plus" :size="15" />
-                {{ adding ? '添加中…' : `全部加入（${summaryEntries.length}）` }}
+              <button
+                class="btn btn-soft btn-sm"
+                :disabled="adding || newSummaryCount === 0"
+                @click="addSummaryEntries"
+              >
+                <Icon :name="adding ? 'refresh' : 'plus'" :size="15" />
+                {{
+                  adding
+                    ? '添加中…'
+                    : newSummaryCount
+                      ? `加入新词条（${newSummaryCount}）`
+                      : '全部已在词库'
+                }}
               </button>
             </div>
+            <p
+              v-if="newSummaryCount === 0"
+              class="banner banner-info suggested-all-existing"
+            >
+              这些候选词条都已经在词库中，因此没有新增内容。重复词条不会再次进入复习队列。
+            </p>
+            <p v-else-if="existingSummaryCount" class="hint suggested-hint">
+              其中 {{ existingSummaryCount }} 条已在词库中，加入时会自动跳过，只会加入新词条。
+            </p>
             <ul>
               <li v-for="(entry, index) in summaryEntries" :key="index">
                 <TypeBadge :type="entry.type" />
                 <span class="entry-text">{{ entry.text }}</span>
                 <span v-if="entry.meaning" class="muted small">{{ entry.meaning }}</span>
+                <span v-if="entry.duplicate" class="tag">已在词库</span>
               </li>
             </ul>
           </div>
@@ -374,6 +423,12 @@ watch(
 }
 .suggested {
   margin-top: 22px;
+}
+.suggested-hint {
+  margin: 8px 0 0;
+}
+.suggested-all-existing {
+  margin: 12px 0 0;
 }
 .suggested ul {
   list-style: none;
