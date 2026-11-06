@@ -9,6 +9,7 @@ import { logger } from 'hono/logger'
 import { ZodError } from 'zod'
 import chatRoutes from './routes/chat'
 import entriesRoutes from './routes/entries'
+import exportRoutes from './routes/export'
 import importRoutes from './routes/import'
 import libraryRoutes from './routes/library'
 import reviewRoutes from './routes/review'
@@ -37,6 +38,7 @@ app.route('/', settingsRoutes)
 app.route('/', scenesRoutes)
 app.route('/', libraryRoutes)
 app.route('/', importRoutes)
+app.route('/', exportRoutes)
 
 app.onError((err, c) => {
   if (err instanceof ZodError) {

@@ -8,6 +8,8 @@ import type {
   Entry,
   EntryInput,
   EntryType,
+  ExportInput,
+  ExportOptions,
   ImportCommitItem,
   ImportCommitResult,
   ImportPreview,
@@ -58,6 +60,31 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   if (response.status === 204) return undefined as T
   return (await response.json()) as T
+}
+
+async function requestText(path: string, options: RequestInit = {}): Promise<string> {
+  const response = await fetch(`/api${path}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(options.headers as Record<string, string> | undefined),
+    },
+  })
+
+  if (!response.ok) {
+    let message = `请求失败（${response.status}）`
+    let details: unknown
+    try {
+      const body = await response.json()
+      if (body && typeof body.error === 'string') message = body.error
+      details = body?.details
+    } catch {
+      // ignore
+    }
+    throw new ApiError(message, response.status, details)
+  }
+
+  return response.text()
 }
 
 function toQuery(params: Record<string, string | number | undefined>): string {
@@ -161,6 +188,15 @@ export const api = {
       request<ImportCommitResult>('/import/markdown/commit', {
         method: 'POST',
         body: JSON.stringify({ items }),
+      }),
+  },
+
+  exports: {
+    options: () => request<ExportOptions>('/export/options'),
+    markdown: (input: ExportInput) =>
+      requestText('/export/markdown', {
+        method: 'POST',
+        body: JSON.stringify(input),
       }),
   },
 

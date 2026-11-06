@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, ref, watch } from 'vue'
+import { nextTick, reactive, ref, watch } from 'vue'
 import type { Entry, EntryInput, EntryType } from '@shared/types'
 import { api, errorMessage } from '@/lib/api'
 import BaseModal from '@/components/BaseModal.vue'
@@ -91,6 +91,13 @@ async function submit() {
     emit('close')
   } catch (caught) {
     error.value = errorMessage(caught)
+    await nextTick()
+    document.querySelector('.entry-form .banner-error')?.scrollIntoView({
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        ? 'auto'
+        : 'smooth',
+      block: 'center',
+    })
   } finally {
     saving.value = false
   }
@@ -132,6 +139,9 @@ async function submit() {
           rows="2"
           placeholder="例如：make up for lost time"
         />
+        <span class="hint">
+          保存时会按英文内容查重：忽略大小写、首尾空格和结尾标点；释义、例句不同也算重复，同一个英文内容只会保留一条。
+        </span>
       </div>
 
       <div class="field">

@@ -40,7 +40,7 @@ app.post('/api/import/markdown/preview', async (c) => {
   const seen = new Set<string>()
 
   const items: ImportItem[] = parsed.items.map((item, index) => {
-    const key = entryKey(item.type, item.text)
+    const key = entryKey(item.text)
     const duplicate = existing.has(key) || seen.has(key)
     seen.add(key)
     return {
@@ -80,9 +80,10 @@ app.post('/api/import/markdown/commit', async (c) => {
   const sceneNames = new Set<string>()
 
   db.transaction(() => {
+    const existing = loadExistingEntryKeys()
     for (const item of items) {
-      const key = entryKey(item.type, item.text)
-      if (seen.has(key)) {
+      const key = entryKey(item.text)
+      if (existing.has(key) || seen.has(key)) {
         result.skipped += 1
         continue
       }

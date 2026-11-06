@@ -99,7 +99,7 @@ async function addSelected() {
           <div>
             <strong>值得加入复习的词条</strong>
             <p class="hint">
-              默认不选已存在于词库的条目；加入时会再次按类型和文本查重。
+              默认不选已存在于词库的条目；加入时会再次按英文内容查重。
             </p>
           </div>
           <div class="row">
@@ -148,7 +148,13 @@ async function addSelected() {
 
       <p v-else class="empty">这次没有抽取到需要加入词库的新词条。</p>
 
-      <p v-if="store.addNotice" class="banner banner-ok">{{ store.addNotice }}</p>
+      <p
+        v-if="store.addNotice"
+        class="banner"
+        :class="store.addNoticeKind === 'info' ? 'banner-info' : 'banner-ok'"
+      >
+        {{ store.addNotice }}
+      </p>
       <p v-if="store.addError" class="banner banner-error">{{ store.addError }}</p>
     </div>
 

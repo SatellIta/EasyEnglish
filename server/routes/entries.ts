@@ -1,8 +1,13 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
+import { ENTRY_TYPE_LABELS } from '../../shared/types'
 import type { BulkCreateResult, Entry } from '../../shared/types'
 import { db } from '../db'
-import { entryKey, loadExistingEntryKeys } from '../lib/dedupe'
+import {
+  entryKey,
+  findExistingEntryByText,
+  loadExistingEntryKeys,
+} from '../lib/dedupe'
 import { insertEntry } from '../lib/entry-store'
 import { mapEntry } from '../lib/mappers'
 import { buildSearchFilter, ENTRY_SELECT, getEntryById } from '../lib/queries'
@@ -25,7 +30,7 @@ const entryInput = z.object({
 const updateInput = entryInput.partial()
 const bulkInput = z.object({
   entries: z.array(entryInput).min(1).max(50),
-  /** 默认 true：跳过词库中和本批次内已存在的同类型同文本词条 */
+  /** 默认 true：跳过词库中和本批次内主要英文内容相同的词条 */
   skipDuplicates: z.boolean().optional(),
 })
 
@@ -92,6 +97,16 @@ app.get('/api/entries', (c) => {
 
 app.post('/api/entries', async (c) => {
   const input = entryInput.parse(await c.req.json())
+  const existing = findExistingEntryByText(input.text)
+  if (existing) {
+    return c.json(
+      {
+        error: `词库中已存在相同的英文内容「${existing.text}」（${ENTRY_TYPE_LABELS[existing.type]}）。请直接编辑已有词条。`,
+        details: { existing },
+      },
+      409,
+    )
+  }
   const entry = db.transaction(() => insertEntry(input))()
   return c.json(entry, 201)
 })
@@ -105,7 +120,7 @@ app.post('/api/entries/bulk', async (c) => {
   db.transaction(() => {
     const existing = skipDuplicates ? loadExistingEntryKeys() : new Set<string>()
     for (const input of entries) {
-      const key = entryKey(input.type, input.text)
+      const key = entryKey(input.text)
       if (skipDuplicates && (existing.has(key) || seen.has(key))) {
         duplicates.push({ type: input.type, text: input.text })
         continue
@@ -138,6 +153,18 @@ app.patch('/api/entries/:id', async (c) => {
   if (!getEntryById(id)) return c.json({ error: '词条不存在' }, 404)
 
   const input = updateInput.parse(await c.req.json())
+  if (input.text !== undefined) {
+    const existing = findExistingEntryByText(input.text, id)
+    if (existing) {
+      return c.json(
+        {
+          error: `词库中已存在相同的英文内容「${existing.text}」（${ENTRY_TYPE_LABELS[existing.type]}）。请直接编辑已有词条。`,
+          details: { existing },
+        },
+        409,
+      )
+    }
+  }
   const fields: string[] = []
   const params: unknown[] = []
   const set = (column: string, value: unknown) => {

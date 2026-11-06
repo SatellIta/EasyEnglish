@@ -119,6 +119,24 @@ export interface LibraryOverview {
   scenes: SceneSummary[]
 }
 
+/** 导出选项：常规词条只统计未归入场景的内容 */
+export interface ExportTypeCounts {
+  total: number
+  word: number
+  phrase: number
+  sentence: number
+}
+
+export interface ExportOptions {
+  types: ExportTypeCounts
+  scenes: SceneSummary[]
+}
+
+export interface ExportInput {
+  types: EntryType[]
+  sceneIds: number[]
+}
+
 /** Markdown 预览中的一条候选词条 */
 export interface ImportItem {
   id: string

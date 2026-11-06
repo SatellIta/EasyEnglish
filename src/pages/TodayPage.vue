@@ -269,7 +269,10 @@ watch(
                 :disabled="adding || newSummaryCount === 0"
                 @click="addSummaryEntries"
               >
-                <Icon :name="adding ? 'refresh' : 'plus'" :size="15" />
+                <Icon
+                  :name="adding ? 'refresh' : newSummaryCount ? 'plus' : 'check'"
+                  :size="15"
+                />
                 {{
                   adding
                     ? '添加中…'

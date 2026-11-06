@@ -7,8 +7,11 @@ import type {
   ImportItem,
   ImportPreview,
 } from '@shared/types'
+import importFormatHelp from '@/assets/import-format.md?raw'
+import BaseModal from '@/components/BaseModal.vue'
 import Icon from '@/components/Icon.vue'
 import ImportItemRow from '@/components/import/ImportItemRow.vue'
+import MarkdownView from '@/components/MarkdownView.vue'
 import { api, errorMessage } from '@/lib/api'
 import { useAppStore } from '@/stores/app'
 
@@ -50,6 +53,7 @@ const selected = ref<Set<string>>(new Set())
 const expanded = ref<Set<string>>(new Set())
 const sceneReview = ref(false)
 const commitResult = ref<ImportCommitResult | null>(null)
+const helpOpen = ref(false)
 
 const categoryLabels: Record<string, string> = {
   words: '单词',
@@ -301,10 +305,19 @@ function reset() {
         </RouterLink>
         <h1>导入 Markdown</h1>
         <p>
-          识别你手写笔记里的 # / ## / ### 结构。# words、# collocations、# sentences
-          会成为普通词条；# Scenery 下的 H2 会成为场景，H3 和加粗小标题会保留为场景小节。
+          识别 # words / # collocations / # sentences / # Scenery。# Scenery 下 H2
+          是场景，H3 是单词/短语/句子分类；表格只取前三列。
         </p>
       </div>
+      <button
+        class="icon-btn"
+        type="button"
+        title="Markdown 格式说明"
+        aria-label="Markdown 格式说明"
+        @click="helpOpen = true"
+      >
+        <Icon name="help" :size="18" />
+      </button>
     </header>
 
     <p v-if="error" class="banner banner-error">{{ error }}</p>
@@ -342,12 +355,9 @@ function reset() {
         placeholder="# words
 
 cheap-looking
-
 index finger / middle finger / ring finger
 
 # sentences
-
-## Everyday expressions
 
 That really got me.
 
@@ -355,11 +365,14 @@ That really got me.
 
 ## Bank
 
-### Deposit money
+### 单词
 
-| Expression | Meaning |
-| --- | --- |
-| Deposit money | 存钱 |"
+Deposit money
+- I'd like to deposit $500 into my savings account.
+
+| English | 含义 | 补充 |
+| --- | --- | --- |
+| Deposit money | 存钱 | 办理存款 |"
       />
 
       <div class="actions">
@@ -548,6 +561,20 @@ That really got me.
         </button>
       </div>
     </template>
+
+    <BaseModal
+      :open="helpOpen"
+      title="Markdown 格式说明"
+      width="760px"
+      @close="helpOpen = false"
+    >
+      <MarkdownView :content="importFormatHelp" />
+      <template #footer>
+        <button class="btn btn-ghost" type="button" @click="helpOpen = false">
+          关闭
+        </button>
+      </template>
+    </BaseModal>
   </div>
 </template>
 
