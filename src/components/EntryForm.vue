@@ -108,6 +108,7 @@ async function submit() {
             type="button"
             class="type-option"
             :class="{ active: form.type === option.value }"
+            :aria-pressed="form.type === option.value"
             @click="form.type = option.value"
           >
             <strong>{{ option.label }}</strong>

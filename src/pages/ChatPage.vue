@@ -580,7 +580,7 @@ onMounted(async () => {
   width: 7px;
   height: 15px;
   margin-left: 3px;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   background: var(--accent);
   animation: blink 1s steps(1) infinite;
   vertical-align: -2px;

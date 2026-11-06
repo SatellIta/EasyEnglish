@@ -1,0 +1,823 @@
+/* Swiss International Style theme.
+   Rules: sharp grid, Helvetica-like sans, black/white with red accent,
+   no shadows, no rounded corners, 150ms ease-out, arrow on buttons. */
+
+:root[data-theme="swiss"] {
+  --bg: #ffffff;
+  --bg-soft: #f0f0f0;
+  --surface: #ffffff;
+  --surface-2: #f0f0f0;
+  --ink: #000000;
+  --ink-soft: #333333;
+  --muted: #4b5563;
+  --shadow-dark: transparent;
+  --shadow-light: transparent;
+
+  --accent: #ff0000;
+  --accent-strong: #e30613;
+  --accent-soft: #f0f0f0;
+  --success: #0057b8;
+  --success-soft: #ffffff;
+  --danger: #e30613;
+  --danger-soft: #ffffff;
+  --warning: #000000;
+  --warning-soft: #ffffff;
+
+  --radius-sm: 0px;
+  --radius: 0px;
+  --radius-lg: 0px;
+  --border-width: 1px;
+  --border-color: #000000;
+  --divider-color: #cccccc;
+
+  --shadow-raised-sm: none;
+  --shadow-raised: none;
+  --shadow-raised-lg: none;
+  --shadow-hover-sm: none;
+  --shadow-hover: none;
+  --shadow-pressed: none;
+  --shadow-inset: none;
+  --shadow-inset-sm: none;
+  --shadow-inset-focus: none;
+
+  --font-sans: "Helvetica Neue", Helvetica, Arial, "PingFang SC", "Noto Sans SC",
+    "Microsoft YaHei", sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --font-weight-heading: 700;
+  --page-title-size: clamp(38px, 5vw, 58px);
+  --title-letter-spacing: -0.03em;
+  --body-size: 15px;
+
+  --transition: 150ms ease-out;
+  --main-pad-y: 48px;
+  --main-pad-x: clamp(24px, 5vw, 72px);
+  --main-pad-bottom: 96px;
+}
+
+@media (max-width: 900px) {
+  :root[data-theme="swiss"] {
+    --main-pad-y: 28px;
+    --main-pad-x: 16px;
+    --main-pad-bottom: 64px;
+  }
+}
+
+/* ---------- shell ---------- */
+
+html[data-theme="swiss"] #app .sidebar {
+  border-right: 1px solid #000000;
+  background: #ffffff;
+}
+
+html[data-theme="swiss"] .brand-mark {
+  background: #000000;
+  color: #ffffff;
+  border-color: #000000;
+}
+
+html[data-theme="swiss"] .brand-text strong {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+html[data-theme="swiss"] .nav-item {
+  border: 1px solid transparent;
+  border-left: 1px solid #cccccc;
+  border-radius: 0;
+  background: #ffffff;
+  color: #000000;
+}
+
+html[data-theme="swiss"] .nav-item:hover {
+  background: #f0f0f0;
+  border-left-color: #ff0000;
+  color: #000000;
+}
+
+html[data-theme="swiss"] .nav-item.active,
+html[data-theme="swiss"] .nav-item.active:hover {
+  background: #000000;
+  border-color: #000000;
+  border-left-color: #ff0000;
+  color: #ffffff;
+}
+
+html[data-theme="swiss"] .nav-badge {
+  background: #ff0000;
+  color: #000000;
+  border-radius: 0;
+}
+
+html[data-theme="swiss"] .sidebar-note {
+  background: #ffffff;
+  border: 1px solid #000000;
+  border-radius: 0;
+  box-shadow: none;
+  color: #000000;
+}
+
+/* ---------- typography ---------- */
+
+html[data-theme="swiss"] .page-head h1 {
+  font-size: var(--page-title-size);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+
+html[data-theme="swiss"] .page-head p {
+  color: #4b5563;
+  max-width: 65ch;
+}
+
+html[data-theme="swiss"] .today-date {
+  color: #e30613 !important;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 11px !important;
+  font-weight: 700;
+}
+
+html[data-theme="swiss"] #app .hero-kicker {
+  color: #e30613;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+html[data-theme="swiss"] #app .hero h2,
+html[data-theme="swiss"] #app .panel-head h2,
+html[data-theme="swiss"] #app .setup-card h2,
+html[data-theme="swiss"] #app .card-title h2,
+html[data-theme="swiss"] #app .chat-head h1,
+html[data-theme="swiss"] #app .chat-welcome h2,
+html[data-theme="swiss"] #app .lib-title h3,
+html[data-theme="swiss"] #app .done-card h2,
+html[data-theme="swiss"] #app .review-text {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+html[data-theme="swiss"] #app .stat strong,
+html[data-theme="swiss"] #app .setup-summary strong,
+html[data-theme="swiss"] #app .filter-chip strong {
+  font-weight: 700;
+}
+
+/* ---------- cards & surfaces ---------- */
+
+html[data-theme="swiss"] .card {
+  background: #ffffff;
+  border: 1px solid #000000;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+html[data-theme="swiss"] #app .hero,
+html[data-theme="swiss"] #app .stat {
+  background: #ffffff;
+  border: 1px solid #000000;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+html[data-theme="swiss"] #app .hero {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 20px;
+}
+
+html[data-theme="swiss"] #app .hero-actions {
+  justify-content: flex-start;
+}
+
+html[data-theme="swiss"] #app .stat-icon {
+  color: #ff0000;
+}
+
+/* ---------- buttons ---------- */
+
+html[data-theme="swiss"] .btn {
+  background: #ffffff;
+  border: 1px solid #000000;
+  border-radius: 0;
+  color: #000000;
+  font-weight: 700;
+  box-shadow: none;
+}
+
+html[data-theme="swiss"] .btn::after {
+  content: "→";
+  display: inline-block;
+  margin-left: 8px;
+  transition: transform var(--transition);
+}
+
+html[data-theme="swiss"] .btn:hover {
+  background: #f0f0f0;
+  border-color: #ff0000;
+  color: #000000;
+  box-shadow: none;
+}
+
+html[data-theme="swiss"] .btn:hover::after {
+  transform: translateX(4px);
+}
+
+html[data-theme="swiss"] .btn:active,
+html[data-theme="swiss"] .icon-btn:active {
+  opacity: 0.7;
+  box-shadow: none;
+}
+
+html[data-theme="swiss"] .btn-primary {
+  background: #000000;
+  border-color: #000000;
+  color: #ffffff;
+}
+
+html[data-theme="swiss"] .btn-primary:hover {
+  background: #ff0000;
+  border-color: #ff0000;
+  color: #000000;
+}
+
+html[data-theme="swiss"] .btn-soft,
+html[data-theme="swiss"] .btn-ghost {
+  background: #ffffff;
+  border-color: #000000;
+  color: #000000;
+}
+
+html[data-theme="swiss"] .btn-danger {
+  background: #ffffff;
+  border-color: #e30613;
+  color: #e30613;
+}
+
+html[data-theme="swiss"] .btn-sm,
+html[data-theme="swiss"] .btn-lg {
+  border-radius: 0;
+}
+
+html[data-theme="swiss"] .icon-btn {
+  background: #ffffff;
+  border: 1px solid #000000;
+  border-radius: 0;
+  color: #000000;
+  box-shadow: none;
+}
+
+html[data-theme="swiss"] .icon-btn:hover {
+  background: #f0f0f0;
+  border-color: #ff0000;
+  color: #000000;
+  box-shadow: none;
+}
+
+/* ---------- forms ---------- */
+
+html[data-theme="swiss"] #app .input,
+html[data-theme="swiss"] #app .textarea,
+html[data-theme="swiss"] #app .select,
+html[data-theme="swiss"] #app .composer-input,
+html[data-theme="swiss"] .modal-card .input,
+html[data-theme="swiss"] .modal-card .textarea,
+html[data-theme="swiss"] .modal-card .select {
+  background: #ffffff;
+  border: 1px solid #000000;
+  border-radius: 0;
+  color: #000000;
+  box-shadow: none;
+}
+
+html[data-theme="swiss"] #app .input:focus,
+html[data-theme="swiss"] #app .textarea:focus,
+html[data-theme="swiss"] #app .select:focus,
+html[data-theme="swiss"] #app .composer-input:focus,
+html[data-theme="swiss"] .modal-card .input:focus,
+html[data-theme="swiss"] .modal-card .textarea:focus {
+  border-color: #e30613;
+  box-shadow: none;
+  outline: none;
+}
+
+html[data-theme="swiss"] .input::placeholder,
+html[data-theme="swiss"] .textarea::placeholder,
+html[data-theme="swiss"] .composer-input::placeholder {
+  color: #6b7280;
+}
+
+html[data-theme="swiss"] #app .search-box {
+  background: #ffffff;
+  border: 1px solid #000000;
+  border-radius: 0;
+  box-shadow: none;
+  color: #000000;
+}
+
+html[data-theme="swiss"] #app .search-box:focus-within {
+  border-color: #e30613;
+  box-shadow: none;
+  outline: none;
+}
+
+html[data-theme="swiss"] #app .search-input {
+  color: #000000;
+  background: transparent;
+}
+
+/* ---------- labels, tags, banners ---------- */
+
+html[data-theme="swiss"] .tag,
+html[data-theme="swiss"] .type-badge {
+  background: #ffffff;
+  border: 1px solid #000000;
+  border-radius: 0;
+  color: #000000;
+}
+
+html[data-theme="swiss"] .type-badge {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+html[data-theme="swiss"] .tag {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+html[data-theme="swiss"] .type-word,
+html[data-theme="swiss"] .type-phrase,
+html[data-theme="swiss"] .type-sentence {
+  background: #ffffff;
+  color: #000000;
+}
+
+html[data-theme="swiss"] .banner {
+  background: #ffffff;
+  border: 1px solid #000000;
+  border-radius: 0;
+  color: #000000;
+  box-shadow: none;
+}
+
+html[data-theme="swiss"] .banner-error {
+  border-color: #e30613;
+  color: #000000;
+}
+
+html[data-theme="swiss"] .banner-ok {
+  border-color: #0057b8;
+  color: #000000;
+}
+
+html[data-theme="swiss"] .banner-info {
+  border-color: #000000;
+  color: #000000;
+}
+
+html[data-theme="swiss"] .link {
+  color: #e30613;
+}
+
+html[data-theme="swiss"] button:focus-visible,
+html[data-theme="swiss"] a:focus-visible,
+html[data-theme="swiss"] [tabindex]:focus-visible {
+  outline: 2px solid #ff0000;
+  outline-offset: 2px;
+}
+
+/* ---------- markdown ---------- */
+
+html[data-theme="swiss"] .markdown {
+  color: #333333;
+}
+
+html[data-theme="swiss"] .markdown code,
+html[data-theme="swiss"] .markdown pre,
+html[data-theme="swiss"] .markdown blockquote {
+  background: #ffffff;
+  border: 1px solid #000000;
+  border-radius: 0;
+  box-shadow: none;
+  color: #000000;
+}
+
+html[data-theme="swiss"] .markdown blockquote {
+  border-left: 1px solid #000000;
+}
+
+html[data-theme="swiss"] .markdown th,
+html[data-theme="swiss"] .markdown td {
+  border: 1px solid #000000;
+}
+
+html[data-theme="swiss"] .markdown th {
+  background: #000000;
+  color: #ffffff;
+}
+
+html[data-theme="swiss"] .markdown tr:nth-child(even) td {
+  background: #f0f0f0;
+}
+
+html[data-theme="swiss"] .markdown a {
+  color: #e30613;
+}
+
+html[data-theme="swiss"] .markdown hr {
+  background: #000000;
+}
+
+/* ---------- modal ---------- */
+
+html[data-theme="swiss"] .modal-overlay {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+html[data-theme="swiss"] .modal-card {
+  background: #ffffff;
+  border: 1px solid #000000;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+html[data-theme="swiss"] .modal-head h2 {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+/* ---------- today ---------- */
+
+html[data-theme="swiss"] #app .entry-text {
+  color: #000000;
+  font-weight: 700;
+}
+
+html[data-theme="swiss"] #app .entry-meaning,
+html[data-theme="swiss"] #app .entry-time {
+  color: #4b5563;
+}
+
+/* ---------- review ---------- */
+
+html[data-theme="swiss"] #app .filter-chip {
+  background: #ffffff;
+  border: 1px solid #000000;
+  border-radius: 0;
+  color: #000000;
+  box-shadow: none;
+}
+
+html[data-theme="swiss"] #app .filter-chip:hover {
+  background: #f0f0f0;
+  border-color: #ff0000;
+  box-shadow: none;
+}
+
+html[data-theme="swiss"] #app .filter-chip.active,
+html[data-theme="swiss"] #app .filter-chip.active:hover {
+  background: #000000;
+  border-color: #000000;
+  color: #ffffff;
+  box-shadow: none;
+}
+
+html[data-theme="swiss"] #app .filter-chip.active strong {
+  color: #ffffff;
+}
+
+html[data-theme="swiss"] #app .progress-track {
+  background: #ffffff;
+  border: 1px solid #000000;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+html[data-theme="swiss"] #app .progress-fill {
+  background: #ff0000;
+  border-radius: 0;
+}
+
+html[data-theme="swiss"] #app .review-card {
+  align-items: flex-start;
+  text-align: left;
+}
+
+html[data-theme="swiss"] #app .recall-actions,
+html[data-theme="swiss"] #app .review-stats {
+  justify-content: flex-start;
+}
+
+html[data-theme="swiss"] #app .reveal-block h3 {
+  color: #000000;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 11px;
+}
+
+html[data-theme="swiss"] #app .reveal-block p,
+html[data-theme="swiss"] #app .reveal-block ul {
+  color: #333333;
+}
+
+html[data-theme="swiss"] #app .done-card {
+  align-items: flex-start;
+  text-align: left;
+}
+
+html[data-theme="swiss"] #app .done-mark {
+  background: #000000;
+  border-radius: 0;
+  box-shadow: none;
+  color: #ffffff;
+}
+
+html[data-theme="swiss"] #app .done-actions {
+  justify-content: flex-start;
+}
+
+/* ---------- chat ---------- */
+
+html[data-theme="swiss"] #app .chat-welcome {
+  align-items: flex-start;
+  margin: 0;
+  text-align: left;
+}
+
+html[data-theme="swiss"] #app .welcome-mark {
+  background: #000000;
+  border: 1px solid #000000;
+  border-radius: 0;
+  box-shadow: none;
+  color: #ffffff;
+}
+
+html[data-theme="swiss"] #app .suggestions {
+  justify-content: flex-start;
+}
+
+html[data-theme="swiss"] #app .suggestion {
+  background: #ffffff;
+  border: 1px solid #000000;
+  border-radius: 0;
+  box-shadow: none;
+  color: #000000;
+}
+
+html[data-theme="swiss"] #app .suggestion:hover {
+  background: #f0f0f0;
+  border-color: #ff0000;
+  color: #000000;
+  box-shadow: none;
+}
+
+html[data-theme="swiss"] #app .session-item {
+  border: 1px solid transparent;
+  border-left: 1px solid #cccccc;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+html[data-theme="swiss"] #app .session-item:hover {
+  background: #f0f0f0;
+  border-left-color: #ff0000;
+  box-shadow: none;
+}
+
+html[data-theme="swiss"] #app .session-item.active,
+html[data-theme="swiss"] #app .session-item.active:hover {
+  background: #000000;
+  border-color: #000000;
+  border-left-color: #ff0000;
+  box-shadow: none;
+}
+
+html[data-theme="swiss"] #app .session-item.active .session-title {
+  color: #ffffff;
+}
+
+html[data-theme="swiss"] #app .session-item.active .session-preview,
+html[data-theme="swiss"] #app .session-item.active .session-meta {
+  color: #d1d5db;
+}
+
+html[data-theme="swiss"] #app .message-bubble {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0;
+}
+
+html[data-theme="swiss"] #app .message.user .message-bubble {
+  background: #000000;
+  border: 0;
+  color: #ffffff;
+  padding: 10px 14px;
+  box-shadow: none;
+}
+
+html[data-theme="swiss"] #app .user-text {
+  color: #ffffff;
+}
+
+html[data-theme="swiss"] #app .composer {
+  background: #ffffff;
+}
+
+/* ---------- library ---------- */
+
+html[data-theme="swiss"] #app .type-tabs {
+  background: #ffffff;
+  border: 1px solid #000000;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+html[data-theme="swiss"] #app .type-tab {
+  background: #ffffff;
+  border: 1px solid transparent;
+  border-radius: 0;
+  box-shadow: none;
+  color: #000000;
+}
+
+html[data-theme="swiss"] #app .type-tab:hover {
+  background: #f0f0f0;
+  border-color: #ff0000;
+  box-shadow: none;
+}
+
+html[data-theme="swiss"] #app .type-tab.active,
+html[data-theme="swiss"] #app .type-tab.active:hover {
+  background: #000000;
+  border-color: #000000;
+  color: #ffffff;
+  box-shadow: none;
+}
+
+html[data-theme="swiss"] #app .lib-row {
+  border-left-color: #cccccc;
+}
+
+html[data-theme="swiss"] #app .lib-row:hover {
+  background: #f0f0f0;
+  border-left-color: #ff0000;
+}
+
+html[data-theme="swiss"] #app .lib-title h3 {
+  color: #000000;
+}
+
+html[data-theme="swiss"] #app .lib-meaning {
+  color: #333333;
+}
+
+html[data-theme="swiss"] #app .lib-explain,
+html[data-theme="swiss"] #app .review-info {
+  color: #4b5563;
+}
+
+/* ---------- settings ---------- */
+
+html[data-theme="swiss"] #app .status-pill {
+  background: #ffffff;
+  border: 1px solid #000000;
+  border-radius: 0;
+  color: #000000;
+}
+
+html[data-theme="swiss"] #app .status-pill.ok {
+  background: #000000;
+  border-color: #000000;
+  color: #ffffff;
+}
+
+html[data-theme="swiss"] #app .status-pill.warn {
+  background: #ffffff;
+  border-color: #e30613;
+  color: #e30613;
+}
+
+html[data-theme="swiss"] #app .preset {
+  background: #ffffff;
+  border: 1px solid #000000;
+  border-radius: 0;
+  box-shadow: none;
+  color: #000000;
+}
+
+html[data-theme="swiss"] #app .preset:hover {
+  background: #f0f0f0;
+  border-color: #ff0000;
+  box-shadow: none;
+}
+
+html[data-theme="swiss"] #app .info-list code {
+  background: #ffffff;
+  border: 1px solid #000000;
+  border-radius: 0;
+  box-shadow: none;
+  color: #000000;
+}
+
+html[data-theme="swiss"] #app .theme-option {
+  background: #ffffff;
+  border: 1px solid #000000;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+html[data-theme="swiss"] #app .theme-option:hover {
+  background: #f0f0f0;
+  border-color: #ff0000;
+  box-shadow: none;
+}
+
+html[data-theme="swiss"] #app .theme-option.active,
+html[data-theme="swiss"] #app .theme-option.active:hover {
+  background: #000000;
+  border-color: #000000;
+  color: #ffffff;
+  box-shadow: none;
+}
+
+html[data-theme="swiss"] #app .theme-option.active .theme-copy strong,
+html[data-theme="swiss"] #app .theme-option.active .theme-check {
+  color: #ffffff;
+}
+
+html[data-theme="swiss"] #app .theme-option.active small {
+  color: #d1d5db;
+}
+
+/* The Neumorphism preview stays inside the Swiss page, so keep it sharp and shadowless there. */
+html[data-theme="swiss"] #app .swatch-neumorphism {
+  border: 1px solid #000000;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+html[data-theme="swiss"] #app .theme-option.active .theme-check {
+  color: #ffffff;
+}
+
+/* ---------- entry form ---------- */
+
+html[data-theme="swiss"] body .type-option {
+  background: #ffffff;
+  border: 1px solid #000000;
+  border-radius: 0;
+  box-shadow: none;
+  color: #000000;
+}
+
+html[data-theme="swiss"] body .type-option:hover {
+  background: #f0f0f0;
+  border-color: #ff0000;
+  box-shadow: none;
+}
+
+html[data-theme="swiss"] body .type-option.active,
+html[data-theme="swiss"] body .type-option.active:hover {
+  background: #000000;
+  border-color: #000000;
+  color: #ffffff;
+  box-shadow: none;
+}
+
+html[data-theme="swiss"] body .type-option.active small {
+  color: #d1d5db;
+}
+
+/* ---------- empty & misc ---------- */
+
+html[data-theme="swiss"] .empty {
+  text-align: left;
+}
+
+html[data-theme="swiss"] .muted,
+html[data-theme="swiss"] .hint {
+  color: #4b5563;
+}
+
+html[data-theme="swiss"] * {
+  scrollbar-color: #cccccc transparent;
+}
+
+html[data-theme="swiss"] *::-webkit-scrollbar-thumb {
+  background: #cccccc;
+}
+
+@media (max-width: 900px) {
+  html[data-theme="swiss"] #app .sidebar {
+    border-right: 0;
+    border-bottom: 1px solid #000000;
+  }
+}

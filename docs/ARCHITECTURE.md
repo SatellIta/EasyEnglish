@@ -64,7 +64,7 @@
 
 ### settings
 
-简单 key-value。目前使用 `ai.baseUrl`、`ai.model`、`ai.apiKey`。
+简单 key-value。目前使用 `ai.baseUrl`、`ai.model`、`ai.apiKey`，以及复习配置 `review.intervalsDays`（JSON 数字数组）和 `review.forgotRetryMinutes`。
 
 ### entries_fts
 
@@ -113,17 +113,20 @@ FTS5 虚拟表，`tokenize='trigram'`，内容来自 entries，通过 INSERT/UPD
 | GET | `/api/settings` | 返回 URL、模型、Key 掩码、是否已配置 |
 | PUT | `/api/settings` | 更新设置；`clearApiKey: true` 清除 Key |
 | POST | `/api/settings/test` | 用当前或传入的配置做一次最小请求 |
+| GET | `/api/settings/review` | 读取复习间隔阶梯与遗忘重试窗口 |
+| PUT | `/api/settings/review` | 更新复习配置；服务端会排序、去重并限制范围 |
 
 ## 复习调度
 
-`server/lib/scheduler.ts`：
+`server/lib/scheduler.ts` 使用 `server/lib/review-config.ts` 提供的配置：
 
-- 间隔阶梯：`[1, 2, 4, 7, 15, 30, 60, 120, 240]` 天。
+- 默认间隔阶梯：`[1, 2, 4, 7, 15, 30, 60, 120, 240]` 天，可在设置页的「遗忘曲线」中修改（排序、去重，最多 20 项）。
+- 默认遗忘重试窗口：10 分钟，可在设置页修改。
 - 新词条：`stage = 0`，`next_review_at = now`，立即进入队列。
-- 记得：`stage += 1`，下次间隔为 `INTERVALS[stage - 1]`；超过阶梯后 `status = mastered`，下次 365 天。
-- 不记得：`stage = 0`，`lapses += 1`，10 分钟后重新出现，`status = learning`。
+- 记得：`stage += 1`，下次间隔为 `intervals[stage - 1]`；超过阶梯后 `status = mastered`，下次 365 天。
+- 不记得：`stage = 0`，`lapses += 1`，按配置的重试分钟数重新出现，`status = learning`。
 
-复习界面只展示英文，用户先主动回忆，再选择「记得 / 不记得」。不使用选择题，避免只记选项差异。
+复习界面只展示英文，用户先主动回忆，再选择「记得 / 不记得」。不使用选择题，避免只记选项差异。修改配置只影响之后的评分，不会重排已有词条的下次复习时间。
 
 ## AI 流程
 
@@ -168,10 +171,20 @@ FTS5 虚拟表，`tokenize='trigram'`，内容来自 entries，通过 INSERT/UPD
 
 解析时容忍 Markdown 代码围栏；解析失败则退化为纯 Markdown 总结、候选词条为空。结果按日期 upsert 到 `daily_summaries`。
 
+## 主题
+
+界面支持两套主题，通过 `<html data-theme="...">` 切换：
+
+- `neumorphism`（默认）：新拟物派，浅灰同色系、双光源阴影。
+- `swiss`：瑞士国际风格，白底、黑框、红色强调、直角、无阴影。
+
+主题状态由 `src/stores/theme.ts` 管理，持久化在 `localStorage` 的 `easyenglish.theme`；`index.html` 的内联脚本在首屏绘制前恢复主题，避免闪烁。结构样式在 `src/styles/main.css`，主题变量与覆盖在 `src/styles/themes/`。设置页的「外观」区块和侧栏底部按钮都可以切换。
+
 ## 扩展点
 
 - **新词条类型**：同步修改 `shared/types.ts` 的 `EntryType`、`server/schema.sql` 的 CHECK 约束（需要迁移），以及前端类型标签。
 - **更复杂的调度**：可替换 `scheduler.ts` 为 FSRS/SM-2，`review_logs` 已保留每次评分的历史。
 - **更多 AI Provider**：当前所有兼容 OpenAI Chat Completions 的服务共用一条代码路径；若接入 Anthropic 原生协议，在 `server/ai/` 下增加适配器并在配置中区分 provider。
 - **多设备同步**：当前是单机 SQLite。若要做同步，建议保持服务端数据模型不变，增加远端存储或同步层，而不是把数据库搬到浏览器里。
-- **测试**：尚无测试。优先为 `scheduler.ts`、`queries.ts` 和 API 路由补单元/集成测试。
+- **新增主题**：在 `src/styles/themes/` 下新增变量与覆盖文件，在 `src/stores/theme.ts` 注册，并在设置页加入主题选项；按对应风格文档自检。
+- **测试**：尚无测试。优先为 `scheduler.ts`、`review-config.ts`、`queries.ts` 和 API 路由补单元/集成测试。

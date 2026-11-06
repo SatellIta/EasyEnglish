@@ -75,6 +75,12 @@ export interface ReviewStats {
   streakDays: number
 }
 
+/** 遗忘曲线配置：成功复习后的间隔阶梯（天）与遗忘后的重试窗口（分钟） */
+export interface ReviewSettings {
+  intervalsDays: number[]
+  forgotRetryMinutes: number
+}
+
 export interface ChatSession {
   id: number
   title: string | null

@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
+import type { ReviewSettings } from '@shared/types'
 import Icon from '@/components/Icon.vue'
 import { api, errorMessage } from '@/lib/api'
 import { useAppStore } from '@/stores/app'
+import { THEMES, useThemeStore } from '@/stores/theme'
 
 const store = useAppStore()
+const themeStore = useThemeStore()
 
 const form = reactive({
   baseUrl: '',
@@ -12,11 +15,19 @@ const form = reactive({
   apiKey: '',
   clearApiKey: false,
 })
+const reviewForm = reactive({
+  intervalsText: '',
+  forgotRetryMinutes: 10,
+})
 const loading = ref(true)
 const saving = ref(false)
 const testing = ref(false)
+const reviewSaving = ref(false)
+const savedReviewText = ref('')
 const error = ref('')
 const notice = ref('')
+const reviewError = ref('')
+const reviewNotice = ref('')
 const testResult = ref<{ ok: boolean; message: string } | null>(null)
 
 const presets = [
@@ -34,12 +45,19 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const settings = await api.settings.get()
+    const [settings, review] = await Promise.all([
+      api.settings.get(),
+      api.settings.review(),
+    ])
     form.baseUrl = settings.baseUrl
     form.model = settings.model
     form.apiKey = ''
     form.clearApiKey = false
     store.settings = settings
+
+    reviewForm.intervalsText = review.intervalsDays.join(', ')
+    reviewForm.forgotRetryMinutes = review.forgotRetryMinutes
+    savedReviewText.value = `${review.intervalsDays.join(' / ')} 天 · 重试 ${review.forgotRetryMinutes} 分钟`
   } catch (caught) {
     error.value = errorMessage(caught)
   } finally {
@@ -98,6 +116,37 @@ async function test() {
   }
 }
 
+async function saveReview() {
+  reviewSaving.value = true
+  reviewError.value = ''
+  reviewNotice.value = ''
+  try {
+    const intervals = reviewForm.intervalsText
+      .split(/[,，\s]+/)
+      .map((value) => Number(value))
+      .filter((value) => Number.isFinite(value) && value > 0)
+
+    if (!intervals.length) throw new Error('请至少填写一个大于 0 的复习间隔')
+    const retry = Number(reviewForm.forgotRetryMinutes)
+    if (!Number.isFinite(retry) || retry <= 0) {
+      throw new Error('遗忘后重试窗口必须大于 0 分钟')
+    }
+
+    const saved: ReviewSettings = await api.settings.updateReview({
+      intervalsDays: intervals,
+      forgotRetryMinutes: retry,
+    })
+    reviewForm.intervalsText = saved.intervalsDays.join(', ')
+    reviewForm.forgotRetryMinutes = saved.forgotRetryMinutes
+    savedReviewText.value = `${saved.intervalsDays.join(' / ')} 天 · 重试 ${saved.forgotRetryMinutes} 分钟`
+    reviewNotice.value = '遗忘曲线已保存，新的安排会应用于之后的复习。'
+  } catch (caught) {
+    reviewError.value = errorMessage(caught)
+  } finally {
+    reviewSaving.value = false
+  }
+}
+
 onMounted(load)
 </script>
 
@@ -106,12 +155,96 @@ onMounted(load)
     <header class="page-head">
       <div>
         <h1>设置</h1>
-        <p>接入任意 OpenAI 兼容接口，数据全部保存在本机。</p>
+        <p>配置 AI 接入、遗忘曲线与界面主题，数据全部保存在本机。</p>
       </div>
     </header>
 
     <p v-if="error" class="banner banner-error">{{ error }}</p>
     <p v-if="notice" class="banner banner-ok">{{ notice }}</p>
+
+    <section class="card settings-card">
+      <div class="card-title">
+        <div>
+          <h2>外观</h2>
+          <p class="hint">切换后立即生效，偏好保存在当前浏览器。</p>
+        </div>
+        <span class="status-pill ok">
+          {{ themeStore.theme === 'swiss' ? '瑞士国际' : '新拟物派' }}
+        </span>
+      </div>
+
+      <div class="theme-options">
+        <button
+          v-for="option in THEMES"
+          :key="option.id"
+          type="button"
+          class="theme-option"
+          :class="{ active: themeStore.theme === option.id }"
+          :aria-pressed="themeStore.theme === option.id"
+          @click="themeStore.setTheme(option.id)"
+        >
+          <span class="theme-swatch" :class="`swatch-${option.id}`" aria-hidden="true" />
+          <span class="theme-copy">
+            <strong>{{ option.name }}</strong>
+            <small>{{ option.description }}</small>
+          </span>
+          <Icon
+            v-if="themeStore.theme === option.id"
+            class="theme-check"
+            name="check"
+            :size="17"
+          />
+        </button>
+      </div>
+    </section>
+
+    <section class="card settings-card">
+      <div class="card-title">
+        <div>
+          <h2>遗忘曲线</h2>
+          <p class="hint">控制每个复习阶段之间的窗口长度。</p>
+        </div>
+      </div>
+
+      <p v-if="reviewError" class="banner banner-error">{{ reviewError }}</p>
+      <p v-if="reviewNotice" class="banner banner-ok">{{ reviewNotice }}</p>
+
+      <div class="field">
+        <label for="review-intervals">复习间隔（天）</label>
+        <input
+          id="review-intervals"
+          v-model="reviewForm.intervalsText"
+          class="input"
+          placeholder="1, 2, 4, 7, 15, 30, 60, 120, 240"
+          :disabled="loading"
+        />
+        <span class="hint">
+          用逗号分隔。第 N 次选择「记得」后，按第 N 个间隔安排下一次复习；走完最后一个间隔后视为已掌握。
+        </span>
+      </div>
+
+      <div class="field">
+        <label for="review-retry">遗忘后重试窗口（分钟）</label>
+        <input
+          id="review-retry"
+          v-model.number="reviewForm.forgotRetryMinutes"
+          type="number"
+          min="1"
+          max="1440"
+          class="input"
+          :disabled="loading"
+        />
+        <span class="hint">
+          选择「不记得」后，词条会在该时间后重新进入复习队列。默认 10 分钟。
+        </span>
+      </div>
+
+      <div class="actions">
+        <button class="btn btn-primary" :disabled="reviewSaving" @click="saveReview">
+          {{ reviewSaving ? '保存中…' : '保存遗忘曲线' }}
+        </button>
+      </div>
+    </section>
 
     <section class="card settings-card">
       <div class="card-title">
@@ -159,9 +292,21 @@ onMounted(load)
           id="model"
           v-model="form.model"
           class="input"
+          list="model-options"
           placeholder="gpt-4o-mini"
           :disabled="loading"
         />
+        <datalist id="model-options">
+          <option value="gpt-4o-mini" />
+          <option value="gpt-4o" />
+          <option value="deepseek-chat" />
+          <option value="deepseek-reasoner" />
+          <option value="qwen-plus" />
+          <option value="qwen-max" />
+          <option value="qwen2.5:7b" />
+          <option value="llama3.1" />
+        </datalist>
+        <span class="hint">可从常见模型中选择，也可以直接输入自定义模型名。</span>
       </div>
 
       <div class="field">
@@ -219,8 +364,8 @@ onMounted(load)
           <code>{{ store.settings?.source === 'env' ? '环境变量' : store.settings?.source === 'settings' ? '设置页' : '默认值' }}</code>
         </li>
         <li>
-          <span>复习算法</span>
-          <code>艾宾浩斯间隔 1 / 2 / 4 / 7 / 15 / 30 / 60 / 120 / 240 天</code>
+          <span>复习配置</span>
+          <code>{{ savedReviewText || '未读取' }}</code>
         </li>
       </ul>
       <p class="hint">
@@ -259,7 +404,7 @@ onMounted(load)
 .status-pill {
   flex: 0 0 auto;
   padding: 4px 11px;
-  border-radius: 12px;
+  border-radius: var(--radius-sm);
   font-size: 12px;
   font-weight: 600;
 }
@@ -307,6 +452,89 @@ onMounted(load)
   gap: 12px;
   flex-wrap: wrap;
 }
+.theme-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.theme-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: var(--border-width, 0) solid var(--border-color, transparent);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--ink-soft);
+  text-align: left;
+  box-shadow: var(--shadow-raised-sm);
+  transition: box-shadow var(--transition), background-color var(--transition),
+    border-color var(--transition), color var(--transition);
+}
+.theme-option:hover {
+  box-shadow: var(--shadow-hover-sm);
+}
+.theme-option:active {
+  box-shadow: var(--shadow-pressed);
+}
+.theme-option.active {
+  box-shadow: var(--shadow-pressed);
+}
+.theme-option.active .theme-copy strong {
+  color: var(--accent-strong);
+}
+.theme-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.theme-copy strong {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.theme-copy small {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+.theme-swatch {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  border-radius: var(--radius-sm);
+}
+.swatch-neumorphism {
+  background: #e0e5ec;
+  box-shadow: 4px 4px 8px #b8bcc2, -4px -4px 8px #ffffff;
+}
+.swatch-swiss {
+  position: relative;
+  overflow: hidden;
+  background: #ffffff;
+  border: 2px solid #000000;
+  border-radius: 0;
+}
+.swatch-swiss::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 9px;
+  background: #ff0000;
+}
+.theme-check {
+  margin-left: auto;
+  flex: 0 0 auto;
+  color: var(--accent-strong);
+}
+@media (max-width: 620px) {
+  .theme-options {
+    grid-template-columns: 1fr;
+  }
+}
 .info-list {
   list-style: none;
   margin: 0;
@@ -328,7 +556,7 @@ onMounted(load)
 .info-list code {
   background: var(--bg);
   padding: 3px 9px;
-  border-radius: 12px;
+  border-radius: var(--radius-sm);
   box-shadow: var(--shadow-inset-sm);
   font-family: var(--font-mono);
   font-size: 12px;

@@ -1,13 +1,9 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { testConnection } from '../ai/client'
-import {
-  deleteSetting,
-  getAiConfig,
-  isLocalUrl,
-  publicSettings,
-  setSetting,
-} from '../ai/config'
+import { getAiConfig, isLocalUrl, publicSettings } from '../ai/config'
+import { getReviewConfig, saveReviewConfig } from '../lib/review-config'
+import { deleteSetting, setSetting } from '../lib/settings'
 
 const app = new Hono()
 
@@ -19,6 +15,18 @@ const updateInput = z.object({
 })
 
 app.get('/api/settings', (c) => c.json(publicSettings()))
+
+const reviewInput = z.object({
+  intervalsDays: z.array(z.number().positive().max(3650)).min(1).max(20),
+  forgotRetryMinutes: z.number().positive().max(1440),
+})
+
+app.get('/api/settings/review', (c) => c.json(getReviewConfig()))
+
+app.put('/api/settings/review', async (c) => {
+  const input = reviewInput.parse(await c.req.json())
+  return c.json(saveReviewConfig(input))
+})
 
 app.put('/api/settings', async (c) => {
   const input = updateInput.parse(await c.req.json())

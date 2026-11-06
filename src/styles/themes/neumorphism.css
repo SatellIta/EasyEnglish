@@ -1,0 +1,80 @@
+:root,
+:root[data-theme="neumorphism"] {
+  /* palette */
+  --bg: #e0e5ec;
+  --bg-soft: #e9edf2;
+  --surface: #e0e5ec;
+  --surface-2: #f0f0f3;
+  --ink: #333333;
+  --ink-soft: #4b5563;
+  --muted: #59606c;
+  --shadow-dark: #b8bcc2;
+  --shadow-light: #ffffff;
+
+  --accent: #6d5dfc;
+  --accent-strong: #4c3fd6;
+  --accent-soft: #dcd8ff;
+  --success: #2f6b52;
+  --success-soft: #d7e8df;
+  --danger: #9f3f3a;
+  --danger-soft: #f3d9d6;
+  --warning: #8a5a1f;
+  --warning-soft: #f4e4cf;
+
+  /* shape */
+  --radius-sm: 12px;
+  --radius: 16px;
+  --radius-lg: 24px;
+  --border-width: 0px;
+  --border-color: transparent;
+  --divider-color: #cdd3db;
+
+  /* dual-light shadows: white top-left, dark bottom-right */
+  --shadow-raised-sm: 3px 3px 6px var(--shadow-dark), -3px -3px 6px var(--shadow-light);
+  --shadow-raised: 4px 4px 8px var(--shadow-dark), -4px -4px 8px var(--shadow-light);
+  --shadow-raised-lg: 6px 6px 12px var(--shadow-dark), -6px -6px 12px var(--shadow-light);
+  --shadow-hover-sm: 2px 2px 4px var(--shadow-dark), -2px -2px 4px var(--shadow-light);
+  --shadow-hover: 2px 2px 4px var(--shadow-dark), -2px -2px 4px var(--shadow-light);
+  --shadow-pressed: inset 5px 5px 10px var(--shadow-dark), inset -5px -5px 10px var(--shadow-light);
+  --shadow-inset: inset 6px 6px 12px var(--shadow-dark), inset -6px -6px 12px var(--shadow-light);
+  --shadow-inset-sm: inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light);
+  --shadow-inset-focus: inset 2px 2px 4px var(--shadow-dark), inset -2px -2px 4px var(--shadow-light);
+
+  /* typography */
+  --font-sans: "Avenir Next", "Segoe UI", "PingFang SC", "Hiragino Sans GB",
+    "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  --font-mono: "SFMono-Regular", Menlo, Consolas, monospace;
+  --font-weight-heading: 600;
+  --page-title-size: clamp(27px, 3.4vw, 34px);
+  --title-letter-spacing: -0.02em;
+  --body-size: 15px;
+
+  /* motion & layout */
+  --transition: 300ms ease-in-out;
+  --main-pad-y: 36px;
+  --main-pad-x: clamp(20px, 4vw, 52px);
+  --main-pad-bottom: 72px;
+}
+
+@media (min-width: 768px) {
+  :root,
+  :root[data-theme="neumorphism"] {
+    --shadow-raised-sm: 4px 4px 8px var(--shadow-dark), -4px -4px 8px var(--shadow-light);
+    --shadow-raised: 8px 8px 16px var(--shadow-dark), -8px -8px 16px var(--shadow-light);
+    --shadow-raised-lg: 12px 12px 24px var(--shadow-dark), -12px -12px 24px var(--shadow-light);
+    --shadow-hover-sm: 2px 2px 4px var(--shadow-dark), -2px -2px 4px var(--shadow-light);
+    --shadow-hover: 4px 4px 8px var(--shadow-dark), -4px -4px 8px var(--shadow-light);
+    --shadow-pressed: inset 5px 5px 10px var(--shadow-dark), inset -5px -5px 10px var(--shadow-light);
+    --shadow-inset: inset 8px 8px 16px var(--shadow-dark), inset -8px -8px 16px var(--shadow-light);
+    --shadow-inset-sm: inset 4px 4px 8px var(--shadow-dark), inset -4px -4px 8px var(--shadow-light);
+  }
+}
+
+@media (max-width: 900px) {
+  :root,
+  :root[data-theme="neumorphism"] {
+    --main-pad-y: 24px;
+    --main-pad-x: 16px;
+    --main-pad-bottom: 56px;
+  }
+}

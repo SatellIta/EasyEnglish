@@ -1,14 +1,19 @@
-import type { ReviewRating, ReviewStatus } from '../../shared/types'
+import type { ReviewRating, ReviewSettings, ReviewStatus } from '../../shared/types'
+import {
+  DEFAULT_FORGOT_RETRY_MINUTES,
+  DEFAULT_REVIEW_INTERVALS_DAYS,
+  getReviewConfig,
+} from './review-config'
 import { addDays, addMinutes } from './time'
 
 /**
- * 艾宾浩斯复习间隔（天）。第 n 次成功回忆后，下一次复习安排在
- * INTERVALS_DAYS[n - 1] 天后。
+ * 默认艾宾浩斯复习间隔（天）。实际值可在设置页的「遗忘曲线」中修改。
+ * 第 n 次成功回忆后，下一次复习安排在 intervals[n - 1] 天后。
  */
-export const EBBINGHAUS_INTERVALS_DAYS = [1, 2, 4, 7, 15, 30, 60, 120, 240]
+export const EBBINGHAUS_INTERVALS_DAYS = DEFAULT_REVIEW_INTERVALS_DAYS
 
-/** 遗忘后的短暂重试间隔（分钟），当天可以快速再见到这个词条。 */
-export const FORGOT_RETRY_MINUTES = 10
+/** 默认遗忘后的重试窗口（分钟），可在设置页修改。 */
+export const FORGOT_RETRY_MINUTES = DEFAULT_FORGOT_RETRY_MINUTES
 
 export interface Schedule {
   stage: number
@@ -34,12 +39,21 @@ interface CurrentSchedule {
   lapses: number
 }
 
-export function nextSchedule(current: CurrentSchedule, rating: ReviewRating, now = new Date()): Schedule {
+export function nextSchedule(
+  current: CurrentSchedule,
+  rating: ReviewRating,
+  now = new Date(),
+  config: ReviewSettings = getReviewConfig(),
+): Schedule {
+  const intervals = config.intervalsDays.length
+    ? config.intervalsDays
+    : DEFAULT_REVIEW_INTERVALS_DAYS
+
   if (rating === 'forgot') {
     return {
       stage: 0,
       intervalDays: 0,
-      nextReviewAt: addMinutes(now, FORGOT_RETRY_MINUTES).toISOString(),
+      nextReviewAt: addMinutes(now, config.forgotRetryMinutes).toISOString(),
       status: 'learning',
       lapses: current.lapses + 1,
     }
@@ -47,7 +61,7 @@ export function nextSchedule(current: CurrentSchedule, rating: ReviewRating, now
 
   const stage = current.stage + 1
 
-  if (stage > EBBINGHAUS_INTERVALS_DAYS.length) {
+  if (stage > intervals.length) {
     const intervalDays = 365
     return {
       stage,
@@ -58,7 +72,7 @@ export function nextSchedule(current: CurrentSchedule, rating: ReviewRating, now
     }
   }
 
-  const intervalDays = EBBINGHAUS_INTERVALS_DAYS[stage - 1]
+  const intervalDays = intervals[stage - 1]
   return {
     stage,
     intervalDays,

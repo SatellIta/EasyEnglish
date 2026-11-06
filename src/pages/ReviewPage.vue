@@ -24,6 +24,7 @@ const remembered = ref(0)
 const forgot = ref(0)
 const loading = ref(false)
 const error = ref('')
+const retryMinutes = ref(10)
 
 const allTypes: EntryType[] = ['word', 'phrase', 'sentence']
 const current = computed(() => queue.value[index.value] ?? null)
@@ -128,6 +129,12 @@ function onKeydown(event: KeyboardEvent) {
 onMounted(() => {
   window.addEventListener('keydown', onKeydown)
   if (!store.stats) store.refreshStats().catch(() => {})
+  api.settings
+    .review()
+    .then((config) => {
+      retryMinutes.value = config.forgotRetryMinutes
+    })
+    .catch(() => {})
 })
 
 onBeforeUnmount(() => {
@@ -155,6 +162,7 @@ onBeforeUnmount(() => {
             :key="type"
             class="filter-chip"
             :class="{ active: selectedTypes.includes(type) }"
+            :aria-pressed="selectedTypes.includes(type)"
             @click="toggleType(type)"
           >
             <span>{{ ENTRY_TYPE_LABELS[type] }}</span>
@@ -253,7 +261,7 @@ onBeforeUnmount(() => {
           <button class="btn btn-primary btn-lg" :disabled="loading" @click="advance">
             继续 <Icon name="arrow-right" :size="18" />
           </button>
-          <p class="hint">按空格继续 · 这个词条会在 10 分钟后再次出现</p>
+          <p class="hint">按空格继续 · 这个词条会在 {{ retryMinutes }} 分钟后再次出现</p>
         </template>
       </section>
 
@@ -355,14 +363,14 @@ onBeforeUnmount(() => {
 .progress-track {
   flex: 1;
   height: 10px;
-  border-radius: 12px;
+  border-radius: var(--radius-sm);
   background: var(--bg);
   box-shadow: var(--shadow-inset-sm);
   overflow: hidden;
 }
 .progress-fill {
   height: 100%;
-  border-radius: 12px;
+  border-radius: var(--radius-sm);
   background: var(--accent);
   transition: width var(--transition);
 }

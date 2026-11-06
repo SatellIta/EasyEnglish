@@ -44,7 +44,7 @@ Tables: `entries`, `review_states`, `review_logs`, `chat_sessions`, `chat_messag
 
 ### Review scheduling
 
-`server/lib/scheduler.ts`: intervals `[1, 2, 4, 7, 15, 30, 60, 120, 240]` days. New entries are due immediately. "Remembered" advances one stage and schedules `INTERVALS[stage - 1]` days out; "forgot" resets to stage 0 and returns in 10 minutes; past the ladder the entry becomes `mastered` (365-day interval). Review is active recall only — never multiple choice.
+`server/lib/scheduler.ts`: default intervals `[1, 2, 4, 7, 15, 30, 60, 120, 240]` days and a 10-minute forgot-retry window. Both are configurable from the Settings page and stored in the `settings` table as `review.intervalsDays` (JSON array) and `review.forgotRetryMinutes`. `getReviewConfig()` in `server/lib/review-config.ts` normalizes/falls back; `nextSchedule()` reads it on every rating. New entries are due immediately. "Remembered" advances one stage and schedules `intervals[stage - 1]` days out; "forgot" resets to stage 0 and returns after the configured retry window; past the ladder the entry becomes `mastered` (365-day interval). Review is active recall only — never multiple choice.
 
 ### AI
 
@@ -64,12 +64,17 @@ OpenAI-compatible providers only (OpenAI, DeepSeek, Qwen, Ollama, etc.). Config 
 - AI Markdown is rendered by `MarkdownView.vue` (marked + DOMPurify). Sanitization is mandatory; keep it.
 - Review keyboard shortcuts (1/J remember, 2/K forget, Space/Enter continue) live in `ReviewPage.vue`.
 - The chat composer guards IME composition before sending on Enter.
-- Styling is plain CSS with tokens at the top of `src/styles/main.css`. No component library; avoid adding one.
-- UI style is **Neumorphism / Soft UI** and is binding: see `docs/UI_STYLE.md`. Key rules: `#e0e5ec` background, same-color surfaces, dual shadows (white top-left, `#b8bcc2` bottom-right), no borders / gradients / pure white or black backgrounds / translate on buttons, hover shrinks shadows, active becomes inset, inputs are inset and focus reduces the inset, 12–24px radii, 300ms ease-in-out. Use system sans fonts — avoid Inter/Roboto/Geist and serif headings.
+- Styling is plain CSS. Shared structure lives in `src/styles/main.css`; theme tokens live in `src/styles/themes/neumorphism.css` and `src/styles/themes/swiss.css`. No component library; avoid adding one.
+- Two themes are supported and switchable from Settings or the sidebar footer: **Neumorphism / Soft UI** (default) and **Swiss International**. Binding contracts: `docs/UI_STYLE_NEUMORPHISM.md`, `docs/UI_STYLE_SWISS.md`, indexed in `docs/UI_STYLE.md`.
+- Theme state is `<html data-theme="...">`, persisted in `localStorage` under `easyenglish.theme`; `src/stores/theme.ts` owns it. The inline script in `index.html` restores it before paint.
+- Prefer tokens (`--bg`, `--ink`, `--accent`, `--border-*`, `--radius-*`, shadows, `--transition`, typography) over hard-coded colors so both themes keep working.
+- Neumorphism rules: `#e0e5ec` surfaces, dual shadows (white top-left, `#b8bcc2` bottom-right), no borders/gradients/pure white backgrounds/translate, hover shrinks shadows, active goes inset, inputs inset and relax on focus.
+- Swiss rules: white/black/red, sharp corners, 1px black borders, no shadows, Helvetica-like sans, `150ms ease-out`, buttons carry a `→`, left-aligned, generous negative space.
 - Apply visual changes through tokens and global classes, not hard-coded colors in pages.
 
 ## Current state
 
-- Working: entries CRUD + search, Ebbinghaus review, AI chat streaming, daily summary, settings, responsive desktop/mobile layout.
+- Working: entries CRUD + search, configurable Ebbinghaus review, AI chat streaming, daily summary, settings (AI / forgetting curve / theme), responsive desktop/mobile layout.
+- Two themes: Neumorphism and Swiss International, with persistence and a sidebar toggle.
 - Verified by manual API smoke tests and Playwright screenshots; no automated tests yet.
-- `docs/ARCHITECTURE.md` has endpoint/data-model detail; `docs/UI_STYLE.md` is the binding visual contract (Neumorphism).
+- `docs/ARCHITECTURE.md` has endpoint/data-model detail; `docs/UI_STYLE.md` indexes the two binding visual contracts.

@@ -1,5 +1,5 @@
 import type { AiSettings } from '../../shared/types'
-import { db } from '../db'
+import { getSetting } from '../lib/settings'
 
 export interface AiConfig {
   baseUrl: string
@@ -10,22 +10,6 @@ export interface AiConfig {
 
 const DEFAULT_BASE_URL = 'https://api.openai.com/v1'
 const DEFAULT_MODEL = 'gpt-4o-mini'
-
-export function getSetting(key: string): string | null {
-  const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key) as { value: string } | undefined
-  return row?.value ?? null
-}
-
-export function setSetting(key: string, value: string): void {
-  db.prepare(
-    `INSERT INTO settings (key, value) VALUES (?, ?)
-     ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
-  ).run(key, value)
-}
-
-export function deleteSetting(key: string): void {
-  db.prepare('DELETE FROM settings WHERE key = ?').run(key)
-}
 
 export function isLocalUrl(url: string): boolean {
   return /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0)(:\d+)?(\/|$)/i.test(url)

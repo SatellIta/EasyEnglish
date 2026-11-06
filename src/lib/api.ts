@@ -7,6 +7,7 @@ import type {
   Entry,
   EntryInput,
   EntryType,
+  ReviewSettings,
   ReviewState,
   ReviewStats,
   SummaryResult,
@@ -149,6 +150,12 @@ export const api = {
     test: (input: { baseUrl?: string; model?: string; apiKey?: string }) =>
       request<{ ok: boolean; error?: string; model?: string; reply?: string }>('/settings/test', {
         method: 'POST',
+        body: JSON.stringify(input),
+      }),
+    review: () => request<ReviewSettings>('/settings/review'),
+    updateReview: (input: ReviewSettings) =>
+      request<ReviewSettings>('/settings/review', {
+        method: 'PUT',
         body: JSON.stringify(input),
       }),
   },

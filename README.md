@@ -9,7 +9,8 @@
 - **自建语料**：单词、短语、句子统一管理，支持释义、用法、例句、笔记和标签。
 - **AI 英语助手**：内置面向中文学习者的提示词，直接在 App 内问词义、辨析、语法和表达。AI 会读取你记录的词句作为联想记忆。
 - **一键今日总结**：让 AI 把今天的对话和词条整理成可复习的总结，并抽取值得加入词库的候选条目。
-- **艾宾浩斯复习**：新词条立即进入队列；记得则推进到 1 / 2 / 4 / 7 / 15 / 30 / 60 / 120 / 240 天，不记得则 10 分钟后重试。复习只展示英文，先主动回忆，再展开答案。
+- **艾宾浩斯复习**：新词条立即进入队列；默认按 1 / 2 / 4 / 7 / 15 / 30 / 60 / 120 / 240 天推进，不记得则在 10 分钟后重试。复习间隔和重试窗口都可以在设置页调整。复习只展示英文，先主动回忆，再展开答案。
+- **主题切换**：内置「新拟物派」与「瑞士国际风格」两套主题，可在设置页或侧栏底部一键切换，偏好保存在浏览器本地。
 - **本地数据**：所有内容保存在一个 SQLite 文件里，离线可用，备份只需复制 `data/`。
 - **响应式界面**：桌面和手机浏览器都可用。
 
@@ -51,7 +52,7 @@ pnpm typecheck    # 仅类型检查
 - 前端：Vue 3、TypeScript、Vite、Vue Router、Pinia、marked + DOMPurify
 - 后端：Hono、better-sqlite3（SQLite + FTS5 全文检索）
 - AI：OpenAI 兼容 Chat Completions（流式 NDJSON）
-- UI：新拟物派（Neumorphism / Soft UI），纯 CSS 设计变量，无组件库
+- UI：纯 CSS 设计变量，内置「新拟物派（Neumorphism）」与「瑞士国际风格（Swiss International）」两套主题，无组件库
 
 项目刻意保持轻量：没有 ORM、没有 UI 组件库、没有数据库服务。
 
@@ -84,4 +85,6 @@ API Key 以明文保存在本地 SQLite 的 `settings` 表中，接口只返回�
 
 - [CLAUDE.md](CLAUDE.md) — 给 AI 编码助手的仓库指南
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — 数据模型、接口、调度与 AI 流程
-- [docs/UI_STYLE.md](docs/UI_STYLE.md) — 视觉风格约束（待补充）
+- [docs/UI_STYLE.md](docs/UI_STYLE.md) — 两套主题的风格索引
+- [docs/UI_STYLE_NEUMORPHISM.md](docs/UI_STYLE_NEUMORPHISM.md) — 新拟物派约束
+- [docs/UI_STYLE_SWISS.md](docs/UI_STYLE_SWISS.md) — 瑞士国际风格约束

@@ -5,6 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#e0e5ec" />
     <title>EasyEnglish · 沉浸式英语学习</title>
+    <script>
+      ;(function () {
+        try {
+          var theme = localStorage.getItem('easyenglish.theme')
+          document.documentElement.dataset.theme = theme === 'swiss' ? 'swiss' : 'neumorphism'
+          var meta = document.querySelector('meta[name="theme-color"]')
+          if (meta && theme === 'swiss') meta.setAttribute('content', '#ffffff')
+        } catch (error) {
+          document.documentElement.dataset.theme = 'neumorphism'
+        }
+      })()
+    </script>
   </head>
   <body>
     <div id="app"></div>

@@ -113,6 +113,7 @@ onMounted(load)
           :key="filter.value"
           class="type-tab"
           :class="{ active: activeType === filter.value }"
+          :aria-pressed="activeType === filter.value"
           @click="activeType = filter.value"
         >
           {{ filter.label }}
@@ -223,7 +224,7 @@ onMounted(load)
 .type-tab {
   border: 0;
   background: transparent;
-  border-radius: 12px;
+  border-radius: var(--radius-sm);
   padding: 7px 13px;
   font-size: 13px;
   color: var(--muted);
