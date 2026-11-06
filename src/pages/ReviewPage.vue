@@ -8,6 +8,13 @@ import SpeakButton from '@/components/SpeakButton.vue'
 import TypeBadge from '@/components/TypeBadge.vue'
 import { api, errorMessage } from '@/lib/api'
 import { stageLabel } from '@/lib/format'
+import {
+  comparePronunciation,
+  speechRecognitionSupported,
+  startRecognition,
+  type PronunciationResult,
+} from '@/lib/pronunciation'
+import { speak, stopSpeaking } from '@/lib/speech'
 import { useAppStore } from '@/stores/app'
 
 type Phase = 'setup' | 'session' | 'done'
@@ -27,6 +34,12 @@ const error = ref('')
 const retryMinutes = ref(10)
 const generatingExamples = ref(false)
 const exampleNotice = ref('')
+const shadowing = ref(false)
+const shadowingResult = ref<PronunciationResult | null>(null)
+const shadowingError = ref('')
+const recognitionSupported = speechRecognitionSupported()
+let recognitionController: { stop: () => void } | null = null
+let shadowingToken = 0
 
 const allTypes: EntryType[] = ['word', 'phrase', 'sentence']
 const current = computed(() => queue.value[index.value] ?? null)
@@ -59,6 +72,7 @@ async function start() {
     forgot.value = 0
     revealed.value = false
     exampleNotice.value = ''
+    resetShadowing()
     if (!queue.value.length) {
       error.value = '当前筛选下没有到期的复习内容。可以先去词库添加，或者稍后再来。'
       return
@@ -115,9 +129,77 @@ async function generateExamples() {
   }
 }
 
+function resetShadowing() {
+  shadowingToken += 1
+  recognitionController?.stop()
+  recognitionController = null
+  stopSpeaking()
+  shadowing.value = false
+  shadowingResult.value = null
+  shadowingError.value = ''
+}
+
+function stopShadowing() {
+  resetShadowing()
+}
+
+function startShadowing() {
+  const entry = current.value
+  if (!entry || shadowing.value) return
+  if (!recognitionSupported) {
+    shadowingError.value = '当前浏览器不支持语音识别，建议使用 Chrome 或 Edge。'
+    return
+  }
+
+  shadowingError.value = ''
+  shadowingResult.value = null
+  shadowing.value = true
+  const token = ++shadowingToken
+  stopSpeaking()
+
+  const begin = () => {
+    if (token !== shadowingToken) return
+    const controller = startRecognition({
+      onError: (message) => {
+        if (token !== shadowingToken) return
+        shadowingError.value = message
+      },
+      onEnd: (transcript) => {
+        if (token !== shadowingToken) return
+        recognitionController = null
+        shadowing.value = false
+        if (transcript.trim()) {
+          shadowingResult.value = comparePronunciation(entry.text, transcript)
+        }
+      },
+    })
+
+    if (!controller) {
+      shadowing.value = false
+      shadowingError.value = '无法启动语音识别。'
+      return
+    }
+    recognitionController = controller
+  }
+
+  const ok = speak(entry.text, {
+    onEnd: begin,
+    onError: () => {
+      if (token !== shadowingToken) return
+      shadowing.value = false
+      shadowingError.value = '朗读失败，无法开始跟读。'
+    },
+  })
+  if (!ok) {
+    shadowing.value = false
+    shadowingError.value = '当前浏览器不支持语音朗读。'
+  }
+}
+
 function advance() {
   revealed.value = false
   exampleNotice.value = ''
+  resetShadowing()
   if (index.value + 1 >= queue.value.length) {
     phase.value = 'done'
   } else {
@@ -131,6 +213,7 @@ function exit() {
   index.value = 0
   revealed.value = false
   exampleNotice.value = ''
+  resetShadowing()
   store.refreshStats().catch(() => {})
 }
 
@@ -165,6 +248,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeydown)
+  resetShadowing()
 })
 </script>
 
@@ -249,11 +333,43 @@ onBeforeUnmount(() => {
             来自对话
           </RouterLink>
           <SpeakButton :text="current.text" :size="20" />
+          <button
+            class="icon-btn"
+            :class="{ speaking: shadowing }"
+            type="button"
+            :title="
+              !recognitionSupported
+                ? '当前浏览器不支持语音识别'
+                : shadowing
+                  ? '停止跟读'
+                  : '跟读练习'
+            "
+            aria-label="跟读练习"
+            :aria-pressed="shadowing"
+            :disabled="!recognitionSupported"
+            @click="shadowing ? stopShadowing() : startShadowing()"
+          >
+            <Icon :name="shadowing ? 'stop' : 'mic'" :size="20" />
+          </button>
         </div>
 
         <p class="review-text" :class="{ sentence: current.type === 'sentence' }">
           {{ current.text }}
         </p>
+
+        <div v-if="shadowing || shadowingResult || shadowingError" class="shadowing-box">
+          <p v-if="shadowing" class="hint">先听一遍，再跟着读…</p>
+          <p v-else-if="shadowingError" class="hint">{{ shadowingError }}</p>
+          <template v-else-if="shadowingResult">
+            <div class="row between wrap">
+              <strong>跟读匹配度 {{ shadowingResult.score }}%</strong>
+              <span class="muted small">
+                {{ shadowingResult.matchedWords }} / {{ shadowingResult.totalWords }} 词匹配
+              </span>
+            </div>
+            <p class="hint">识别到：{{ shadowingResult.transcript }}</p>
+          </template>
+        </div>
 
         <template v-if="!revealed">
           <p class="recall-prompt">你记得它的意思吗？</p>
@@ -450,6 +566,24 @@ onBeforeUnmount(() => {
 .source-link {
   font-size: 12px;
   color: var(--accent-strong);
+}
+.icon-btn.speaking {
+  color: var(--accent-strong);
+  box-shadow: var(--shadow-pressed);
+}
+.shadowing-box {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  box-shadow: var(--shadow-inset-sm);
+  text-align: left;
+}
+.shadowing-box strong {
+  color: var(--accent-strong);
+}
+.shadowing-box .hint {
+  margin: 4px 0 0;
 }
 .review-text {
   margin: 0;
