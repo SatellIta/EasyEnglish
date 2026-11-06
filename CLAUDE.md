@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-EasyEnglish is a local-first English-learning app for Chinese speakers. Users save their own vocabulary (words / phrases / sentences), chat with a built-in AI tutor that references their saved material, generate a daily study summary, and review items on an Ebbinghaus schedule. The UI is Chinese; the learning content is English.
+EasyEnglish is a local-first English-learning app for Chinese speakers. Users save their own vocabulary (words / phrases / sentences), chat with a built-in AI tutor that references their saved material, generate a daily study summary, and review items on an Ebbinghaus schedule. The interface supports Chinese and English; the learning content is English.
 
 The app is deliberately light: one Vue 3 SPA + one small Hono process + one SQLite file. No ORM, no UI component library, no cloud services.
 
@@ -33,22 +33,25 @@ Dev flow: Vite proxies `/api` to `:3001`. Production: `pnpm start` sets `NODE_EN
 
 ### Data layer
 
-SQLite via `better-sqlite3` at `data/easy-english.db` (override with `DB_PATH`). WAL mode, foreign keys on. `server/schema.sql` is applied for fresh databases; versioned migrations live in `server/migrations/` and are applied by `server/db.ts` when `PRAGMA user_version` is behind. Current schema version is **2**. To evolve the schema, bump `SCHEMA_VERSION`, add a numbered migration, and reflect the final shape in `schema.sql`.
+SQLite via `better-sqlite3` at `data/easy-english.db` (override with `DB_PATH`). WAL mode, foreign keys on. `server/schema.sql` is applied for fresh databases; versioned migrations live in `server/migrations/` and are applied by `server/db.ts` when `PRAGMA user_version` is behind. Current schema version is **5** (`002_scenes`, `003_learning_signals`, `004_scene_chat`, `005_personas`). To evolve the schema, bump `SCHEMA_VERSION`, add a numbered migration, and reflect the final shape in `schema.sql`.
 
-Tables: `entries`, `review_states`, `review_logs`, `chat_sessions`, `chat_messages`, `daily_summaries`, `settings`, `scenes`, `scene_entries`, plus `entries_fts` (FTS5 trigram) kept in sync by triggers.
+Tables: `entries`, `review_states`, `review_logs`, `chat_sessions`, `chat_messages`, `daily_summaries`, `settings`, `scenes`, `scene_entries`, `learner_errors`, `personas`, plus `entries_fts` (FTS5 trigram) kept in sync by triggers.
 
 - `entries.type` is `word | phrase | sentence`; `examples` / `tags` are JSON text.
 - `entries.review_enabled` (0/1) decides whether an entry enters `/api/review/queue` and due stats. Scene imports default to 0; manual entries default to 1.
+- `entries.error_rate` / `error_samples` store the recency-weighted error rate used by the scheduler; `normalized_text` backs dedupe lookups; `source_session_id` / `source_message_id` link summary-added entries back to the conversation.
 - `scenes` are user-defined associative-memory spaces. `scene_entries` is many-to-many and stores `section` (H3), `subsection` (bold label / lead-in), `position`, and `added_at`. Scene membership never changes review scheduling.
+- `learner_errors` stores recurring mistakes extracted by the daily summary, deduped by normalized `pattern`; `personas` stores the selected/default/custom tutoring personas.
+- `chat_sessions.scene_id` binds a conversation to a scene for scene-practice chat.
 - Timestamps are UTC ISO strings; "today" boundaries are computed in the server's local timezone in `server/lib/time.ts`. Library date grouping uses SQLite `date(created_at, 'localtime')`.
 - API uses camelCase, DB uses snake_case; mapping lives in `server/lib/mappers.ts`.
 - Search: `server/lib/queries.ts` uses FTS5 MATCH for queries ≥ 3 chars and falls back to LIKE for shorter/CJK queries. Tag filters use `json_each`.
-- Dedupe: `server/lib/dedupe.ts` normalizes the main English text (case, whitespace, surrounding quotes, trailing punctuation) and keys by **text only** — type, meaning, explanation, examples, and tags are not part of the key. Manual create/update returns 409 on a text collision; `POST /api/entries/bulk` skips existing/batch duplicates by default and returns `count` / `skipped` / `duplicates`; summary candidates, import preview/commit use the same key.
-- `ENTRY_SELECT` includes `review_enabled` and a JSON `scene_refs` aggregate; `SCENE_ENTRY_SELECT` adds scene metadata.
+- Dedupe: `server/lib/dedupe.ts` normalizes the main English text (case, whitespace, surrounding quotes, trailing punctuation) and keys by **text only** — type, meaning, explanation, examples, and tags are not part of the key. Manual create/update returns 409 on a text collision; `POST /api/entries/bulk` skips existing/batch duplicates by default and returns `count` / `skipped` / `duplicates` (with `existingEntryId`); summary candidates, import preview/commit use the same key.
+- `ENTRY_SELECT` includes `review_enabled`, error-rate fields, source pointers and a JSON `scene_refs` aggregate; `SCENE_ENTRY_SELECT` adds scene metadata.
 
 ### Review scheduling
 
-`server/lib/scheduler.ts`: default intervals `[1, 2, 4, 7, 15, 30, 60, 120, 240]` days and a 10-minute forgot-retry window. Both are configurable from the Settings page and stored in the `settings` table as `review.intervalsDays` (JSON array) and `review.forgotRetryMinutes`. `getReviewConfig()` in `server/lib/review-config.ts` normalizes/falls back; `nextSchedule()` reads it on every rating. New entries are due immediately. "Remembered" advances one stage and schedules `intervals[stage - 1]` days out; "forgot" resets to stage 0 and returns after the configured retry window; past the ladder the entry becomes `mastered` (365-day interval). Only entries with `review_enabled = 1` appear in the queue or due stats. Review is active recall only — never multiple choice.
+`server/lib/scheduler.ts`: default intervals `[1, 2, 4, 7, 15, 30, 60, 120, 240]` days and a 10-minute forgot-retry window. Both are configurable from the Settings page and stored in the `settings` table as `review.intervalsDays` (JSON array) and `review.forgotRetryMinutes`. Error-rate tuning uses `review.errorRateRecentWeight` and `review.errorRateIntervalPenalty`: each review updates a recency-weighted `error_rate`, and the effective interval is `base × (1 − errorRate × penalty)`. `getReviewConfig()` in `server/lib/review-config.ts` normalizes/falls back; `nextSchedule()` reads it on every rating. New entries are due immediately. "Remembered" advances one stage and schedules `intervals[stage - 1]` days out; "forgot" resets to stage 0 and returns after the configured retry window; past the ladder the entry becomes `mastered` (365-day interval), unless the high error rate keeps it reviewing. Only entries with `review_enabled = 1` appear in the queue or due stats. Review is active recall only — never multiple choice.
 
 ## Markdown import and scenes
 
@@ -64,16 +67,22 @@ Tables: `entries`, `review_states`, `review_logs`, `chat_sessions`, `chat_messag
 
 OpenAI-compatible providers only (OpenAI, DeepSeek, Qwen, Ollama, etc.). Config resolution in `server/ai/config.ts`: DB settings > `EASYENGLISH_BASE_URL` / `EASYENGLISH_API_KEY` / `EASYENGLISH_MODEL` > defaults. Deliberately do **not** read generic `OPENAI_*` env vars — they may belong to unrelated tools on the machine. Localhost URLs may run without an API key.
 
-- Built-in prompts: `server/ai/prompts.ts` (tutor persona + learner-memory block; summary JSON contract).
-- Chat memory: `server/routes/chat.ts` retrieves FTS-relevant entries + today's entries + recent entries, dedupes, and injects up to 30 into the system prompt.
+- Prompt layers in `server/ai/prompts.ts` (top to bottom): language base (Chinese-assisted / English-only) → persona → task/rules → scene practice → learner memory → recurring errors → current context. The language layer only locks output language; persona/rules/scene/memory/error layers still apply.
+- Personas: `server/lib/personas.ts` + `server/routes/personas.ts`. Defaults are `serious`, `homie`, `catgirl`; users can edit default prompts, reset them, or add/delete custom personas. Selection is stored in `ai.personaId`. Default persona names/descriptions are localized by key in the frontend.
+- Explanation language: `server/lib/ai-teaching.ts`, setting `ai.explanationMode` (`bilingual` / `english`). Applies to chat, summary and personalized examples. Endpoint `GET/PUT /api/settings/ai-teaching`.
+- Chat memory: `server/routes/chat.ts` prioritizes due/high-error entries, scene entries, FTS-relevant entries, today's entries and recent entries. Limits come from `ai.memoryLimit`, `ai.historyLimit`, `ai.memoryCharBudget` (`server/lib/ai-behavior.ts`, `/api/settings/ai-behavior`).
+- Recurring errors: `server/lib/errors.ts` + `server/routes/errors.ts`; top active errors are injected into chat and updated by summary generation.
 - Streaming: `POST /api/chat/stream` emits newline-delimited JSON (`meta` / `delta` / `done` / `error`), not SSE. Client parser is `streamChat()` in `src/lib/api.ts`.
-- Daily summary: `POST /api/summary/today/generate` asks the model for `{ summary, entries[] }`, tolerates code fences, upserts `daily_summaries`, and returns candidate entries the UI can bulk-add. Candidates are marked `duplicate` by `server/lib/dedupe.ts`; bulk add checks again and reports `skipped`.
-- Summary generation is a **background job** in `src/stores/summary.ts`. Triggering it from Chat or Today keeps it running across route changes; `SummaryJobHost.vue` (mounted in `AppShell`) shows the confirmation modal on any page, with a persistent "今日总结已生成" pill while pending candidates remain.
+- Scene chat: `chat_sessions.scene_id` binds a session to a scene; scene entries are injected and the prompt switches to role-play. `POST /api/chat/sessions { sceneId }` creates one.
+- Daily summary: `POST /api/summary/today/generate` asks the model for `{ summary, entries[], errors[] }`, tolerates code fences, upserts `daily_summaries`, stores recurring errors, and returns candidate entries. Candidates include `duplicate` / `existingEntryId`, `sourceSessionId` / `sourceMessageId`, and validated `sceneSuggestion` (`existing` / `new` / `none`). Bulk add checks again and reports `skipped`.
+- Personalized examples: `POST /api/entries/:id/examples` generates 2–3 examples from the entry, its scenes, recurring errors and existing examples; appends deduped examples. In English-only mode no Chinese translation is appended.
+- Summary generation is a **background job** in `src/stores/summary.ts`. Triggering it from Chat or Today keeps it running across route changes; `SummaryJobHost.vue` (mounted in `AppShell`) shows the confirmation modal on any page, with a persistent pill while pending candidates remain.
 - The API key is stored in the local SQLite `settings` table in plaintext and masked in responses. This is a personal local app; keep it that way unless asked to add OS keychain support.
 
 ## Frontend conventions
 
-- Chinese UI. Type labels/constants live in `shared/types.ts`.
+- UI is bilingual: Chinese and English, switchable in Settings and persisted in `localStorage` under `easyenglish.locale`. All display strings live in `src/i18n/messages.ts` and are accessed through `t()`; never hard-code UI text in pages/components. `src/i18n/index.ts` owns `locale`, `setLocale`, label helpers and server-error localization. The inline `index.html` script restores `<html lang>` before paint.
+- Type labels use `entryTypeLabel()` / `errorCategoryLabel()` from `src/i18n`, not the Chinese constants in `shared/types.ts` (those remain for server prompts).
 - Pages: Today (`/today`), Chat (`/chat/:id?`), Review (`/review`), Library (`/library`), Import (`/import`), Settings (`/settings`).
 - Library has three views: date (`DateView.vue`), type (`TypeView.vue`), scene (`SceneView.vue`). The page owns search debouncing and the shared `EntryForm`; views own their own data loads. `EntryCard.vue` is the shared row component.
 - Scene creation/editing uses `SceneFormModal.vue`; adding existing entries uses `SceneEntryPicker.vue`. New entries created from a scene default to `reviewEnabled: false`.
@@ -94,10 +103,11 @@ OpenAI-compatible providers only (OpenAI, DeepSeek, Qwen, Ollama, etc.). Config 
 
 ## Current state
 
-- Working: entries CRUD + search, configurable Ebbinghaus review, AI chat streaming, daily summary, settings (AI / forgetting curve / theme), Markdown import preview/commit, scenes, and three library views (date / type / scene).
-- Daily summary generation is background-safe across route changes and confirms candidates in a global modal; bulk/summary adds are deduped by type + normalized text.
+- Working: entries CRUD + text-only dedupe, configurable Ebbinghaus review with error-rate weighting, AI chat streaming with language/persona/scene/memory/error layers, daily summary with scene suggestions and traceability, personalized examples, pronunciation shadowing, settings (AI / persona / forgetting curve / explanation language / interface language / theme), Markdown import preview/commit, scenes, export, and three library views (date / type / scene).
+- Daily summary generation is background-safe across route changes and confirms candidates in a global modal; bulk/summary adds are deduped by normalized English text.
 - Two themes: Neumorphism and Swiss International, with persistence and a sidebar toggle.
-- Speech uses the browser Web Speech API with graceful support/error feedback.
-- Schema version 2 adds `entries.review_enabled`, `scenes`, and `scene_entries`; existing databases migrate automatically.
+- Speech uses the browser Web Speech API for TTS; `src/lib/pronunciation.ts` adds local shadowing feedback via `SpeechRecognition` (Chrome/Edge).
+- Schema version 5 adds `review_enabled`, `scenes`, `scene_entries`, `learner_errors`, `personas`, error-rate fields, dedupe text, source pointers, and `chat_sessions.scene_id`; existing databases migrate automatically.
+- `docs/LEARNING_SIGNALS.md` documents error rate, learner errors, dedupe, traceability, context budget, scenes/chat, scene suggestions, examples, pronunciation and the prompt layers.
 - Verified by manual API smoke tests and Playwright screenshots; no automated tests yet.
 - `docs/ARCHITECTURE.md` has endpoint/data-model detail; `docs/SCENERY_IMPORT.md` documents the import/scene mapping; `docs/UI_STYLE.md` indexes the two binding visual contracts.
