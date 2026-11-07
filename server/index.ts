@@ -10,7 +10,6 @@ import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
 import { ZodError } from 'zod'
 import ankiImportRoutes, { cleanupOldImportSessions } from './routes/anki-import'
-import ankiSharedRoutes from './routes/anki-shared'
 import chatRoutes from './routes/chat'
 import entriesRoutes from './routes/entries'
 import errorsRoutes from './routes/errors'
@@ -84,7 +83,6 @@ app.route('/', examplesRoutes)
 app.route('/', exportRoutes)
 app.route('/', personasRoutes)
 app.route('/', ankiImportRoutes)
-app.route('/', ankiSharedRoutes)
 app.route('/', learnRoutes)
 app.route('/', tagsRoutes)
 

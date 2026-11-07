@@ -382,6 +382,27 @@ export const zh = {
   'library.detail.title': '词条详情',
   'library.detail.open': '查看详情',
   'library.detail.edit': '编辑词条',
+  'library.bulkDelete.open': '批量删除',
+  'library.bulkDelete.title': '批量删除词条',
+  'library.bulkDelete.hint':
+    '按类型、标签、日期或场景选择要删除的词条；同一分类内可以多选或全选。',
+  'library.bulkDelete.category.type': '按类型',
+  'library.bulkDelete.category.tag': '按标签',
+  'library.bulkDelete.category.date': '按日期',
+  'library.bulkDelete.category.scene': '按场景',
+  'library.bulkDelete.selectedCount': '已选 {count} 项',
+  'library.bulkDelete.noneSelected': '尚未选择',
+  'library.bulkDelete.selectAll': '全选',
+  'library.bulkDelete.selectNone': '全不选',
+  'library.bulkDelete.empty': '这个分类下还没有可选内容。',
+  'library.bulkDelete.sceneWarning':
+    '按场景删除会从词库中删除这些词条，而不只是移出场景；如果词条同时属于其他场景，也会一并消失。',
+  'library.bulkDelete.confirmHint':
+    '将永久删除 {count} 条词条及其复习记录。再次点击确认；此操作不可恢复。',
+  'library.bulkDelete.submit': '删除所选',
+  'library.bulkDelete.confirm': '确认删除 {count} 条',
+  'library.bulkDelete.deleting': '删除中…',
+  'library.bulkDelete.done': '已删除 {count} 条词条。',
 
   'export.title': '导出 Markdown',
   'export.description':
@@ -752,8 +773,12 @@ export const zh = {
   'anki.backToBrowse': '返回共享牌组',
   'anki.tabFile': '上传文件',
   'anki.tabBrowse': 'AnkiWeb 共享牌组',
+  'anki.browseTitle': '在 AnkiWeb 查找牌组',
   'anki.browseHint':
-    '搜索 AnkiWeb 公开共享的牌组并下载 .apkg，只支持 .apkg 格式。AnkiWeb 可能限制匿名搜索频率。',
+    'AnkiWeb 共享牌组在浏览器中浏览和下载。下载 .apkg 文件后，回到这里上传导入。',
+  'anki.browseOpen': '打开 AnkiWeb 共享牌组',
+  'anki.browseSteps':
+    'AnkiWeb 会限制匿名搜索和下载；如果提示请求过多，请稍后重试或登录 AnkiWeb。',
   'anki.searchPlaceholder': '搜索牌组，例如 english、考研、雅思…',
   'anki.search': '搜索',
   'anki.sortRating': '按评分',
@@ -797,11 +822,6 @@ export const zh = {
   'api.ankiNoNotes': '包内没有找到可导入的笔记',
   'api.ankiMapping': '字段映射不合法',
   'api.fileTooLarge': '文件过大，最大支持 200MB',
-  'api.ankiRateLimited':
-    'AnkiWeb 请求次数过多，请稍后再试。',
-  'api.ankiOnlyApkg': '只支持 .apkg 格式的共享牌组',
-  'api.ankiDeckNotFound': '共享牌组不存在或已被删除',
-  'api.ankiDownloadInvalid': '下载到的文件不是有效的 Anki 牌组',
 } as const
 
 export type MessageKey = keyof typeof zh
@@ -1217,6 +1237,27 @@ export const en: Record<MessageKey, string> = {
   'library.detail.title': 'Entry details',
   'library.detail.open': 'View details',
   'library.detail.edit': 'Edit entry',
+  'library.bulkDelete.open': 'Bulk delete',
+  'library.bulkDelete.title': 'Bulk delete entries',
+  'library.bulkDelete.hint':
+    'Choose entries by type, tag, date or scene. You can multi-select or select all within a category.',
+  'library.bulkDelete.category.type': 'By type',
+  'library.bulkDelete.category.tag': 'By tag',
+  'library.bulkDelete.category.date': 'By date',
+  'library.bulkDelete.category.scene': 'By scene',
+  'library.bulkDelete.selectedCount': '{count} selected',
+  'library.bulkDelete.noneSelected': 'Nothing selected',
+  'library.bulkDelete.selectAll': 'Select all',
+  'library.bulkDelete.selectNone': 'Select none',
+  'library.bulkDelete.empty': 'Nothing to choose in this category yet.',
+  'library.bulkDelete.sceneWarning':
+    'Deleting by scene removes these entries from the library, not just from the scene. Entries that also belong to other scenes are removed everywhere.',
+  'library.bulkDelete.confirmHint':
+    'This permanently deletes {count} entries and their review history. Click again to confirm; this cannot be undone.',
+  'library.bulkDelete.submit': 'Delete selected',
+  'library.bulkDelete.confirm': 'Confirm delete {count}',
+  'library.bulkDelete.deleting': 'Deleting…',
+  'library.bulkDelete.done': 'Deleted {count} entries.',
 
   'export.title': 'Export Markdown',
   'export.description':
@@ -1611,8 +1652,12 @@ export const en: Record<MessageKey, string> = {
   'anki.backToBrowse': 'Back to shared decks',
   'anki.tabFile': 'Upload file',
   'anki.tabBrowse': 'AnkiWeb shared decks',
+  'anki.browseTitle': 'Find decks on AnkiWeb',
   'anki.browseHint':
-    'Search public AnkiWeb decks and download them as .apkg. Only .apkg is supported. AnkiWeb may rate-limit anonymous searches.',
+    'Browse and download AnkiWeb shared decks in your browser. After downloading an .apkg, come back here to upload it.',
+  'anki.browseOpen': 'Open AnkiWeb shared decks',
+  'anki.browseSteps':
+    'AnkiWeb rate-limits anonymous searches and downloads. If it asks you to wait, try again later or log in to AnkiWeb.',
   'anki.searchPlaceholder': 'Search decks, e.g. english, IELTS, GRE…',
   'anki.search': 'Search',
   'anki.sortRating': 'Top rated',
@@ -1657,9 +1702,4 @@ export const en: Record<MessageKey, string> = {
   'api.ankiNoNotes': 'No importable notes were found in the package',
   'api.ankiMapping': 'Invalid field mapping',
   'api.fileTooLarge': 'The file is too large. The maximum is 200MB',
-  'api.ankiRateLimited':
-    'AnkiWeb is limiting requests. Please try again later.',
-  'api.ankiOnlyApkg': 'Only .apkg shared decks are supported',
-  'api.ankiDeckNotFound': 'The shared deck does not exist or was removed',
-  'api.ankiDownloadInvalid': 'The downloaded file is not a valid Anki deck',
 }

@@ -40,6 +40,144 @@ const bulkInput = z.object({
   skipDuplicates: z.boolean().optional(),
 })
 
+const bulkDeleteFilter = z.object({
+  types: z
+    .array(z.enum(['word', 'phrase', 'sentence']))
+    .max(3)
+    .optional(),
+  tags: z.array(z.string().trim().min(1).max(200)).max(200).optional(),
+  dates: z.array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).max(366).optional(),
+  sceneIds: z.array(z.number().int().positive()).max(200).optional(),
+  q: z.string().trim().max(500).optional(),
+})
+
+const bulkDeleteInput = z
+  .object({
+    ids: z.array(z.number().int().positive()).max(10000).optional(),
+    filter: bulkDeleteFilter.optional(),
+  })
+  .refine((value) => (value.ids?.length ?? 0) > 0 || value.filter, {
+    message: '请提供要删除的词条或筛选条件',
+  })
+
+/** 同一维度内 OR，不同维度之间 AND；空条件返回 null，避免误删整库。 */
+function buildBulkDeleteWhere(
+  filter: z.infer<typeof bulkDeleteFilter>,
+): { clause: string; params: unknown[] } | null {
+  const clauses: string[] = []
+  const params: unknown[] = []
+
+  if (filter.types?.length) {
+    clauses.push(`e.type IN (${filter.types.map(() => '?').join(', ')})`)
+    params.push(...filter.types)
+  }
+  if (filter.tags?.length) {
+    clauses.push(
+      `EXISTS (SELECT 1 FROM json_each(e.tags) WHERE json_each.value IN (${filter.tags
+        .map(() => '?')
+        .join(', ')}))`,
+    )
+    params.push(...filter.tags)
+  }
+  if (filter.dates?.length) {
+    clauses.push(
+      `date(e.created_at, 'localtime') IN (${filter.dates.map(() => '?').join(', ')})`,
+    )
+    params.push(...filter.dates)
+  }
+  if (filter.sceneIds?.length) {
+    clauses.push(
+      `EXISTS (SELECT 1 FROM scene_entries se WHERE se.entry_id = e.id AND se.scene_id IN (${filter.sceneIds
+        .map(() => '?')
+        .join(', ')}))`,
+    )
+    params.push(...filter.sceneIds)
+  }
+  if (filter.q?.trim()) {
+    const search = buildSearchFilter(filter.q)
+    if (search.clause) {
+      clauses.push(search.clause)
+      params.push(...search.params)
+    }
+  }
+
+  return clauses.length ? { clause: clauses.join(' AND '), params } : null
+}
+
+function countIds(ids: number[]): number {
+  let total = 0
+  for (let index = 0; index < ids.length; index += 500) {
+    const chunk = ids.slice(index, index + 500)
+    const row = db
+      .prepare(
+        `SELECT count(*) AS n FROM entries WHERE id IN (${chunk.map(() => '?').join(', ')})`,
+      )
+      .get(...chunk) as { n: number }
+    total += Number(row.n ?? 0)
+  }
+  return total
+}
+
+function deleteIds(ids: number[]): number {
+  const unique = [...new Set(ids)]
+  let deleted = 0
+  db.transaction(() => {
+    for (let index = 0; index < unique.length; index += 500) {
+      const chunk = unique.slice(index, index + 500)
+      const info = db
+        .prepare(
+          `DELETE FROM entries WHERE id IN (${chunk.map(() => '?').join(', ')})`,
+        )
+        .run(...chunk)
+      deleted += Number(info.changes)
+    }
+  })()
+  return deleted
+}
+
+/** 预统计：与批量删除使用完全相同的条件。 */
+function countBulkDelete(input: z.infer<typeof bulkDeleteInput>): number | null {
+  if (input.ids?.length) return countIds(input.ids)
+  if (!input.filter) return null
+  const where = buildBulkDeleteWhere(input.filter)
+  if (!where) return null
+  const row = db
+    .prepare(`SELECT count(*) AS n FROM entries e WHERE ${where.clause}`)
+    .get(...where.params) as { n: number }
+  return Number(row.n ?? 0)
+}
+
+app.post('/api/entries/bulk-delete/preview', async (c) => {
+  const input = bulkDeleteInput.parse(await c.req.json())
+  const count = countBulkDelete(input)
+  if (count === null) {
+    return c.json({ error: '请选择至少一个删除条件' }, 400)
+  }
+  return c.json({ count })
+})
+
+app.post('/api/entries/bulk-delete', async (c) => {
+  const input = bulkDeleteInput.parse(await c.req.json())
+
+  let deleted = 0
+  if (input.ids?.length) {
+    deleted = deleteIds(input.ids)
+  } else if (input.filter) {
+    const where = buildBulkDeleteWhere(input.filter)
+    if (!where) return c.json({ error: '请选择至少一个删除条件' }, 400)
+    const info = db
+      .prepare(
+        `DELETE FROM entries WHERE id IN (SELECT e.id FROM entries e WHERE ${where.clause})`,
+      )
+      .run(...where.params)
+    deleted = Number(info.changes)
+  } else {
+    return c.json({ error: '请提供要删除的词条或筛选条件' }, 400)
+  }
+
+  return c.json({ deleted })
+})
+
 /** 列表排序白名单；未知值回退到最新优先。 */
 const SORT_SQL: Record<string, string> = {
   newest: 'e.created_at DESC, e.id DESC',

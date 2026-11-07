@@ -108,10 +108,6 @@ const EXACT_ERRORS: Record<string, MessageKey> = {
   '写入失败': 'anki.errorWrite',
   '字段解析失败': 'anki.errorParse',
   '已有词条不存在': 'anki.errorMissingEntry',
-  'AnkiWeb 请求次数过多，请稍后再试。': 'api.ankiRateLimited',
-  '只支持导入 .apkg 格式的共享牌组': 'api.ankiOnlyApkg',
-  '这个共享牌组已被删除': 'api.ankiDeckNotFound',
-  '下载到的文件不是有效的 Anki 牌组': 'api.ankiDownloadInvalid',
 }
 
 /** 英文界面下把后端常见中文错误转成英文；无法识别时避免泄漏中文。 */
@@ -140,7 +136,6 @@ export function localizeServerError(raw: string): string {
   if (raw.includes('包内没有找到可导入的笔记')) return t('api.ankiNoNotes')
   if (raw.includes('导入会话已过期')) return t('api.ankiSessionExpired')
   if (raw.includes('文件过大')) return t('api.fileTooLarge')
-  if (raw.includes('AnkiWeb 请求次数过多')) return t('api.ankiRateLimited')
   if (raw.includes('ZIP') || raw.includes('Anki 词库文件')) return t('api.ankiInvalidFile')
   if (raw.startsWith('AI 整理失败：')) {
     return t('api.summaryFailed', { message: raw.slice('AI 整理失败：'.length) })

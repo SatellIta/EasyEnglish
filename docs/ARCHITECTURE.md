@@ -103,6 +103,8 @@ FTS5 虚拟表，`tokenize='trigram'`，内容来自 entries，通过 INSERT/UPD
 | GET | `/api/entries?types=word,phrase&q=&tag=&from=&to=&sort=&limit=&offset=` | 列表 + 搜索 + 标签过滤 + 排序 + 分页；`sort` 取 `newest`（默认）/ `oldest` / `alpha` / `alphaDesc` |
 | POST | `/api/entries` | 新建，自动创建复习状态（立即到期）；主要英文内容重复时返回 409 |
 | POST | `/api/entries/bulk` | 批量新建（最多 50）；默认按规范化后的主要英文内容跳过词库中和批次内重复项（不看释义/例句），返回 `count` / `skipped` / `duplicates` |
+| POST | `/api/entries/bulk-delete/preview` | body `{ ids }` 或 `{ filter }`；返回匹配条数，不删除 |
+| POST | `/api/entries/bulk-delete` | 同预览条件；删除词条并级联清理复习状态/日志/场景关联 |
 | GET | `/api/entries/:id` | 详情 |
 | PATCH | `/api/entries/:id` | 部分更新；改成已存在的英文内容时返回 409 |
 | DELETE | `/api/entries/:id` | 删除（级联复习状态/日志） |
@@ -140,8 +142,6 @@ FTS5 虚拟表，`tokenize='trigram'`，内容来自 entries，通过 INSERT/UPD
 | POST | `/api/import/anki/preview` | `multipart/form-data` 的 `file`；返回牌组、笔记类型、字段映射、示例和媒体数量 |
 | POST | `/api/import/anki/commit` | body `{ importId, options }`；按映射写入词条并提取图片 |
 | DELETE | `/api/import/anki/:importId` | 删除临时导入会话 |
-| GET | `/api/anki-shared/decks?search=&sort=rating\|updated&page=&pageSize=` | 代理 AnkiWeb 共享牌组列表（protobuf → JSON） |
-| POST | `/api/anki-shared/download` | body `{ deckId }`；下载 `.apkg` 并返回导入预览 |
 | GET | `/api/media/:name` | 读取已提取的本地图片，长缓存 |
 
 Anki 包解析在 `server/lib/import/`：
@@ -155,13 +155,11 @@ Anki 包解析在 `server/lib/import/`：
 
 ### AnkiWeb 共享牌组
 
-`server/lib/import/ankiweb.ts` 把 AnkiWeb 的 protobuf 二进制接口解码成普通 JSON：
+应用不代理 AnkiWeb。导入弹窗的「AnkiWeb 共享牌组」页签只提供一个外链，在浏览器打开 `https://ankiweb.net/shared/decks`；用户自行下载 `.apkg` 后回到「上传文件」页签导入。这样不需要处理 AnkiWeb 匿名搜索/下载的 429 限流，也不保存 AnkiWeb 登录凭证。
 
-- `GET /svc/shared/list-decks?search=`：牌组 id、标题、赞/踩、更新时间、笔记/音频/图片数量。AnkiWeb 要求 `search` 非空，服务端默认使用 `english`。
-- `GET /svc/shared/item-info?sharedId=`：标题、大小、下载凭证 `download_key`。
-- `GET /svc/shared/download-deck/<id>?t=<download_key>`：返回 `.apkg`；没有正确凭证会返回 400。
+### 批量删除
 
-列表结果按 `search` 缓存 5 分钟，服务端负责排序和分页（默认 20 条/页）。下载只接受 `Content-Disposition` 中 `.apkg` 的文件名，限制 200MB，并复用上传导入的 `buildAnkiPreview()`，所以下载后同样进入字段映射预览、提交和去重流程。AnkiWeb 对匿名搜索/下载有频率限制（HTTP 429），界面会显示可重试的提示；`ANKIWEB_BASE_URL` 只用于本地 mock 测试。
+`POST /api/entries/bulk-delete/preview` 和 `POST /api/entries/bulk-delete` 接受 `{ ids }` 或 `{ filter }`。`filter` 支持 `types` / `tags` / `dates` / `sceneIds` / `q`：同一维度内是 OR，不同维度之间是 AND；空条件会被拒绝，避免误删整库。删除依赖 SQLite 外键级联清理 `review_states`、`review_logs` 和 `scene_entries`，FTS 触发器同步删除索引。词库的「批量删除」弹窗按类型 / 标签 / 日期 / 场景分类展示选项，支持分类内全选，删除前由服务端返回精确数量并二次确认。
 
 ### 复习
 
