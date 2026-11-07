@@ -368,34 +368,6 @@ export interface AnkiImportPreview {
   sample: AnkiSampleNote[]
   warnings: AnkiWarning[]
   defaultNotetypeId: number | null
-  /** 从 AnkiWeb 共享牌组下载时携带来源信息 */
-  sharedDeck?: SharedDeckRef | null
-}
-
-export interface SharedDeckRef {
-  id: number
-  title: string
-  url: string
-}
-
-export interface SharedDeckSummary {
-  id: number
-  title: string
-  thumbsUp: number
-  thumbsDown: number
-  /** 最后更新时间（ISO） */
-  mtime: string
-  notes: number
-  audio: number
-  images: number
-}
-
-export interface SharedDeckPage {
-  items: SharedDeckSummary[]
-  total: number
-  page: number
-  pageSize: number
-  hasMore: boolean
 }
 
 export interface AnkiImportOptions {
@@ -464,6 +436,30 @@ export interface BulkCreateResult {
   count: number
   skipped: number
   duplicates: Array<{ type: EntryType; text: string; existingEntryId?: number | null }>
+}
+
+/** 批量删除的筛选条件；同一维度内为 OR，不同维度之间为 AND。 */
+export interface BulkDeleteFilter {
+  types?: EntryType[]
+  tags?: string[]
+  /** 本地日期 YYYY-MM-DD */
+  dates?: string[]
+  sceneIds?: number[]
+  q?: string
+}
+
+export interface BulkDeleteInput {
+  /** 手动指定的词条 ID；与 filter 二选一 */
+  ids?: number[]
+  filter?: BulkDeleteFilter
+}
+
+export interface BulkDeletePreview {
+  count: number
+}
+
+export interface BulkDeleteResult {
+  deleted: number
 }
 
 export interface ReviewStats {

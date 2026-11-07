@@ -7,6 +7,9 @@ import type {
   AnkiImportPreview,
   AnkiImportResult,
   BulkCreateResult,
+  BulkDeleteInput,
+  BulkDeletePreview,
+  BulkDeleteResult,
   ChatMessage,
   ChatSession,
   DailySummary,
@@ -36,7 +39,6 @@ import type {
   SceneDetail,
   SceneInput,
   SceneSummary,
-  SharedDeckPage,
   SummaryResult,
   TagListResult,
 } from '@shared/types'
@@ -178,6 +180,16 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ entries, skipDuplicates: options.skipDuplicates }),
       }),
+    previewBulkDelete: (input: BulkDeleteInput) =>
+      request<BulkDeletePreview>('/entries/bulk-delete/preview', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+    bulkDelete: (input: BulkDeleteInput) =>
+      request<BulkDeleteResult>('/entries/bulk-delete', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
     generateExamples: (id: number, count = 3) =>
       request<{
         entry: Entry
@@ -306,23 +318,6 @@ export const api = {
       request<LearnCompleteResult>('/learn/complete', {
         method: 'POST',
         body: JSON.stringify(input),
-      }),
-  },
-
-  ankiShared: {
-    list: (params: { search: string; sort?: 'rating' | 'updated'; page?: number; pageSize?: number }) =>
-      request<SharedDeckPage>(
-        `/anki-shared/decks${toQuery({
-          search: params.search,
-          sort: params.sort,
-          page: params.page,
-          pageSize: params.pageSize,
-        })}`,
-      ),
-    download: (deckId: number) =>
-      request<AnkiImportPreview>('/anki-shared/download', {
-        method: 'POST',
-        body: JSON.stringify({ deckId }),
       }),
   },
 

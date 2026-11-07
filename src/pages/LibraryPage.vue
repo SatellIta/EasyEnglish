@@ -7,6 +7,7 @@ import EntryDetailModal from '@/components/EntryDetailModal.vue'
 import EntryForm from '@/components/EntryForm.vue'
 import ExportModal from '@/components/ExportModal.vue'
 import Icon from '@/components/Icon.vue'
+import BulkDeleteModal from '@/components/library/BulkDeleteModal.vue'
 import DateView from '@/components/library/DateView.vue'
 import SceneView from '@/components/library/SceneView.vue'
 import TagView from '@/components/library/TagView.vue'
@@ -27,9 +28,11 @@ const refreshToken = ref(0)
 const formOpen = ref(false)
 const exportOpen = ref(false)
 const ankiOpen = ref(false)
+const bulkOpen = ref(false)
 const editing = ref<Entry | null>(null)
 const detail = ref<Entry | null>(null)
 const error = ref('')
+const notice = ref('')
 let timer: number | undefined
 
 const views: Array<{
@@ -91,6 +94,15 @@ async function onAnkiImported() {
   refresh()
 }
 
+function onBulkDeleted(count: number) {
+  bulkOpen.value = false
+  notice.value = t('library.bulkDelete.done', { count })
+  refresh()
+  window.setTimeout(() => {
+    notice.value = ''
+  }, 6000)
+}
+
 async function remove(entry: Entry) {
   if (
     !window.confirm(
@@ -131,6 +143,9 @@ onMounted(() => {
         <button class="btn btn-ghost" @click="exportOpen = true">
           <Icon name="download" :size="16" /> {{ t('export.title') }}
         </button>
+        <button class="btn btn-ghost" @click="bulkOpen = true">
+          <Icon name="trash" :size="16" /> {{ t('library.bulkDelete.open') }}
+        </button>
         <button class="btn btn-primary" @click="openCreate">
           <Icon name="plus" :size="16" /> {{ t('library.addEntry') }}
         </button>
@@ -138,6 +153,7 @@ onMounted(() => {
     </header>
 
     <p v-if="error" class="banner banner-error">{{ error }}</p>
+    <p v-if="notice" class="banner banner-ok">{{ notice }}</p>
 
     <section class="toolbar card">
       <div class="search-box">
@@ -215,6 +231,11 @@ onMounted(() => {
     />
 
     <ExportModal :open="exportOpen" @close="exportOpen = false" />
+    <BulkDeleteModal
+      :open="bulkOpen"
+      @close="bulkOpen = false"
+      @deleted="onBulkDeleted"
+    />
     <AnkiImportModal :open="ankiOpen" @close="ankiOpen = false" @imported="onAnkiImported" />
   </div>
 </template>

@@ -151,10 +151,9 @@ export interface BuildPreviewInput {
   zipPath: string
   fileName: string
   fileSize: number
-  sharedDeck?: AnkiImportPreview['sharedDeck']
 }
 
-/** 从已保存的导入会话构建预览；上传和 AnkiWeb 下载共用。 */
+/** 从已保存的导入会话构建预览。 */
 export function buildAnkiPreview(input: BuildPreviewInput): AnkiImportPreview {
   const files = prepareAnkiPackage(input.zipPath, input.dir)
   const db = openAnkiDatabase(files.sqlitePath)
@@ -201,7 +200,6 @@ export function buildAnkiPreview(input: BuildPreviewInput): AnkiImportPreview {
       sample,
       warnings,
       defaultNotetypeId,
-      sharedDeck: input.sharedDeck ?? null,
     }
   } finally {
     closeAnkiDatabase(db)
