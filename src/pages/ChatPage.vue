@@ -23,6 +23,7 @@ const streaming = ref(false)
 const streamContent = ref('')
 const loadingMessages = ref(false)
 const error = ref('')
+const summaryNotice = ref('')
 const showSessions = ref(false)
 const composing = ref(false)
 const messageList = ref<HTMLElement | null>(null)
@@ -53,8 +54,10 @@ const organizing = computed(() => summaryStore.running)
 
 async function organizeToday() {
   error.value = ''
+  summaryNotice.value = ''
   const result = await summaryStore.generate()
-  if (!result && summaryStore.error) error.value = summaryStore.error
+  if (!result && summaryStore.notice) summaryNotice.value = summaryStore.notice
+  else if (!result && summaryStore.error) error.value = summaryStore.error
 }
 
 async function loadSessions() {
@@ -255,6 +258,7 @@ onMounted(async () => {
     </header>
 
     <p v-if="error" class="banner banner-error">{{ error }}</p>
+    <p v-else-if="summaryNotice" class="banner banner-info">{{ summaryNotice }}</p>
 
     <div class="chat-layout">
       <aside class="sessions card" :class="{ open: showSessions }">

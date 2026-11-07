@@ -87,6 +87,9 @@ async function generateSummary() {
     await loadActiveErrors()
     noticeKind.value = 'ok'
     notice.value = t('today.summarySaved')
+  } else if (summaryStore.notice) {
+    noticeKind.value = 'info'
+    notice.value = summaryStore.notice
   } else if (summaryStore.error) {
     error.value = summaryStore.error
   }

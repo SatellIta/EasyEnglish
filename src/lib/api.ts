@@ -35,12 +35,14 @@ import { localizeServerError, t } from '@/i18n'
 export class ApiError extends Error {
   status: number
   details?: unknown
+  code?: string
 
-  constructor(message: string, status: number, details?: unknown) {
+  constructor(message: string, status: number, details?: unknown, code?: string) {
     super(message)
     this.name = 'ApiError'
     this.status = status
     this.details = details
+    this.code = code
   }
 }
 
@@ -56,14 +58,16 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (!response.ok) {
     let message = t('api.requestFailed', { status: response.status })
     let details: unknown
+    let code: string | undefined
     try {
       const body = await response.json()
       if (body && typeof body.error === 'string') message = body.error
       details = body?.details
+      if (body && typeof body.code === 'string') code = body.code
     } catch {
       // ignore
     }
-    throw new ApiError(message, response.status, details)
+    throw new ApiError(message, response.status, details, code)
   }
 
   if (response.status === 204) return undefined as T
@@ -284,8 +288,11 @@ export const api = {
       request<{ date: string; summary: (DailySummary & { entries: DraftEntry[] }) | null }>(
         '/summary/today',
       ),
-    generate: () =>
-      request<SummaryResult>('/summary/today/generate', { method: 'POST' }),
+    generate: (locale: 'zh' | 'en' = 'zh') =>
+      request<SummaryResult>('/summary/today/generate', {
+        method: 'POST',
+        body: JSON.stringify({ locale }),
+      }),
   },
 
   settings: {
