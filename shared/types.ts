@@ -225,10 +225,14 @@ export interface ImportItem {
   type: EntryType
   text: string
   meaning: string | null
+  /** 英英释义，来自表格的「英英释义」列或续行 */
+  englishDefinition: string | null
   explanation: string | null
   examples: string[]
   notes: string | null
   tags: string[]
+  /** 音标，来自表格的「音标」列或续行 */
+  phonetic: string | null
   /** 一级标题，例如 words / collocations / sentences / Scenery */
   category: string
   /** 二三级标题路径，用于普通词条分组 */
@@ -264,10 +268,12 @@ export interface ImportCommitItem {
   type: EntryType
   text: string
   meaning?: string | null
+  englishDefinition?: string | null
   explanation?: string | null
   examples?: string[]
   notes?: string | null
   tags?: string[]
+  phonetic?: string | null
   scene?: string | null
   section?: string | null
   subsection?: string | null
@@ -276,9 +282,29 @@ export interface ImportCommitItem {
 
 export interface ImportCommitResult {
   created: number
+  /** 已存在词条被关联到场景的次数 */
+  linked: number
+  /** 已存在词条内容被更新的次数 */
+  updated: number
   skipped: number
   scenes: string[]
   entryIds: number[]
+}
+
+export interface ImportCommitInput {
+  items: ImportCommitItem[]
+  /** 同步时用 Markdown 内容更新已有词条；复习开关和学习状态保持不变 */
+  updateExisting?: boolean
+}
+
+export interface MarkdownSyncSettings {
+  /** 服务端文件路径；null 表示未配置 */
+  path: string | null
+}
+
+export interface MarkdownSyncResult extends ImportCommitResult {
+  fileName: string
+  warnings: string[]
 }
 
 /* ------------------------------------------------------------------ */

@@ -15,6 +15,7 @@ import Icon from '@/components/Icon.vue'
 import SceneEntryPicker from '@/components/library/SceneEntryPicker.vue'
 import SceneFormModal from '@/components/library/SceneFormModal.vue'
 import { api, errorMessage } from '@/lib/api'
+import { useAppStore } from '@/stores/app'
 
 const props = defineProps<{ query: string; refreshToken: number }>()
 const emit = defineEmits<{
@@ -24,6 +25,7 @@ const emit = defineEmits<{
   changed: []
 }>()
 const router = useRouter()
+const store = useAppStore()
 
 const scenes = ref<SceneSummary[]>([])
 const activeScene = ref<SceneDetail | null>(null)
@@ -39,6 +41,9 @@ const editingScene = ref<SceneSummary | null>(null)
 const pickerOpen = ref(false)
 const entryFormOpen = ref(false)
 const startingChat = ref(false)
+const reviewBusy = ref(false)
+const reviewError = ref('')
+const reviewNotice = ref('')
 
 const typeFilterValues: Array<EntryType | 'all'> = ['all', 'word', 'phrase', 'sentence']
 
@@ -97,6 +102,11 @@ interface SectionGroup {
   subsections: SubsectionGroup[]
 }
 
+const allInReview = computed(() => {
+  const items = activeScene.value?.items ?? []
+  return items.length > 0 && items.every((item) => item.entry.reviewEnabled)
+})
+
 const groups = computed<SectionGroup[]>(() => {
   const sectionMap = new Map<string, SectionGroup>()
   for (const item of filteredItems.value) {
@@ -124,6 +134,25 @@ const groups = computed<SectionGroup[]>(() => {
 function typeCount(type: EntryType): number {
   if (!activeScene.value) return 0
   return activeScene.value.scene.counts[type]
+}
+
+async function toggleSceneReview() {
+  const detail = activeScene.value
+  if (!detail || reviewBusy.value || !detail.items.length) return
+  const enabled = !allInReview.value
+  reviewBusy.value = true
+  reviewError.value = ''
+  reviewNotice.value = ''
+  try {
+    const result = await api.scenes.setReview(detail.scene.id, enabled)
+    for (const item of detail.items) item.entry.reviewEnabled = enabled
+    reviewNotice.value = t('scene.view.reviewUpdated', { count: result.updated })
+    store.refreshStats().catch(() => {})
+  } catch (caught) {
+    reviewError.value = errorMessage(caught)
+  } finally {
+    reviewBusy.value = false
+  }
 }
 
 async function startSceneChat() {
@@ -192,11 +221,15 @@ async function bootstrap() {
 function openScene(scene: SceneSummary) {
   activeType.value = 'all'
   sortMode.value = 'memory'
+  reviewError.value = ''
+  reviewNotice.value = ''
   loadScene(scene.id)
 }
 
 function backToScenes() {
   activeScene.value = null
+  reviewError.value = ''
+  reviewNotice.value = ''
   loadSceneList()
 }
 
@@ -348,11 +381,24 @@ onMounted(bootstrap)
           <button class="btn btn-ghost btn-sm" @click="pickerOpen = true">
             <Icon name="layers" :size="15" /> {{ t('scene.view.addFromLibrary') }}
           </button>
+          <button
+            v-if="activeScene.items.length"
+            class="btn btn-ghost btn-sm"
+            type="button"
+            :disabled="reviewBusy"
+            @click="toggleSceneReview"
+          >
+            <Icon :name="reviewBusy ? 'refresh' : allInReview ? 'x' : 'check'" :size="15" />
+            {{ allInReview ? t('scene.view.disableReview') : t('scene.view.enableReview') }}
+          </button>
           <button class="btn btn-primary btn-sm" @click="entryFormOpen = true">
             <Icon name="plus" :size="15" /> {{ t('scene.view.addEntry') }}
           </button>
         </div>
       </div>
+
+      <p v-if="reviewError" class="banner banner-error">{{ reviewError }}</p>
+      <p v-if="reviewNotice" class="banner banner-ok">{{ reviewNotice }}</p>
 
       <header class="scene-hero card">
         <div class="scene-hero-main">
@@ -445,7 +491,7 @@ onMounted(bootstrap)
                 :entry="item.entry"
                 :scene-id="activeScene.scene.id"
                 :section="null"
-                :subsection="item.subsection"
+                :subsection="null"
                 :show-scene-refs="false"
                 @open="emit('open', $event)"
                 @edit="emit('edit', $event)"
@@ -467,7 +513,7 @@ onMounted(bootstrap)
 
       <EntryForm
         :open="entryFormOpen"
-        :default-review-enabled="false"
+        :default-review-enabled="true"
         @close="entryFormOpen = false"
         @saved="onEntrySaved"
       />

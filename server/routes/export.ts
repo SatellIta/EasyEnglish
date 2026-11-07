@@ -6,8 +6,10 @@ import type {
   EntryType,
   ExportOptions,
   ExportTypeCounts,
+  SceneEntry,
 } from '../../shared/types'
 import { db } from '../db'
+import { sceneTypeFromHeading } from '../lib/markdown-import'
 import { mapEntry, mapSceneEntry } from '../lib/mappers'
 import { ENTRY_SELECT, SCENE_ENTRY_SELECT } from '../lib/queries'
 import { getSceneSummary, listSceneSummaries } from '../lib/scenes'
@@ -25,31 +27,61 @@ const H1_FOR_TYPE: Record<EntryType, string> = {
   sentence: 'sentences',
 }
 
+const TYPE_ORDER: EntryType[] = ['word', 'phrase', 'sentence']
+
 function escapeCell(value: string): string {
   return value.replace(/\r?\n/g, '<br>').replace(/\|/g, '\\|').trim()
 }
 
-/** 表格只有三列；音标、英英释义、解释、例句、笔记、标签合并进「补充」列。 */
-function supplementFor(entry: Entry): string {
-  const parts: string[] = []
-  if (entry.phonetic) parts.push(`音标：${entry.phonetic}`)
-  if (entry.englishDefinition) parts.push(`英英释义：${entry.englishDefinition}`)
-  if (entry.explanation) parts.push(entry.explanation)
-  if (entry.examples.length) parts.push(`例句：${entry.examples.join(' / ')}`)
-  if (entry.notes) parts.push(`笔记：${entry.notes}`)
-  if (entry.tags.length) parts.push(`标签：${entry.tags.join(', ')}`)
-  return parts.join('；')
+interface ExportColumn {
+  header: string
+  /** 该列在整组里是否至少有一个值 */
+  has: (entry: Entry) => boolean
+  value: (entry: Entry) => string
+  /** 总是输出 */
+  always?: boolean
 }
 
+/** 具名列；导入端按表头识别，列顺序可以改变。 */
+const COLUMNS: ExportColumn[] = [
+  { header: 'English', has: () => true, value: (entry) => entry.text, always: true },
+  { header: '含义', has: (entry) => Boolean(entry.meaning), value: (entry) => entry.meaning ?? '' },
+  {
+    header: '英英释义',
+    has: (entry) => Boolean(entry.englishDefinition),
+    value: (entry) => entry.englishDefinition ?? '',
+  },
+  {
+    header: '例句',
+    has: (entry) => entry.examples.length > 0,
+    value: (entry) => entry.examples.join('<br>'),
+  },
+  {
+    header: '补充',
+    has: (entry) => Boolean(entry.explanation),
+    value: (entry) => entry.explanation ?? '',
+  },
+  { header: '笔记', has: (entry) => Boolean(entry.notes), value: (entry) => entry.notes ?? '' },
+  {
+    header: '音标',
+    has: (entry) => Boolean(entry.phonetic),
+    value: (entry) => entry.phonetic ?? '',
+  },
+  {
+    header: '标签',
+    has: (entry) => entry.tags.length > 0,
+    value: (entry) => entry.tags.join(', '),
+  },
+]
+
 function tableFor(entries: Entry[]): string {
+  const columns = COLUMNS.filter((column) => column.always || entries.some(column.has))
   const lines = [
-    '| English | 含义 | 补充 |',
-    '| --- | --- | --- |',
+    `| ${columns.map((column) => column.header).join(' | ')} |`,
+    `| ${columns.map(() => '---').join(' | ')} |`,
     ...entries.map(
       (entry) =>
-        `| ${escapeCell(entry.text)} | ${escapeCell(entry.meaning ?? '')} | ${escapeCell(
-          supplementFor(entry),
-        )} |`,
+        `| ${columns.map((column) => escapeCell(column.value(entry))).join(' | ')} |`,
     ),
   ]
   return lines.join('\n')
@@ -67,15 +99,70 @@ function loadRegularEntries(type: EntryType): Entry[] {
   return rows.map(mapEntry)
 }
 
-function loadSceneEntries(sceneId: number): Entry[] {
+function loadSceneEntries(sceneId: number): SceneEntry[] {
   const rows = db
     .prepare(
       `${SCENE_ENTRY_SELECT}
        WHERE se.scene_id = ?
-       ORDER BY e.created_at ASC, e.id ASC`,
+       ORDER BY se.position ASC, se.added_at ASC, e.id ASC`,
     )
     .all(sceneId)
-  return rows.map((row) => mapSceneEntry(row).entry)
+  return rows.map(mapSceneEntry)
+}
+
+function typeTable(type: EntryType, entries: SceneEntry[]): string {
+  const typed = entries.filter((item) => item.entry.type === type).map((item) => item.entry)
+  if (!typed.length) return ''
+  return `#### ${ENTRY_TYPE_LABELS[type]}\n\n${tableFor(typed)}`
+}
+
+interface SectionGroup {
+  /** null 表示没有片段，直接使用类型标题（旧格式） */
+  name: string | null
+  items: SceneEntry[]
+}
+
+/**
+ * 场景按 section 分组：
+ * - section 为空或本身就是类型标题 → 旧格式，输出 `### 单词/短语/句子`
+ * - section 是用户写的片段 → 新格式，输出 `### 片段` + `#### 单词/短语/句子`
+ * subsection 在导出时统一由词条类型决定，保证再次导入时类型正确。
+ */
+function sceneBlock(sceneName: string, entries: SceneEntry[]): string {
+  const groups = new Map<string, SectionGroup>()
+  for (const item of entries) {
+    const section = item.section?.trim() ?? ''
+    const typeOnly = !section || sceneTypeFromHeading(section) !== null
+    const key = typeOnly ? '\u0000type' : section
+    let group = groups.get(key)
+    if (!group) {
+      group = { name: typeOnly ? null : section, items: [] }
+      groups.set(key, group)
+    }
+    group.items.push(item)
+  }
+
+  const blocks: string[] = []
+  for (const group of groups.values()) {
+    if (group.name === null) {
+      for (const type of TYPE_ORDER) {
+        const typed = group.items
+          .filter((item) => item.entry.type === type)
+          .map((item) => item.entry)
+        if (!typed.length) continue
+        blocks.push(`### ${ENTRY_TYPE_LABELS[type]}\n\n${tableFor(typed)}`)
+      }
+      continue
+    }
+
+    const typeBlocks = TYPE_ORDER.map((type) => typeTable(type, group.items)).filter(Boolean)
+    if (!typeBlocks.length) continue
+    blocks.push(`### ${group.name}\n\n${typeBlocks.join('\n\n')}`)
+  }
+
+  if (!blocks.length) return ''
+  const title = sceneName.replace(/\r?\n/g, ' ').trim()
+  return `## ${title}\n\n${blocks.join('\n\n')}`
 }
 
 app.get('/api/export/options', (c) => {
@@ -113,7 +200,7 @@ app.post('/api/export/markdown', async (c) => {
 
   const blocks: string[] = []
 
-  for (const type of ['word', 'phrase', 'sentence'] as EntryType[]) {
+  for (const type of TYPE_ORDER) {
     if (!types.includes(type)) continue
     const entries = loadRegularEntries(type)
     if (!entries.length) continue
@@ -124,25 +211,8 @@ app.post('/api/export/markdown', async (c) => {
   for (const sceneId of sceneIds) {
     const scene = getSceneSummary(sceneId)
     if (!scene) continue
-    const entries = loadSceneEntries(sceneId)
-    if (!entries.length) continue
-
-    const byType: Record<EntryType, Entry[]> = {
-      word: [],
-      phrase: [],
-      sentence: [],
-    }
-    for (const entry of entries) byType[entry.type].push(entry)
-
-    const typeBlocks: string[] = []
-    for (const type of ['word', 'phrase', 'sentence'] as EntryType[]) {
-      if (!byType[type].length) continue
-      typeBlocks.push(`### ${ENTRY_TYPE_LABELS[type]}\n\n${tableFor(byType[type])}`)
-    }
-    if (!typeBlocks.length) continue
-
-    const title = scene.name.replace(/\r?\n/g, ' ').trim()
-    sceneBlocks.push(`## ${title}\n\n${typeBlocks.join('\n\n')}`)
+    const block = sceneBlock(scene.name, loadSceneEntries(sceneId))
+    if (block) sceneBlocks.push(block)
   }
 
   if (sceneBlocks.length) {

@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import type {
   AiBehaviorSettings,
   AiTeachingSettings,
   ExplanationMode,
+  MarkdownSyncResult,
   Persona,
   PersonaInput,
   ReviewSettings,
@@ -21,7 +23,14 @@ import { api, errorMessage } from '@/lib/api'
 import { useAppStore } from '@/stores/app'
 import { THEMES, useThemeStore } from '@/stores/theme'
 
-type SettingsCategory = 'general' | 'appearance' | 'review' | 'ai' | 'persona' | 'about'
+type SettingsCategory =
+  | 'general'
+  | 'appearance'
+  | 'review'
+  | 'markdown'
+  | 'ai'
+  | 'persona'
+  | 'about'
 
 const categories: {
   id: SettingsCategory
@@ -44,6 +53,11 @@ const categories: {
     hintKey: 'settings.category.reviewHint',
   },
   {
+    id: 'markdown',
+    labelKey: 'settings.category.markdown',
+    hintKey: 'settings.category.markdownHint',
+  },
+  {
     id: 'ai',
     labelKey: 'settings.category.ai',
     hintKey: 'settings.category.aiHint',
@@ -62,8 +76,14 @@ const categories: {
 
 const store = useAppStore()
 const themeStore = useThemeStore()
+const route = useRoute()
 
-const activeCategory = ref<SettingsCategory>('general')
+const queryCategory =
+  typeof route.query.category === 'string' ? route.query.category : ''
+const initialCategory =
+  categories.find((category) => category.id === queryCategory)?.id ?? 'general'
+
+const activeCategory = ref<SettingsCategory>(initialCategory)
 
 const form = reactive({
   baseUrl: '',
@@ -85,6 +105,7 @@ const behaviorForm = reactive({
 const teachingForm = reactive<{ explanationMode: ExplanationMode }>({
   explanationMode: 'bilingual',
 })
+const markdownForm = reactive({ path: '' })
 const personas = ref<Persona[]>([])
 const selectedPersonaId = ref<number | null>(null)
 const personaPrompt = ref('')
@@ -99,6 +120,8 @@ const reviewSaving = ref(false)
 const behaviorSaving = ref(false)
 const teachingSaving = ref(false)
 const personaSaving = ref(false)
+const markdownSaving = ref(false)
+const markdownSyncing = ref(false)
 const savedReviewText = ref('')
 const error = ref('')
 const notice = ref('')
@@ -110,6 +133,8 @@ const teachingError = ref('')
 const teachingNotice = ref('')
 const personaError = ref('')
 const personaNotice = ref('')
+const markdownError = ref('')
+const markdownNotice = ref('')
 const testResult = ref<{ ok: boolean; message: string } | null>(null)
 const selectedPersona = computed(
   () => personas.value.find((persona) => persona.id === selectedPersonaId.value) ?? null,
@@ -142,7 +167,7 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const [settings, review, behavior, teaching, personaList, personaSetting] =
+    const [settings, review, behavior, teaching, personaList, personaSetting, markdown] =
       await Promise.all([
         api.settings.get(),
         api.settings.review(),
@@ -150,6 +175,7 @@ async function load() {
         api.settings.aiTeaching(),
         api.personas.list(),
         api.settings.aiPersona(),
+        api.settings.markdown(),
       ])
     form.baseUrl = settings.baseUrl
     form.model = settings.model
@@ -171,6 +197,7 @@ async function load() {
     behaviorForm.historyLimit = behavior.historyLimit
     behaviorForm.memoryCharBudget = behavior.memoryCharBudget
     teachingForm.explanationMode = teaching.explanationMode
+    markdownForm.path = markdown.path ?? ''
 
     personas.value = personaList.items
     const selected =
@@ -276,6 +303,46 @@ async function saveReview() {
     reviewError.value = errorMessage(caught)
   } finally {
     reviewSaving.value = false
+  }
+}
+
+async function saveMarkdownPath() {
+  markdownSaving.value = true
+  markdownError.value = ''
+  markdownNotice.value = ''
+  try {
+    const saved = await api.settings.updateMarkdown(markdownForm.path.trim() || null)
+    markdownForm.path = saved.path ?? ''
+    markdownNotice.value = t('settings.markdown.saved')
+  } catch (caught) {
+    markdownError.value = errorMessage(caught)
+  } finally {
+    markdownSaving.value = false
+  }
+}
+
+async function syncMarkdownNow() {
+  markdownSyncing.value = true
+  markdownError.value = ''
+  markdownNotice.value = ''
+  try {
+    const saved = await api.settings.updateMarkdown(markdownForm.path.trim() || null)
+    markdownForm.path = saved.path ?? ''
+    if (!saved.path) throw new Error(t('settings.markdown.noPath'))
+    const result: MarkdownSyncResult = await api.imports.syncMarkdown()
+    const changed = result.created + result.linked + result.updated
+    markdownNotice.value = changed
+      ? t('review.syncDone', {
+          created: result.created,
+          linked: result.linked,
+          updated: result.updated,
+        })
+      : t('review.syncNoChanges')
+    store.refreshStats().catch(() => {})
+  } catch (caught) {
+    markdownError.value = errorMessage(caught)
+  } finally {
+    markdownSyncing.value = false
   }
 }
 
@@ -725,6 +792,59 @@ onMounted(load)
             <div class="actions">
               <button class="btn btn-primary" :disabled="reviewSaving" @click="saveReview">
                 {{ reviewSaving ? t('common.saving') : t('settings.review.save') }}
+              </button>
+            </div>
+          </section>
+        </template>
+
+        <template v-else-if="activeCategory === 'markdown'">
+          <section class="card settings-card">
+            <div class="card-title">
+              <div>
+                <h2>{{ t('settings.markdown.title') }}</h2>
+                <p class="hint">{{ t('settings.markdown.hint') }}</p>
+              </div>
+              <span class="status-pill" :class="markdownForm.path ? 'ok' : 'warn'">
+                {{
+                  t(
+                    markdownForm.path
+                      ? 'settings.markdown.configured'
+                      : 'settings.markdown.notConfigured',
+                  )
+                }}
+              </span>
+            </div>
+
+            <p v-if="markdownError" class="banner banner-error">{{ markdownError }}</p>
+            <p v-if="markdownNotice" class="banner banner-ok">{{ markdownNotice }}</p>
+
+            <div class="field">
+              <label for="markdown-path">{{ t('settings.markdown.path') }}</label>
+              <input
+                id="markdown-path"
+                v-model="markdownForm.path"
+                class="input"
+                :placeholder="t('settings.markdown.pathPlaceholder')"
+                :disabled="loading"
+              />
+              <span class="hint">{{ t('settings.markdown.pathHint') }}</span>
+            </div>
+
+            <div class="actions">
+              <button
+                class="btn btn-primary"
+                :disabled="markdownSaving || markdownSyncing"
+                @click="saveMarkdownPath"
+              >
+                {{ markdownSaving ? t('common.saving') : t('settings.markdown.save') }}
+              </button>
+              <button
+                class="btn btn-ghost"
+                :disabled="markdownSyncing || markdownSaving"
+                @click="syncMarkdownNow"
+              >
+                <Icon name="refresh" :size="16" />
+                {{ markdownSyncing ? t('settings.markdown.syncing') : t('settings.markdown.syncNow') }}
               </button>
             </div>
           </section>

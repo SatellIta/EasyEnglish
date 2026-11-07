@@ -55,7 +55,11 @@ const preview = computed(() =>
       </div>
 
       <p v-if="entry.phonetic" class="lib-phonetic">{{ entry.phonetic }}</p>
-      <p v-if="preview" class="lib-meaning" :class="{ english: preview.kind === 'english' }">
+      <p
+        v-if="preview"
+        class="lib-meaning"
+        :class="{ english: preview.kind !== 'meaning', explanation: preview.kind === 'explanation' }"
+      >
         {{ preview.text }}
       </p>
       <div v-if="entry.images.length" class="lib-images">
@@ -195,6 +199,9 @@ const preview = computed(() =>
   font-size: 13.5px;
   line-height: 1.65;
   overflow-wrap: anywhere;
+}
+.lib-meaning.explanation {
+  color: var(--muted);
 }
 .lib-phonetic {
   margin: 5px 0 0;

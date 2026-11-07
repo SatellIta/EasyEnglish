@@ -9,7 +9,6 @@ import type {
 } from '@shared/types'
 import importFormatHelp from '@/assets/import-format.md?raw'
 import importFormatHelpEn from '@/assets/import-format.en.md?raw'
-import AnkiImportModal from '@/components/AnkiImportModal.vue'
 import BaseModal from '@/components/BaseModal.vue'
 import Icon from '@/components/Icon.vue'
 import ImportItemRow from '@/components/import/ImportItemRow.vue'
@@ -55,10 +54,10 @@ const error = ref('')
 const preview = ref<ImportPreview | null>(null)
 const selected = ref<Set<string>>(new Set())
 const expanded = ref<Set<string>>(new Set())
-const sceneReview = ref(false)
+const sceneReview = ref(true)
+const updateExisting = ref(false)
 const commitResult = ref<ImportCommitResult | null>(null)
 const helpOpen = ref(false)
-const ankiOpen = ref(false)
 const helpContent = computed(() =>
   locale.value === 'en' ? importFormatHelpEn : importFormatHelp,
 )
@@ -246,10 +245,13 @@ async function parse() {
     )
     preview.value = result
     selected.value = new Set(
-      result.items.filter((item) => !item.duplicate).map((item) => item.id),
+      result.items
+        .filter((item) => !item.duplicate || item.scene)
+        .map((item) => item.id),
     )
     expanded.value = new Set()
-    sceneReview.value = false
+    sceneReview.value = true
+    updateExisting.value = false
     await nextTick()
     document.querySelector('.import-stats')?.scrollIntoView({
       behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -273,16 +275,18 @@ async function commit() {
       type: item.type,
       text: item.text,
       meaning: item.meaning,
+      englishDefinition: item.englishDefinition,
       explanation: item.explanation,
       examples: item.examples,
       notes: item.notes,
       tags: item.tags,
+      phonetic: item.phonetic,
       scene: item.scene,
       section: item.section,
       subsection: item.subsection,
       reviewEnabled: item.reviewEnabled,
     }))
-    commitResult.value = await api.imports.commitMarkdown(items)
+    commitResult.value = await api.imports.commitMarkdown(items, updateExisting.value)
     selected.value = new Set()
     store.refreshStats().catch(() => {})
   } catch (caught) {
@@ -299,7 +303,8 @@ function reset() {
   selected.value = new Set()
   expanded.value = new Set()
   commitResult.value = null
-  sceneReview.value = false
+  sceneReview.value = true
+  updateExisting.value = false
   error.value = ''
 }
 </script>
@@ -317,9 +322,6 @@ function reset() {
         </p>
       </div>
       <div class="import-actions">
-        <button class="btn btn-ghost" type="button" @click="ankiOpen = true">
-          <Icon name="upload" :size="16" /> {{ t('library.importAnki') }}
-        </button>
         <button
           class="icon-btn"
           type="button"
@@ -426,6 +428,10 @@ function reset() {
           />
           {{ t('import.sceneReview') }}
         </label>
+        <label class="check-row">
+          <input v-model="updateExisting" type="checkbox" />
+          {{ t('import.updateExisting') }}
+        </label>
         <span class="selected-count">
           {{ t('import.selectedSummary', { selected: selectedCount, total: preview.stats.total }) }}
           <span v-if="selectedSceneCount">{{ t('import.selectedScenes', { count: selectedSceneCount }) }}</span>
@@ -524,6 +530,8 @@ function reset() {
           <h3>{{ t('import.doneTitle') }}</h3>
           <p>
             {{ t('import.created', { count: commitResult.created }) }}
+            <span v-if="commitResult.linked">{{ t('import.linked', { count: commitResult.linked }) }}</span>
+            <span v-if="commitResult.updated">{{ t('import.updated', { count: commitResult.updated }) }}</span>
             <span v-if="commitResult.skipped">{{ t('import.skipped', { count: commitResult.skipped }) }}</span>
             <span v-if="commitResult.scenes.length">
               {{ t('import.scenes', { names: commitResult.scenes.join(', ') }) }}
@@ -567,8 +575,6 @@ function reset() {
         </button>
       </template>
     </BaseModal>
-
-    <AnkiImportModal :open="ankiOpen" @close="ankiOpen = false" />
   </div>
 </template>
 

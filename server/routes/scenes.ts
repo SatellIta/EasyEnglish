@@ -13,8 +13,11 @@ import {
   removeEntryFromScene,
   updateScene,
 } from '../lib/scenes'
+import { nowIso } from '../lib/time'
 
 const app = new Hono()
+
+const reviewInput = z.object({ enabled: z.boolean() })
 
 const sceneInput = z.object({
   name: z.string().trim().min(1, '场景名不能为空').max(60),
@@ -44,6 +47,22 @@ app.post('/api/scenes', async (c) => {
     return c.json({ error: `场景「${input.name}」已存在` }, 409)
   }
   return c.json(createScene(input.name, input.description ?? null), 201)
+})
+
+/** 批量打开/关闭一个场景里所有词条的复习开关。 */
+app.post('/api/scenes/:id/review', async (c) => {
+  const id = parseId(c.req.param('id'))
+  if (!id) return c.json({ error: '无效的场景 ID' }, 400)
+  if (!getSceneSummary(id)) return c.json({ error: '场景不存在' }, 404)
+
+  const input = reviewInput.parse(await c.req.json())
+  const info = db
+    .prepare(
+      `UPDATE entries SET review_enabled = ?, updated_at = ?
+       WHERE id IN (SELECT entry_id FROM scene_entries WHERE scene_id = ?)`,
+    )
+    .run(input.enabled ? 1 : 0, nowIso(), id)
+  return c.json({ updated: info.changes })
 })
 
 app.get('/api/scenes/:id', (c) => {

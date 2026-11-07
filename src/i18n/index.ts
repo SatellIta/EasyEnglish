@@ -101,6 +101,10 @@ const EXACT_ERRORS: Record<string, MessageKey> = {
   '包内没有找到可导入的笔记': 'api.ankiNoNotes',
   '字段映射不合法': 'api.ankiMapping',
   '文件过大，最大支持 200MB': 'api.fileTooLarge',
+  '还没有配置 Markdown 同步路径': 'api.markdownSyncNoPath',
+  'Markdown 同步路径必须是 .md / .markdown / .txt 文件': 'api.markdownSyncExtension',
+  'Markdown 同步路径不是文件': 'api.markdownSyncNotFile',
+  'Markdown 文件不能超过 2 MB': 'api.markdownSyncTooLarge',
   '不是有效的 ZIP 文件': 'api.ankiInvalidFile',
   '不是有效的 Anki 词库文件': 'api.ankiInvalidFile',
   '包内数据库格式不受支持': 'api.ankiInvalidFile',
@@ -136,6 +140,11 @@ export function localizeServerError(raw: string): string {
   if (raw.includes('包内没有找到可导入的笔记')) return t('api.ankiNoNotes')
   if (raw.includes('导入会话已过期')) return t('api.ankiSessionExpired')
   if (raw.includes('文件过大')) return t('api.fileTooLarge')
+  if (raw.includes('还没有配置 Markdown 同步路径')) return t('api.markdownSyncNoPath')
+  if (raw.includes('Markdown 同步路径必须是')) return t('api.markdownSyncExtension')
+  if (raw.includes('找不到 Markdown 同步文件')) return t('api.markdownSyncMissing')
+  if (raw.includes('Markdown 同步路径不是文件')) return t('api.markdownSyncNotFile')
+  if (raw.includes('Markdown 文件不能超过')) return t('api.markdownSyncTooLarge')
   if (raw.includes('ZIP') || raw.includes('Anki 词库文件')) return t('api.ankiInvalidFile')
   if (raw.startsWith('AI 整理失败：')) {
     return t('api.summaryFailed', { message: raw.slice('AI 整理失败：'.length) })

@@ -6,10 +6,11 @@ import {
   getAiBehaviorSettings,
   saveAiBehaviorSettings,
 } from '../lib/ai-behavior'
+import { getAiTeachingSettings, saveAiTeachingSettings } from '../lib/ai-teaching'
 import {
-  getAiTeachingSettings,
-  saveAiTeachingSettings,
-} from '../lib/ai-teaching'
+  getMarkdownSyncPath,
+  saveMarkdownSyncPath,
+} from '../lib/markdown-sync'
 import { getReviewConfig, saveReviewConfig } from '../lib/review-config'
 import { deleteSetting, setSetting } from '../lib/settings'
 
@@ -72,6 +73,22 @@ app.get('/api/settings/ai-teaching', (c) => c.json(getAiTeachingSettings()))
 app.put('/api/settings/ai-teaching', async (c) => {
   const input = teachingInput.parse(await c.req.json())
   return c.json(saveAiTeachingSettings(input))
+})
+
+const markdownSyncInput = z.object({
+  path: z.string().trim().max(1000).nullable().optional(),
+})
+
+app.get('/api/settings/markdown', (c) => c.json({ path: getMarkdownSyncPath() }))
+
+app.put('/api/settings/markdown', async (c) => {
+  const input = markdownSyncInput.parse(await c.req.json())
+  try {
+    return c.json({ path: saveMarkdownSyncPath(input.path) })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    return c.json({ error: message }, 400)
+  }
 })
 
 app.put('/api/settings', async (c) => {
