@@ -24,6 +24,9 @@ const entryInput = z.object({
   examples: z.array(z.string().trim().min(1).max(1000)).max(50).optional(),
   notes: z.string().trim().max(8000).nullish(),
   tags: z.array(z.string().trim().min(1).max(50)).max(50).optional(),
+  phonetic: z.string().trim().max(200).nullish(),
+  englishDefinition: z.string().trim().max(8000).nullish(),
+  images: z.array(z.string().trim().min(1).max(500)).max(10).optional(),
   source: z.string().trim().max(50).optional(),
   reviewEnabled: z.boolean().optional(),
   sourceSessionId: z.number().int().positive().nullish(),
@@ -187,6 +190,11 @@ app.patch('/api/entries/:id', async (c) => {
   if (input.examples !== undefined) set('examples', JSON.stringify(input.examples))
   if (input.notes !== undefined) set('notes', input.notes || null)
   if (input.tags !== undefined) set('tags', JSON.stringify(input.tags))
+  if (input.phonetic !== undefined) set('phonetic', input.phonetic || null)
+  if (input.englishDefinition !== undefined) {
+    set('english_definition', input.englishDefinition || null)
+  }
+  if (input.images !== undefined) set('images', JSON.stringify(input.images))
   if (input.source !== undefined) set('source', input.source)
   if (input.reviewEnabled !== undefined) set('review_enabled', input.reviewEnabled ? 1 : 0)
   if (input.sourceSessionId !== undefined) set('source_session_id', input.sourceSessionId)

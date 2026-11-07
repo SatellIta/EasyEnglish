@@ -3,6 +3,9 @@ import type {
   AiPersonaSettings,
   AiSettings,
   AiTeachingSettings,
+  AnkiImportOptions,
+  AnkiImportPreview,
+  AnkiImportResult,
   BulkCreateResult,
   ChatMessage,
   ChatSession,
@@ -16,6 +19,10 @@ import type {
   ImportCommitItem,
   ImportCommitResult,
   ImportPreview,
+  LearnCompleteInput,
+  LearnCompleteResult,
+  LearnQueue,
+  LearnStats,
   LearnerError,
   LearnerErrorStatus,
   LibraryOverview,
@@ -28,6 +35,7 @@ import type {
   SceneDetail,
   SceneInput,
   SceneSummary,
+  SharedDeckPage,
   SummaryResult,
 } from '@shared/types'
 import { localizeServerError, t } from '@/i18n'
@@ -97,6 +105,24 @@ async function requestText(path: string, options: RequestInit = {}): Promise<str
   }
 
   return response.text()
+}
+
+/** multipart 上传：不要手动设置 Content-Type，让浏览器生成 boundary。 */
+async function upload<T>(path: string, form: FormData): Promise<T> {
+  const response = await fetch(`/api${path}`, { method: 'POST', body: form })
+  if (!response.ok) {
+    let message = t('api.requestFailed', { status: response.status })
+    let details: unknown
+    try {
+      const body = await response.json()
+      if (body && typeof body.error === 'string') message = body.error
+      details = body?.details
+    } catch {
+      // ignore
+    }
+    throw new ApiError(message, response.status, details)
+  }
+  return (await response.json()) as T
 }
 
 function toQuery(params: Record<string, string | number | undefined>): string {
@@ -240,6 +266,53 @@ export const api = {
       request<ImportCommitResult>('/import/markdown/commit', {
         method: 'POST',
         body: JSON.stringify({ items }),
+      }),
+    previewAnki: (file: File) => {
+      const form = new FormData()
+      form.append('file', file)
+      return upload<AnkiImportPreview>('/import/anki/preview', form)
+    },
+    commitAnki: (importId: string, options: AnkiImportOptions) =>
+      request<AnkiImportResult>('/import/anki/commit', {
+        method: 'POST',
+        body: JSON.stringify({ importId, options }),
+      }),
+    cancelAnki: (importId: string) =>
+      request<{ ok: boolean }>(`/import/anki/${encodeURIComponent(importId)}`, {
+        method: 'DELETE',
+      }),
+  },
+
+  learn: {
+    stats: () => request<LearnStats>('/learn/stats'),
+    queue: (size = 10, types?: EntryType[]) =>
+      request<LearnQueue>(
+        `/learn/queue${toQuery({
+          size,
+          types: types?.length ? types.join(',') : undefined,
+        })}`,
+      ),
+    complete: (input: LearnCompleteInput) =>
+      request<LearnCompleteResult>('/learn/complete', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+  },
+
+  ankiShared: {
+    list: (params: { search: string; sort?: 'rating' | 'updated'; page?: number; pageSize?: number }) =>
+      request<SharedDeckPage>(
+        `/anki-shared/decks${toQuery({
+          search: params.search,
+          sort: params.sort,
+          page: params.page,
+          pageSize: params.pageSize,
+        })}`,
+      ),
+    download: (deckId: number) =>
+      request<AnkiImportPreview>('/anki-shared/download', {
+        method: 'POST',
+        body: JSON.stringify({ deckId }),
       }),
   },
 

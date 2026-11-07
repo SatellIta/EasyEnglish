@@ -32,8 +32,13 @@
 | `examples` | JSON 字符串数组 |
 | `notes` | 个人笔记 |
 | `tags` | JSON 字符串数组 |
-| `source` | `manual` / `summary` / `markdown-import` 等 |
-| `review_enabled` | 是否进入每日复习；场景导入的默认值为 0 |
+| `phonetic` | 音标，来自 Anki 或手动填写 |
+| `english_definition` | 英英释义，来自 Anki |
+| `images` | JSON 字符串数组，存放本地图片地址 `/api/media/...` |
+| `external_id` | Anki GUID，用于重复导入时识别同一条词 |
+| `source` | `manual` / `summary` / `markdown-import` / `anki` 等 |
+| `review_enabled` | 是否进入每日复习；Anki 导入默认 0，学完后打开 |
+| `learned_at` | 通过学习流程的时间；NULL 表示还在「待学习」 |
 | `created_at`, `updated_at` | UTC ISO |
 
 ### scenes / scene_entries
@@ -127,6 +132,36 @@ FTS5 虚拟表，`tokenize='trigram'`，内容来自 entries，通过 INSERT/UPD
 
 解析器在 `server/lib/markdown-import.ts`，只处理文本，不执行 Markdown 中的任何内容。预览会按规范化英文内容标记数据库中和本批次内的重复项，默认不勾选重复项。提交时会再次跳过词库中已有的相同英文内容，并对本批次去重。
 
+### Anki 导入
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| POST | `/api/import/anki/preview` | `multipart/form-data` 的 `file`；返回牌组、笔记类型、字段映射、示例和媒体数量 |
+| POST | `/api/import/anki/commit` | body `{ importId, options }`；按映射写入词条并提取图片 |
+| DELETE | `/api/import/anki/:importId` | 删除临时导入会话 |
+| GET | `/api/anki-shared/decks?search=&sort=rating\|updated&page=&pageSize=` | 代理 AnkiWeb 共享牌组列表（protobuf → JSON） |
+| POST | `/api/anki-shared/download` | body `{ deckId }`；下载 `.apkg` 并返回导入预览 |
+| GET | `/api/media/:name` | 读取已提取的本地图片，长缓存 |
+
+Anki 包解析在 `server/lib/import/`：
+
+- `zip.ts`：不依赖第三方库的 ZIP 读取器，支持 stored/deflate；超过 65,535 个条目的 ZIP64 目录暂不支持。
+- `anki-package.ts`：从 `collection.anki21b`（zstd）、`collection.anki21`、`collection.anki2` 中选择集合，解压到 `data/imports/<uuid>/collection.sqlite`，用 Node 内置 `node:sqlite` 只读打开。Anki schema 的 `unicase` 排序规则在 `better-sqlite3` 中不可用，但 `node:sqlite` 可以读取 `fields` 等表；`tags` 表本身不参与导入。
+- `anki-mapper.ts`：清洗 HTML、`<br>`、cloze、`[sound:]`，按字段名自动映射（单词 / 基本释义 / 英英释义 / 音标 / 图片 / 考纲 / 柯林斯英汉 / Front-Back），从柯林斯字段提取「英文例句 — 中文翻译」，并推断 word/phrase/sentence。
+- `media-store.ts`：只提取词条引用到的图片，按内容 SHA-256 命名放入 `data/media/`，避免重复；跳过 SVG 和音频。
+
+导入时先按 `source = 'anki'` + `external_id`（GUID）查重，再按规范化英文文本查重。`duplicateMode` 支持 `skip` / `update`（只更新内容，保留复习状态）/ `new`。`.colpkg` 一律合并导入，不删除现有词条。默认 `addToReview = false`：词条写入时 `learned_at = NULL`、`review_enabled = 0`，先进入学习流程。
+
+### AnkiWeb 共享牌组
+
+`server/lib/import/ankiweb.ts` 把 AnkiWeb 的 protobuf 二进制接口解码成普通 JSON：
+
+- `GET /svc/shared/list-decks?search=`：牌组 id、标题、赞/踩、更新时间、笔记/音频/图片数量。AnkiWeb 要求 `search` 非空，服务端默认使用 `english`。
+- `GET /svc/shared/item-info?sharedId=`：标题、大小、下载凭证 `download_key`。
+- `GET /svc/shared/download-deck/<id>?t=<download_key>`：返回 `.apkg`；没有正确凭证会返回 400。
+
+列表结果按 `search` 缓存 5 分钟，服务端负责排序和分页（默认 20 条/页）。下载只接受 `Content-Disposition` 中 `.apkg` 的文件名，限制 200MB，并复用上传导入的 `buildAnkiPreview()`，所以下载后同样进入字段映射预览、提交和去重流程。AnkiWeb 对匿名搜索/下载有频率限制（HTTP 429），界面会显示可重试的提示；`ANKIWEB_BASE_URL` 只用于本地 mock 测试。
+
 ### 复习
 
 | 方法 | 路径 | 说明 |
@@ -134,6 +169,14 @@ FTS5 虚拟表，`tokenize='trigram'`，内容来自 entries，通过 INSERT/UPD
 | GET | `/api/review/queue?types=&limit=` | 当前到期的词条，按到期时间升序 |
 | POST | `/api/review/:id/rate` | body `{ rating: "remembered" \| "forgot" }` |
 | GET | `/api/review/stats` | 到期数（按类型）、今日复习/新增、总数、已掌握、连续天数 |
+
+### 学习
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/api/learn/stats` | 待学习 / 已学习 / 词库总数 |
+| GET | `/api/learn/queue?size=&types=` | 随机抽取一批 `learned_at IS NULL` 的词条；`size` 限制 1–50 |
+| POST | `/api/learn/complete` | body `{ known: number[], unknown: number[] }`，标记已学习并写入复习队列 |
 
 ### 对话
 
@@ -170,6 +213,18 @@ FTS5 虚拟表，`tokenize='trigram'`，内容来自 entries，通过 INSERT/UPD
 - 只有 `entries.review_enabled = 1` 的词条会进入 `/api/review/queue` 和到期统计。场景导入默认关闭该开关，但保留复习状态；之后打开开关时会从当前状态继续。
 
 复习界面只展示英文，用户先主动回忆，再选择「记得 / 不记得」。不使用选择题，避免只记选项差异。修改配置只影响之后的评分，不会重排已有词条的下次复习时间。
+
+## 学习流程
+
+`/learn` 是 Anki 导入词条的入口，也是独立于每日复习的「先认识，再记忆」流程：
+
+1. 设置每组数量（5 / 10 / 20 / 30 / 50，保存在 `localStorage` 的 `easyenglish.learnBatchSize`）。
+2. `GET /api/learn/queue` 随机抽取 `learned_at IS NULL` 的词条。
+3. 辨别阶段：整组逐个显示单词、音标和朗读按钮，用户选择「认识 / 不认识」，不显示释义。
+4. 学习阶段：只展示本组标记为「不认识」的词条，显示词库里的中文释义、英英释义、例句、图片、笔记和标签；内容全部来自用户词库，不调用 AI。
+5. `POST /api/learn/complete`：把本组词条标记为已学习并打开 `review_enabled`。认识的词条在 1 天后到期；不认识的词条立即到期。学习的词条随后进入普通复习队列。
+
+学习进度只保存在当前页面；中途离开会提示确认，未提交的词条保持「待学习」。
 
 ## Markdown 导入与场景映射
 
@@ -223,7 +278,7 @@ FTS5 虚拟表，`tokenize='trigram'`，内容来自 entries，通过 INSERT/UPD
 
 ### 今日总结
 
-`POST /api/summary/today/generate` 收集当天对话（从最近消息向前截断到约 12k 字符）和当天新增/复习过的词条，要求模型只输出：
+`POST /api/summary/today/generate` 收集当天对话（从最近消息向前截断到约 12k 字符）和当天真正学过的词条（`learned_at` 在当天），要求模型只输出：
 
 ```json
 {
@@ -234,7 +289,7 @@ FTS5 虚拟表，`tokenize='trigram'`，内容来自 entries，通过 INSERT/UPD
 }
 ```
 
-生成前先检查：当天既没有对话也没有新增词条（只复习旧词不算）时直接返回 400 `{ code: 'no_study' }`，不调用 AI。请求体可带 `{ locale: 'zh' | 'en' }`；英文界面下强制使用英文总结提示词。解析时容忍 Markdown 代码围栏；解析失败则退化为纯 Markdown 总结、候选词条为空。结果按日期 upsert 到 `daily_summaries`。
+生成前先检查：当天既没有对话也没有今天学过的词条（只复习旧词、或只导入了还没学习的 Anki 词条都不算）时直接返回 400 `{ code: 'no_study' }`，不调用 AI。请求体可带 `{ locale: 'zh' | 'en' }`；英文界面下强制使用英文总结提示词。解析时容忍 Markdown 代码围栏；解析失败则退化为纯 Markdown 总结、候选词条为空。结果按日期 upsert 到 `daily_summaries`。
 
 候选词条在生成和读取时都会通过 `server/lib/dedupe.ts` 标重：规范化文本会忽略大小写、首尾引号和结尾标点，只以主要英文内容与词库及本批次比较；类型、释义、例句、标签都不参与判重。`POST /api/entries/bulk` 在写入前再次查重，并返回 `skipped` / `duplicates`，所以「全部加入」不会把已有词条重复塞进复习队列。
 

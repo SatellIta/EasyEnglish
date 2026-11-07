@@ -16,10 +16,13 @@ const form = reactive({
   type: 'word' as EntryType,
   text: '',
   meaning: '',
+  phonetic: '',
+  englishDefinition: '',
   explanation: '',
   examplesText: '',
   notes: '',
   tagsText: '',
+  images: [] as string[],
   reviewEnabled: true,
 })
 const saving = ref(false)
@@ -43,10 +46,13 @@ function reset() {
   form.type = entry?.type ?? 'word'
   form.text = entry?.text ?? ''
   form.meaning = entry?.meaning ?? ''
+  form.phonetic = entry?.phonetic ?? ''
+  form.englishDefinition = entry?.englishDefinition ?? ''
   form.explanation = entry?.explanation ?? ''
   form.examplesText = (entry?.examples ?? []).join('\n')
   form.notes = entry?.notes ?? ''
   form.tagsText = (entry?.tags ?? []).join(', ')
+  form.images = [...(entry?.images ?? [])]
   form.reviewEnabled = entry?.reviewEnabled ?? props.defaultReviewEnabled
   error.value = ''
 }
@@ -78,6 +84,8 @@ async function submit() {
     type: form.type,
     text: form.text.trim(),
     meaning: form.meaning.trim() || null,
+    phonetic: form.phonetic.trim() || null,
+    englishDefinition: form.englishDefinition.trim() || null,
     explanation: form.explanation.trim() || null,
     examples: form.examplesText
       .split('\n')
@@ -88,6 +96,7 @@ async function submit() {
       .split(/[,，]/)
       .map((tag) => tag.trim())
       .filter(Boolean),
+    images: form.images,
     reviewEnabled: form.reviewEnabled,
   }
 
@@ -158,6 +167,16 @@ async function submit() {
       </div>
 
       <div class="field">
+        <label for="entry-phonetic">{{ t('entryForm.phonetic') }}</label>
+        <input
+          id="entry-phonetic"
+          v-model="form.phonetic"
+          class="input"
+          :placeholder="t('entryForm.phoneticPlaceholder')"
+        />
+      </div>
+
+      <div class="field">
         <label for="entry-explanation">{{ t('entryForm.explanation') }}</label>
         <textarea
           id="entry-explanation"
@@ -165,6 +184,17 @@ async function submit() {
           class="textarea"
           rows="3"
           :placeholder="t('entryForm.explanationPlaceholder')"
+        />
+      </div>
+
+      <div class="field">
+        <label for="entry-english-definition">{{ t('entryForm.englishDefinition') }}</label>
+        <textarea
+          id="entry-english-definition"
+          v-model="form.englishDefinition"
+          class="textarea"
+          rows="3"
+          :placeholder="t('entryForm.englishDefinitionPlaceholder')"
         />
       </div>
 
@@ -193,6 +223,25 @@ async function submit() {
       <div class="field">
         <label for="entry-tags">{{ t('entryForm.tags') }}</label>
         <input id="entry-tags" v-model="form.tagsText" class="input" :placeholder="t('entryForm.tagsPlaceholder')" />
+      </div>
+
+      <div v-if="form.images.length" class="field">
+        <label>{{ t('entryForm.images') }}</label>
+        <div class="form-images">
+          <div v-for="src in form.images" :key="src" class="form-image">
+            <img :src="src" :alt="t('learn.imageAlt')" loading="lazy" />
+            <button
+              type="button"
+              class="icon-btn"
+              :title="t('entryForm.removeImage')"
+              :aria-label="t('entryForm.removeImage')"
+              @click="form.images = form.images.filter((item) => item !== src)"
+            >
+              <Icon name="x" :size="14" />
+            </button>
+          </div>
+        </div>
+        <span class="hint">{{ t('entryForm.imagesHint') }}</span>
       </div>
 
       <label class="check-row">
@@ -282,5 +331,31 @@ async function submit() {
   color: var(--muted);
   font-weight: 400;
   line-height: 1.5;
+}
+.form-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.form-image {
+  position: relative;
+  display: flex;
+}
+.form-image img {
+  width: 88px;
+  height: 88px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  box-shadow: var(--shadow-raised-sm);
+}
+.form-image .icon-btn {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 26px;
+  height: 26px;
+  background: var(--surface);
+  box-shadow: var(--shadow-raised-sm);
 }
 </style>

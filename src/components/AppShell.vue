@@ -13,6 +13,7 @@ const route = useRoute()
 
 const nav = [
   { to: '/today', labelKey: 'nav.today' as const, icon: 'calendar' },
+  { to: '/learn', labelKey: 'nav.learn' as const, icon: 'learn' },
   { to: '/chat', labelKey: 'nav.chat' as const, icon: 'chat' },
   { to: '/review', labelKey: 'nav.review' as const, icon: 'review', badge: true },
   { to: '/library', labelKey: 'nav.library' as const, icon: 'book-open' },

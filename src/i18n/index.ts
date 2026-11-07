@@ -95,6 +95,23 @@ const EXACT_ERRORS: Record<string, MessageKey> = {
   人格名称不能为空: 'api.personaNameRequired',
   人格提示词不能为空: 'api.personaPromptRequired',
   'AI 没有返回可用的例句，请稍后重试。': 'api.examplesEmpty',
+  '请选择要导入的 Anki 文件': 'api.ankiNoFile',
+  '包内没有找到 Anki 数据库': 'api.ankiNoCollection',
+  '导入会话已过期，请重新选择文件': 'api.ankiSessionExpired',
+  '包内没有找到可导入的笔记': 'api.ankiNoNotes',
+  '字段映射不合法': 'api.ankiMapping',
+  '文件过大，最大支持 200MB': 'api.fileTooLarge',
+  '不是有效的 ZIP 文件': 'api.ankiInvalidFile',
+  '不是有效的 Anki 词库文件': 'api.ankiInvalidFile',
+  '包内数据库格式不受支持': 'api.ankiInvalidFile',
+  '清洗后内容为空，已跳过': 'anki.errorEmpty',
+  '写入失败': 'anki.errorWrite',
+  '字段解析失败': 'anki.errorParse',
+  '已有词条不存在': 'anki.errorMissingEntry',
+  'AnkiWeb 请求次数过多，请稍后再试。': 'api.ankiRateLimited',
+  '只支持导入 .apkg 格式的共享牌组': 'api.ankiOnlyApkg',
+  '这个共享牌组已被删除': 'api.ankiDeckNotFound',
+  '下载到的文件不是有效的 Anki 牌组': 'api.ankiDownloadInvalid',
 }
 
 /** 英文界面下把后端常见中文错误转成英文；无法识别时避免泄漏中文。 */
@@ -118,6 +135,13 @@ export function localizeServerError(raw: string): string {
   if (raw.includes('今天还没有学习记录')) return t('api.noStudyRecords')
   if (raw.includes('词库中已存在相同的英文内容')) return t('export.duplicateEntry')
   if (raw.includes('没有返回可用的例句')) return t('api.examplesEmpty')
+  if (raw.includes('暂不支持该 Anki 数据库版本')) return t('api.ankiSchema')
+  if (raw.includes('包内没有找到 Anki 数据库')) return t('api.ankiNoCollection')
+  if (raw.includes('包内没有找到可导入的笔记')) return t('api.ankiNoNotes')
+  if (raw.includes('导入会话已过期')) return t('api.ankiSessionExpired')
+  if (raw.includes('文件过大')) return t('api.fileTooLarge')
+  if (raw.includes('AnkiWeb 请求次数过多')) return t('api.ankiRateLimited')
+  if (raw.includes('ZIP') || raw.includes('Anki 词库文件')) return t('api.ankiInvalidFile')
   if (raw.startsWith('AI 整理失败：')) {
     return t('api.summaryFailed', { message: raw.slice('AI 整理失败：'.length) })
   }

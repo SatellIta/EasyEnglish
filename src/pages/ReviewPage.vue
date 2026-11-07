@@ -356,6 +356,7 @@ onBeforeUnmount(() => {
         <p class="review-text" :class="{ sentence: current.type === 'sentence' }">
           {{ current.text }}
         </p>
+        <p v-if="current.phonetic" class="review-phonetic">{{ current.phonetic }}</p>
 
         <div v-if="shadowing || shadowingResult || shadowingError" class="shadowing-box">
           <p v-if="shadowing" class="hint">{{ t('review.shadowListening') }}</p>
@@ -385,9 +386,25 @@ onBeforeUnmount(() => {
 
         <template v-else>
           <div class="reveal">
+            <div v-if="current.images.length" class="reveal-block">
+              <h3>{{ t('review.images') }}</h3>
+              <div class="review-images">
+                <img
+                  v-for="src in current.images"
+                  :key="src"
+                  :src="src"
+                  :alt="t('learn.imageAlt')"
+                  loading="lazy"
+                />
+              </div>
+            </div>
             <div v-if="current.meaning" class="reveal-block">
               <h3>{{ t('review.meaning') }}</h3>
               <p>{{ current.meaning }}</p>
+            </div>
+            <div v-if="current.englishDefinition" class="reveal-block">
+              <h3>{{ t('review.englishDefinition') }}</h3>
+              <p class="english-def">{{ current.englishDefinition }}</p>
             </div>
             <div v-if="current.explanation" class="reveal-block">
               <h3>{{ t('review.explanation') }}</h3>
@@ -598,6 +615,27 @@ onBeforeUnmount(() => {
   font-size: clamp(23px, 4.4vw, 36px);
   line-height: 1.4;
   font-weight: 500;
+}
+.review-phonetic {
+  margin: -16px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+.review-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.review-images img {
+  max-width: min(100%, 280px);
+  max-height: 220px;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  box-shadow: var(--shadow-raised-sm);
+}
+.english-def {
+  overflow-wrap: anywhere;
 }
 .recall-prompt {
   margin: 0;

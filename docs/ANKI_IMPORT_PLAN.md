@@ -1,5 +1,16 @@
 # AnkiDroid 词库导入实现方案
 
+> **实现状态（2026-11-07）**：MVP 已落地。实际实现与本文的差异：
+>
+> - ZIP 读取没有引入 `fflate`，改为 `server/lib/import/zip.ts` 的最小实现（stored/deflate）。
+> - Anki SQLite 用 Node 内置 `node:sqlite` 读取，因为 `better-sqlite3` 无法加载 Anki 的 `unicase` 排序规则。
+> - 图片会提取被词条引用的栅格文件，存到 `data/media/`，通过 `/api/media/:name` 提供；音频和 SVG 跳过。
+> - 导入词条默认 `learned_at = NULL`、`review_enabled = 0`，先进入 `/learn` 学习流程；也可在预览中勾选直接加入每日复习。
+> - 额外实现了 AnkiWeb 官方共享牌组浏览/下载：`server/lib/import/ankiweb.ts` 解码 AnkiWeb 的 protobuf 列表/详情接口，`server/routes/anki-shared.ts` 下载 `.apkg` 并复用导入预览。只接受 `.apkg`，受 AnkiWeb 匿名频率限制。
+> - 近似保留 Anki 复习进度（`scheduling: 'approximate'`）未实现。
+>
+> 当前代码入口：`server/routes/anki-import.ts`、`server/lib/import/*`、`src/components/AnkiImportModal.vue`、`src/pages/LearnPage.vue`。
+
 > 本文是给编码 agent 的实现规范，不是用户文档。实现前请先读 `CLAUDE.md`、`docs/ARCHITECTURE.md` 和现有 `server/routes/entries.ts`、`src/lib/api.ts`、`src/components/BaseModal.vue`。
 >
 > 目标：让 EasyEnglish 能导入 Anki / AnkiDroid 的词库文件，覆盖 AnkiDroid 当前全部导入能力（`.apkg` 牌组包、`.colpkg` 集合包），并额外支持 Anki 桌面端的文本/CSV 导入作为第二阶段。

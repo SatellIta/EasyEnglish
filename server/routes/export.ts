@@ -29,9 +29,11 @@ function escapeCell(value: string): string {
   return value.replace(/\r?\n/g, '<br>').replace(/\|/g, '\\|').trim()
 }
 
-/** 表格只有三列；解释、例句、笔记、标签合并进「补充」列。 */
+/** 表格只有三列；音标、英英释义、解释、例句、笔记、标签合并进「补充」列。 */
 function supplementFor(entry: Entry): string {
   const parts: string[] = []
+  if (entry.phonetic) parts.push(`音标：${entry.phonetic}`)
+  if (entry.englishDefinition) parts.push(`英英释义：${entry.englishDefinition}`)
   if (entry.explanation) parts.push(entry.explanation)
   if (entry.examples.length) parts.push(`例句：${entry.examples.join(' / ')}`)
   if (entry.notes) parts.push(`笔记：${entry.notes}`)

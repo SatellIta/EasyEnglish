@@ -38,7 +38,23 @@ const emit = defineEmits<{
         <SpeakButton :text="entry.text" />
       </div>
 
+      <p v-if="entry.phonetic" class="lib-phonetic">{{ entry.phonetic }}</p>
       <p v-if="entry.meaning" class="lib-meaning">{{ entry.meaning }}</p>
+      <p v-else-if="entry.englishDefinition" class="lib-explain">
+        {{ truncate(entry.englishDefinition, 180) }}
+      </p>
+      <div v-if="entry.images.length" class="lib-images">
+        <img
+          v-for="src in entry.images.slice(0, compact ? 1 : 3)"
+          :key="src"
+          :src="src"
+          :alt="t('learn.imageAlt')"
+          loading="lazy"
+        />
+        <span v-if="entry.images.length > 1" class="tag">
+          {{ t('entryCard.images', { count: entry.images.length }) }}
+        </span>
+      </div>
       <p v-if="entry.explanation && !compact" class="lib-explain">
         {{ truncate(entry.explanation, 180) }}
       </p>
@@ -145,6 +161,30 @@ const emit = defineEmits<{
   margin: 8px 0 0;
   font-size: 14px;
   color: var(--ink-soft);
+}
+.lib-phonetic {
+  margin: 5px 0 0;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.lib-images {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.lib-images img {
+  width: 54px;
+  height: 54px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  box-shadow: var(--shadow-raised-sm);
+}
+.entry-card.compact .lib-images img {
+  width: 42px;
+  height: 42px;
 }
 .lib-explain {
   margin: 6px 0 0;

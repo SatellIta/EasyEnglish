@@ -5,6 +5,7 @@ import { normalizeEntryText } from './text'
 
 export const ENTRY_COLUMNS = `
   e.id, e.type, e.text, e.meaning, e.explanation, e.examples, e.notes, e.tags,
+  e.phonetic, e.english_definition, e.images, e.learned_at,
   e.source, e.review_enabled, e.error_rate, e.error_samples,
   e.source_session_id, e.source_message_id, e.created_at, e.updated_at,
   (

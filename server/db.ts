@@ -12,7 +12,7 @@ db.pragma('synchronous = NORMAL')
 db.pragma('foreign_keys = ON')
 db.pragma('busy_timeout = 5000')
 
-const SCHEMA_VERSION = 5
+const SCHEMA_VERSION = 6
 const schema = readFileSync(new URL('./schema.sql', import.meta.url), 'utf8')
 const migration2 = readFileSync(new URL('./migrations/002_scenes.sql', import.meta.url), 'utf8')
 const migration3 = readFileSync(
@@ -21,6 +21,10 @@ const migration3 = readFileSync(
 )
 const migration4 = readFileSync(new URL('./migrations/004_scene_chat.sql', import.meta.url), 'utf8')
 const migration5 = readFileSync(new URL('./migrations/005_personas.sql', import.meta.url), 'utf8')
+const migration6 = readFileSync(
+  new URL('./migrations/006_rich_entries.sql', import.meta.url),
+  'utf8',
+)
 
 let currentVersion = db.pragma('user_version', { simple: true }) as number
 
@@ -95,7 +99,7 @@ if (currentVersion < 3) {
       updateRate.run(weightSum ? weighted / weightSum : 0, logs.length, entry.id)
     }
 
-    db.pragma(`user_version = ${SCHEMA_VERSION}`)
+    db.pragma(`user_version = 3`)
   })()
 }
 
@@ -114,5 +118,22 @@ if (currentVersion < 5) {
   db.transaction(() => {
     db.exec(migration5)
     db.pragma('user_version = 5')
+  })()
+}
+
+if (currentVersion < 6) {
+  db.transaction(() => {
+    // 全新数据库的 schema.sql 已经包含这些列；旧库才需要 ALTER。
+    const columns = db.pragma('table_info(entries)') as Array<{ name: string }>
+    if (!columns.some((column) => column.name === 'phonetic')) {
+      db.exec(migration6)
+    } else {
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_entries_external ON entries(source, external_id);
+        CREATE INDEX IF NOT EXISTS idx_entries_learned ON entries(learned_at);
+        UPDATE entries SET learned_at = created_at WHERE learned_at IS NULL;
+      `)
+    }
+    db.pragma('user_version = 6')
   })()
 }
