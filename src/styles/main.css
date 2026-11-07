@@ -13,6 +13,11 @@ body,
   min-height: 100%;
 }
 
+/* 内容高度变化时保留滚动条占位，避免折叠/展开让页面宽度抖动。 */
+html {
+  scrollbar-gutter: stable;
+}
+
 body {
   margin: 0;
   background: var(--bg);
@@ -799,6 +804,7 @@ a:focus-visible,
 .modal-body {
   flex: 1;
   overflow-y: auto;
+  scrollbar-gutter: stable;
   padding: 16px 24px;
 }
 
