@@ -5,7 +5,7 @@ import type { Entry, EntryType } from '@shared/types'
 import Icon from '@/components/Icon.vue'
 import SpeakButton from '@/components/SpeakButton.vue'
 import TypeBadge from '@/components/TypeBadge.vue'
-import { entryTypeLabel, t } from '@/i18n'
+import { entryTypeLabel, locale, t } from '@/i18n'
 import { api, errorMessage } from '@/lib/api'
 import { stageLabel } from '@/lib/format'
 import {
@@ -43,6 +43,29 @@ let shadowingToken = 0
 
 const allTypes: EntryType[] = ['word', 'phrase', 'sentence']
 const current = computed(() => queue.value[index.value] ?? null)
+
+/** 英文界面先显示英英释义，中文界面先显示中文释义。 */
+const definitionBlocks = computed(() => {
+  const entry = current.value
+  if (!entry) return []
+  const blocks: Array<{
+    kind: 'meaning' | 'english'
+    title: string
+    text: string
+  }> = []
+  if (entry.meaning) {
+    blocks.push({ kind: 'meaning', title: t('review.meaning'), text: entry.meaning })
+  }
+  if (entry.englishDefinition) {
+    blocks.push({
+      kind: 'english',
+      title: t('review.englishDefinition'),
+      text: entry.englishDefinition,
+    })
+  }
+  if (locale.value === 'en') blocks.reverse()
+  return blocks
+})
 const progress = computed(() =>
   queue.value.length ? Math.round((index.value / queue.value.length) * 100) : 0,
 )
@@ -398,13 +421,13 @@ onBeforeUnmount(() => {
                 />
               </div>
             </div>
-            <div v-if="current.meaning" class="reveal-block">
-              <h3>{{ t('review.meaning') }}</h3>
-              <p>{{ current.meaning }}</p>
-            </div>
-            <div v-if="current.englishDefinition" class="reveal-block">
-              <h3>{{ t('review.englishDefinition') }}</h3>
-              <p class="english-def">{{ current.englishDefinition }}</p>
+            <div
+              v-for="block in definitionBlocks"
+              :key="block.kind"
+              class="reveal-block"
+            >
+              <h3>{{ block.title }}</h3>
+              <p :class="{ 'english-def': block.kind === 'english' }">{{ block.text }}</p>
             </div>
             <div v-if="current.explanation" class="reveal-block">
               <h3>{{ t('review.explanation') }}</h3>

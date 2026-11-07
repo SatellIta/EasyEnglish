@@ -6,7 +6,7 @@ import Icon from '@/components/Icon.vue'
 import TypeBadge from '@/components/TypeBadge.vue'
 import { t } from '@/i18n'
 import { api, errorMessage } from '@/lib/api'
-import { truncate } from '@/lib/format'
+import { definitionPreview, truncate } from '@/lib/format'
 
 const props = defineProps<{ open: boolean; sceneId: number; existingIds: number[] }>()
 const emit = defineEmits<{ close: []; added: [count: number] }>()
@@ -23,6 +23,11 @@ const available = computed(() =>
   entries.value.filter((entry) => !props.existingIds.includes(entry.id)),
 )
 const count = computed(() => selected.value.size)
+
+/** 缩略释义随界面语言选择中文释义或英英释义。 */
+function definitionText(entry: Entry): string {
+  return definitionPreview(entry)?.text ?? ''
+}
 
 async function load() {
   loading.value = true
@@ -111,7 +116,7 @@ watch(q, () => {
               <TypeBadge :type="entry.type" />
               <strong>{{ entry.text }}</strong>
             </span>
-            <small v-if="entry.meaning">{{ entry.meaning }}</small>
+            <small v-if="definitionText(entry)">{{ definitionText(entry) }}</small>
             <small v-else-if="entry.explanation">
               {{ truncate(entry.explanation, 100) }}
             </small>

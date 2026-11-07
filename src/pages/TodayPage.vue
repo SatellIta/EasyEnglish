@@ -9,11 +9,11 @@ import TypeBadge from '@/components/TypeBadge.vue'
 import { errorCategoryLabel, t } from '@/i18n'
 import { api, errorMessage } from '@/lib/api'
 import {
+  definitionPreview,
   formatDateTime,
   formatRelativeTime,
   startOfTodayIso,
   todayLongLabel,
-  truncate,
 } from '@/lib/format'
 import { useAppStore } from '@/stores/app'
 import { useSummaryStore } from '@/stores/summary'
@@ -28,6 +28,11 @@ const summary = ref<DailySummary | null>(null)
 const summaryEntries = ref<DraftEntry[]>([])
 const activeErrors = ref<LearnerError[]>([])
 const loading = ref(true)
+
+/** 今日词句的缩略释义：英文界面优先英英释义。 */
+function previewText(entry: Entry): string {
+  return definitionPreview(entry, 100)?.text ?? ''
+}
 const error = ref('')
 const notice = ref('')
 const noticeKind = ref<'ok' | 'info'>('ok')
@@ -251,7 +256,7 @@ watch(
                 <span class="entry-text">{{ entry.text }}</span>
                 <SpeakButton :text="entry.text" />
               </div>
-              <p v-if="entry.meaning" class="entry-meaning">{{ truncate(entry.meaning, 100) }}</p>
+              <p v-if="previewText(entry)" class="entry-meaning">{{ previewText(entry) }}</p>
             </div>
             <span class="entry-time">{{ formatRelativeTime(entry.createdAt) }}</span>
           </li>
