@@ -271,9 +271,19 @@ function appendText(current: string | null, value: string): string {
  * - 缩进标签续行（英英释义 / 例句 / ...）可以给上一条词条补充字段；`>` 续行补充例句。
  */
 export function parseMarkdownNotes(markdown: string): ParsedMarkdown {
-  const lines = markdown.replace(/\r\n?/g, '\n').split('\n')
-  const items: ParsedImportItem[] = []
   const warnings: string[] = []
+
+  // HTML 注释不参与导入，支持单行、行内和跨行写法。
+  let body = markdown.replace(/<!--[\s\S]*?-->/g, '')
+  if (body.includes('<!--')) {
+    warnings.push(
+      '有一处 HTML 注释没有闭合（缺少 -->），注释之后的内容已忽略。请检查 <!-- 和 --> 是否成对。',
+    )
+    body = body.slice(0, body.indexOf('<!--'))
+  }
+
+  const lines = body.replace(/\r\n?/g, '\n').split('\n')
+  const items: ParsedImportItem[] = []
   const warnedCategories = new Set<string>()
   let warnedMissingScene = false
   let warnedContinuation = false
@@ -357,7 +367,8 @@ export function parseMarkdownNotes(markdown: string): ParsedMarkdown {
         scene,
         section: isScene ? h3.trim() || ENTRY_TYPE_LABELS[type] : null,
         subsection: isScene ? h4.trim() || null : null,
-        reviewEnabled: !isScene,
+        // Markdown 笔记视为已经学习过的内容，导入后可以直接进入复习。
+        reviewEnabled: true,
       }
       items.push(item)
       created.push(item)

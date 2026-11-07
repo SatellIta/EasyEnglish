@@ -32,6 +32,9 @@ const forgot = ref(0)
 const loading = ref(false)
 const error = ref('')
 const retryMinutes = ref(10)
+const markdownPath = ref('')
+const syncing = ref(false)
+const syncNotice = ref('')
 const generatingExamples = ref(false)
 const exampleNotice = ref('')
 const shadowing = ref(false)
@@ -87,6 +90,7 @@ async function start() {
   loading.value = true
   error.value = ''
   phase.value = 'setup'
+  syncNotice.value = ''
   try {
     const result = await api.review.queue(selectedTypes.value, 200)
     queue.value = result.items
@@ -258,6 +262,32 @@ function onKeydown(event: KeyboardEvent) {
   }
 }
 
+async function syncMarkdown() {
+  if (syncing.value) return
+  syncing.value = true
+  error.value = ''
+  syncNotice.value = ''
+  try {
+    const result = await api.imports.syncMarkdown()
+    const changed = result.created + result.linked + result.updated
+    syncNotice.value = changed
+      ? t('review.syncDone', {
+          created: result.created,
+          linked: result.linked,
+          updated: result.updated,
+        })
+      : t('review.syncNoChanges')
+    await store.refreshStats().catch(() => {})
+    if (phase.value !== 'setup') {
+      syncNotice.value = `${syncNotice.value} ${t('review.syncSessionHint')}`
+    }
+  } catch (caught) {
+    error.value = errorMessage(caught)
+  } finally {
+    syncing.value = false
+  }
+}
+
 onMounted(() => {
   window.addEventListener('keydown', onKeydown)
   if (!store.stats) store.refreshStats().catch(() => {})
@@ -265,6 +295,12 @@ onMounted(() => {
     .review()
     .then((config) => {
       retryMinutes.value = config.forgotRetryMinutes
+    })
+    .catch(() => {})
+  api.settings
+    .markdown()
+    .then((settings) => {
+      markdownPath.value = settings.path ?? ''
     })
     .catch(() => {})
 })
@@ -282,9 +318,32 @@ onBeforeUnmount(() => {
         <h1>{{ t('review.title') }}</h1>
         <p>{{ t('review.subtitle') }}</p>
       </div>
+      <div class="head-actions">
+        <RouterLink to="/import" class="btn btn-ghost">
+          <Icon name="download" :size="16" /> {{ t('review.importMarkdown') }}
+        </RouterLink>
+        <button
+          v-if="markdownPath"
+          class="btn btn-ghost"
+          type="button"
+          :disabled="syncing"
+          @click="syncMarkdown"
+        >
+          <Icon name="refresh" :size="16" />
+          {{ syncing ? t('review.syncing') : t('review.syncMarkdown') }}
+        </button>
+        <RouterLink
+          v-else
+          to="/settings?category=markdown"
+          class="btn btn-ghost"
+        >
+          <Icon name="settings" :size="16" /> {{ t('review.configureSync') }}
+        </RouterLink>
+      </div>
     </header>
 
     <p v-if="error" class="banner banner-error">{{ error }}</p>
+    <p v-if="syncNotice" class="banner banner-ok">{{ syncNotice }}</p>
 
     <template v-if="phase === 'setup'">
       <section class="card setup-card">
@@ -769,6 +828,11 @@ onBeforeUnmount(() => {
 }
 .pre-wrap {
   white-space: pre-wrap;
+}
+.head-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 @media (max-width: 620px) {
   .type-filters {

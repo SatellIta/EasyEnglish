@@ -30,6 +30,8 @@ import type {
   LearnerError,
   LearnerErrorStatus,
   LibraryOverview,
+  MarkdownSyncResult,
+  MarkdownSyncSettings,
   Persona,
   PersonaInput,
   ReviewSettings,
@@ -274,6 +276,11 @@ export const api = {
       ),
     removeEntry: (id: number, entryId: number) =>
       request<{ ok: boolean }>(`/scenes/${id}/entries/${entryId}`, { method: 'DELETE' }),
+    setReview: (id: number, enabled: boolean) =>
+      request<{ updated: number }>(`/scenes/${id}/review`, {
+        method: 'POST',
+        body: JSON.stringify({ enabled }),
+      }),
   },
 
   imports: {
@@ -282,11 +289,13 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ markdown, filename }),
       }),
-    commitMarkdown: (items: ImportCommitItem[]) =>
+    commitMarkdown: (items: ImportCommitItem[], updateExisting = false) =>
       request<ImportCommitResult>('/import/markdown/commit', {
         method: 'POST',
-        body: JSON.stringify({ items }),
+        body: JSON.stringify({ items, updateExisting }),
       }),
+    syncMarkdown: () =>
+      request<MarkdownSyncResult>('/import/markdown/sync', { method: 'POST' }),
     previewAnki: (file: File) => {
       const form = new FormData()
       form.append('file', file)
@@ -403,6 +412,12 @@ export const api = {
       request<AiTeachingSettings>('/settings/ai-teaching', {
         method: 'PUT',
         body: JSON.stringify(input),
+      }),
+    markdown: () => request<MarkdownSyncSettings>('/settings/markdown'),
+    updateMarkdown: (path: string | null) =>
+      request<MarkdownSyncSettings>('/settings/markdown', {
+        method: 'PUT',
+        body: JSON.stringify({ path }),
       }),
     aiPersona: () => request<AiPersonaSettings>('/settings/ai-persona'),
     updateAiPersona: (input: AiPersonaSettings) =>

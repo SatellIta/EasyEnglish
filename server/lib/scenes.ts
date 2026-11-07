@@ -76,7 +76,26 @@ export function addEntryToScene(
   entryId: number,
   section: string | null = null,
   subsection: string | null = null,
+  options: { updatePlacement?: boolean } = {},
 ): boolean {
+  const current = db
+    .prepare('SELECT section, subsection FROM scene_entries WHERE scene_id = ? AND entry_id = ?')
+    .get(sceneId, entryId) as { section: string | null; subsection: string | null } | undefined
+
+  if (current) {
+    if (!options.updatePlacement) return false
+    const nextSection = section ?? null
+    const nextSubsection = subsection ?? null
+    if ((current.section ?? null) === nextSection && (current.subsection ?? null) === nextSubsection) {
+      return false
+    }
+    db.prepare(
+      'UPDATE scene_entries SET section = ?, subsection = ? WHERE scene_id = ? AND entry_id = ?',
+    ).run(nextSection, nextSubsection, sceneId, entryId)
+    db.prepare('UPDATE scenes SET updated_at = ? WHERE id = ?').run(nowIso(), sceneId)
+    return true
+  }
+
   const next = db
     .prepare('SELECT COALESCE(MAX(position), -1) + 1 AS next FROM scene_entries WHERE scene_id = ?')
     .get(sceneId) as { next: number }

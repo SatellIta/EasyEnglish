@@ -37,7 +37,7 @@
 | `images` | JSON 字符串数组，存放本地图片地址 `/api/media/...` |
 | `external_id` | Anki GUID，用于重复导入时识别同一条词 |
 | `source` | `manual` / `summary` / `markdown-import` / `anki` 等 |
-| `review_enabled` | 是否进入每日复习；Anki 导入默认 0，学完后打开 |
+| `review_enabled` | 是否进入每日复习；Markdown 导入默认 1，Anki 导入默认 0，学完后打开 |
 | `learned_at` | 通过学习流程的时间；NULL 表示还在「待学习」 |
 | `created_at`, `updated_at` | UTC ISO |
 
@@ -55,7 +55,7 @@
 | | `position` | 导入/添加顺序，用于「导入顺序」排列 |
 | | `added_at` | 加入场景时间 |
 
-一个词条可以出现在多个场景里。场景成员关系不改变复习调度：是否进入每日复习只看 `entries.review_enabled`。导入 `# Scenery` 时默认把场景词条的 `review_enabled` 设为 0，因此不会额外增加每日复习负担；用户可以在词条编辑表单里重新打开复习，或在导入预览中勾选「场景词条也加入每日复习」。
+一个词条可以出现在多个场景里。场景成员关系不改变复习调度：是否进入每日复习只看 `entries.review_enabled`。Markdown 导入的场景词条默认打开该开关；已有词条保留自己的开关。场景详情页提供批量「全部加入复习 / 全部移出复习」，对应 `POST /api/scenes/:id/review`。
 
 ### review_states
 
@@ -131,9 +131,11 @@ FTS5 虚拟表，`tokenize='trigram'`，内容来自 entries，通过 INSERT/UPD
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
 | POST | `/api/import/markdown/preview` | body `{ markdown, filename? }`，解析并标记重复项 |
-| POST | `/api/import/markdown/commit` | body `{ items }`，写入选中词条，按需创建/关联场景 |
+| POST | `/api/import/markdown/commit` | body `{ items, updateExisting? }`，写入选中词条，按需复用/关联场景 |
+| POST | `/api/import/markdown/sync` | 读取设置中的本地 Markdown 文件并同步（等价于 `updateExisting: true`） |
+| GET/PUT | `/api/settings/markdown` | 读取/保存 `{ path }`，路径必须是 `.md` / `.markdown` / `.txt` |
 
-解析器在 `server/lib/markdown-import.ts`，只处理文本，不执行 Markdown 中的任何内容。预览会按规范化英文内容标记数据库中和本批次内的重复项，默认不勾选重复项。提交时会再次跳过词库中已有的相同英文内容，并对本批次去重。
+解析器在 `server/lib/markdown-import.ts`，只处理文本，不执行 Markdown 中的任何内容。HTML 注释会被整体忽略。预览会按规范化英文内容标记数据库中和本批次内的重复项；普通分组的重复项默认不勾选，场景分组的重复项默认勾选。提交逻辑在 `server/lib/markdown-commit.ts`：已存在文本会复用词条并加入场景；`updateExisting` 只更新 Markdown 实际提供的字段（标签取并集），并保留 `review_enabled`、`learned_at`、错误率和来源；裸词不会清空已有释义。
 
 ### Anki 导入
 
@@ -209,7 +211,7 @@ Anki 包解析在 `server/lib/import/`：
 - 新词条：`stage = 0`，`next_review_at = now`，立即进入队列。
 - 记得：`stage += 1`，下次间隔为 `intervals[stage - 1]`；超过阶梯后 `status = mastered`，下次 365 天。
 - 不记得：`stage = 0`，`lapses += 1`，按配置的重试分钟数重新出现，`status = learning`。
-- 只有 `entries.review_enabled = 1` 的词条会进入 `/api/review/queue` 和到期统计。场景导入默认关闭该开关，但保留复习状态；之后打开开关时会从当前状态继续。
+- 只有 `entries.review_enabled = 1` 的词条会进入 `/api/review/queue` 和到期统计。Markdown 导入默认打开该开关；场景详情页可以批量切换。
 
 复习界面只展示英文，用户先主动回忆，再选择「记得 / 不记得」。不使用选择题，避免只记选项差异。修改配置只影响之后的评分，不会重排已有词条的下次复习时间。
 
@@ -236,9 +238,10 @@ Anki 包解析在 `server/lib/import/`：
 - `# Scenery`：推荐 `##` 场景 → `###` 片段 → `####` 单词/短语/句子；旧格式 `##` 场景 → `###` 类型仍然兼容。普通行按当前类型标题；单词片段下允许用 ` / ` 分隔多个单词；列表行在场景中一律按句子。`section` 保存 H3 片段，`subsection` 保存 H4 标题。
 - 表格支持具名列：`English` / `含义` / `英英释义` / `例句` / `补充` / `笔记` / `音标` / `标签`，顺序任意、可省略；旧的 `English | 含义 | 补充` 三列仍可用。
 - 普通行支持 `text = explanation` / `text — 中文`，也支持缩进标签续行（`英英释义：…`、`例句：…`）和 `>` 例句续行，用来给上一条词条补充独立字段。
+- HTML 注释（`<!-- ... -->`）不参与解析，支持行内、单行和跨行；未闭合时给出提示并忽略其后内容。
 - 非场景分类的 H2/H3 进入标签和预览分组；未知 H1 会按内容自动判断并给出预览提示；Scenery 中未识别的 H3 视为片段名，不告警。
-- 所有导入词条的 `source = 'markdown-import'`；普通词条默认进入每日复习，场景词条默认不进入。
-- 导入预览按分组折叠，支持逐条改类型、按组全选、只选新词条；提交时按英文内容去重，并复用同名场景。
+- 所有新建导入词条的 `source = 'markdown-import'`；Markdown 导入默认进入每日复习，已有词条保留原有复习开关和学习状态。
+- 导入预览按分组折叠，支持逐条改类型、按组全选、只选新词条；提交时按英文内容复用已有词条并关联场景，`updateExisting` 可同步字段内容。
 
 用户可选的 Markdown 导出实现在 `server/routes/export.ts`：
 

@@ -22,9 +22,9 @@ It is deliberately small: one Vue SPA, one Hono process, one SQLite file. Your v
 
 - **Four ways to browse the library.** View entries by date, type, tag or scene, with keyword search and sorting by time or dictionary order. Click any entry title to open a full detail view, or jump straight to editing. Bulk delete can remove entries by type, tag, date or scene, with select-all and an exact count before confirmation.
 
-- **Scenes for associative memory.** Group related words and sentences into user-defined scenes such as travel, work or a movie. Scene membership never changes the review schedule, and scene imports can stay out of daily review by default.
+- **Scenes for associative memory.** Group related words and sentences into user-defined scenes such as travel, work or a movie. Scene entries join daily review by default, with a one-click "add all / remove all from review" action for each scene. Scene membership never changes an existing entry's own review setting.
 
-- **Markdown import and export.** Paste or upload structured Markdown using `# words`, `# collocations`, `# sentences` or `# Scenery` sections. Preview every item, change its type, and choose which groups to import. Export the same format later, including meanings, explanations, examples, notes and tags.
+- **Markdown import, export and file sync.** Paste or upload structured Markdown using `# words`, `# collocations`, `# sentences` or `# Scenery` sections, with named table columns for meaning, English definition, examples, phonetics and tags. HTML comments are ignored, so your own notes stay out of the import. You can also save a local Markdown file path in Settings and sync it from the Review page, so new expressions become reviewable immediately.
 
 - **Pronunciation practice.** Read entries aloud with the browser's built-in speech synthesis. On supported browsers, shadowing mode uses speech recognition to compare what you said with the target sentence and gives local feedback.
 

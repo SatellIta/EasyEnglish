@@ -108,7 +108,8 @@ Rules:
 - Plain lines under a type heading use that type; without a type heading the type is detected from the content
 - Under a word heading, regular lines may split multiple words with ` / `
 - List lines starting with `-`, `*` or `1.` are always treated as sentences, even under `#### Words`, and are never split on `/`
-- Scene entries do not enter daily review by default
+- Scene entries join daily review by default; uncheck “Add scene entries to daily review too” in the preview to exclude them
+- If the English text already exists, no new entry is created; the existing entry is linked to the current scene and its review setting is preserved
 
 After import, `###` segments become the first grouping level in the scene view, and `####` types become the second.
 
@@ -148,7 +149,23 @@ Supported column names (Chinese or English):
 
 The old `| English | Meaning | Supplement |` table still works. If no header can be recognized at all, the parser falls back to "first column English, second column meaning, third column explanation" and shows a preview warning.
 
-## 5. Other rules
+## 5. Ignoring content
+
+Wrap notes, drafts or temporary remarks in HTML comments and the parser will skip them entirely:
+
+```md
+<!-- A note to myself; do not import -->
+deposit = 存款
+
+<!--
+A multi-line comment
+is not turned into entries
+-->
+```
+
+Inline comments work too: `deposit <!-- source: podcast --> = 存款`. Only the `<!--` and `-->` pair matters; it does not have to be on its own line. An unclosed comment produces a warning and everything after it is ignored.
+
+## 6. Other rules
 
 - Every non-empty line outside a table is one candidate entry; lines are never merged (indented continuations excepted)
 - H5 and deeper headings are ignored; H4 does not affect grouping outside scenes
@@ -157,9 +174,11 @@ The old `| English | Meaning | Supplement |` table still works. If no header can
 - Import dedupes by the main English text:
   - Case, surrounding whitespace, surrounding quotes and trailing punctuation are ignored
   - Type, meaning, explanation, examples and tags are not part of the key
-  - Existing English text is never imported twice, including inside scenes
+  - Existing English text is not created again; inside a scene, the existing entry is linked to that scene and keeps its review setting
+  - With “Update existing entries”, only fields actually present in the Markdown are changed; missing examples, phonetics or notes are preserved
+  - To sync a Markdown file, set its path in Settings and sync from the Review page
 
-## 6. Export
+## 7. Export
 
 Exported Markdown uses the same structure and can be imported again:
 

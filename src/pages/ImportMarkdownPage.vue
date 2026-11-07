@@ -54,7 +54,8 @@ const error = ref('')
 const preview = ref<ImportPreview | null>(null)
 const selected = ref<Set<string>>(new Set())
 const expanded = ref<Set<string>>(new Set())
-const sceneReview = ref(false)
+const sceneReview = ref(true)
+const updateExisting = ref(false)
 const commitResult = ref<ImportCommitResult | null>(null)
 const helpOpen = ref(false)
 const helpContent = computed(() =>
@@ -244,10 +245,13 @@ async function parse() {
     )
     preview.value = result
     selected.value = new Set(
-      result.items.filter((item) => !item.duplicate).map((item) => item.id),
+      result.items
+        .filter((item) => !item.duplicate || item.scene)
+        .map((item) => item.id),
     )
     expanded.value = new Set()
-    sceneReview.value = false
+    sceneReview.value = true
+    updateExisting.value = false
     await nextTick()
     document.querySelector('.import-stats')?.scrollIntoView({
       behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -282,7 +286,7 @@ async function commit() {
       subsection: item.subsection,
       reviewEnabled: item.reviewEnabled,
     }))
-    commitResult.value = await api.imports.commitMarkdown(items)
+    commitResult.value = await api.imports.commitMarkdown(items, updateExisting.value)
     selected.value = new Set()
     store.refreshStats().catch(() => {})
   } catch (caught) {
@@ -299,7 +303,8 @@ function reset() {
   selected.value = new Set()
   expanded.value = new Set()
   commitResult.value = null
-  sceneReview.value = false
+  sceneReview.value = true
+  updateExisting.value = false
   error.value = ''
 }
 </script>
@@ -423,6 +428,10 @@ function reset() {
           />
           {{ t('import.sceneReview') }}
         </label>
+        <label class="check-row">
+          <input v-model="updateExisting" type="checkbox" />
+          {{ t('import.updateExisting') }}
+        </label>
         <span class="selected-count">
           {{ t('import.selectedSummary', { selected: selectedCount, total: preview.stats.total }) }}
           <span v-if="selectedSceneCount">{{ t('import.selectedScenes', { count: selectedSceneCount }) }}</span>
@@ -521,6 +530,8 @@ function reset() {
           <h3>{{ t('import.doneTitle') }}</h3>
           <p>
             {{ t('import.created', { count: commitResult.created }) }}
+            <span v-if="commitResult.linked">{{ t('import.linked', { count: commitResult.linked }) }}</span>
+            <span v-if="commitResult.updated">{{ t('import.updated', { count: commitResult.updated }) }}</span>
             <span v-if="commitResult.skipped">{{ t('import.skipped', { count: commitResult.skipped }) }}</span>
             <span v-if="commitResult.scenes.length">
               {{ t('import.scenes', { names: commitResult.scenes.join(', ') }) }}

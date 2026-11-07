@@ -25,7 +25,9 @@ const types: EntryType[] = ['word', 'phrase', 'sentence']
       <div class="row wrap item-title">
         <TypeBadge :type="props.item.type" />
         <strong>{{ props.item.text }}</strong>
-        <span v-if="props.item.duplicate" class="tag duplicate-tag">{{ t('import.item.exists') }}</span>
+        <span v-if="props.item.duplicate" class="tag duplicate-tag">
+          {{ props.item.scene ? t('import.item.link') : t('import.item.exists') }}
+        </span>
         <span v-if="showScenePath && props.item.section" class="tag">
           {{ props.item.section }}
         </span>

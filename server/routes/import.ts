@@ -1,11 +1,16 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
-import type { ImportCommitResult, ImportItem, ImportPreview } from '../../shared/types'
+import type {
+  ImportCommitItem,
+  ImportItem,
+  ImportPreview,
+  MarkdownSyncResult,
+} from '../../shared/types'
 import { db } from '../db'
 import { entryKey, loadExistingEntryKeys } from '../lib/dedupe'
-import { insertEntry } from '../lib/entry-store'
+import { commitMarkdownItems } from '../lib/markdown-commit'
 import { parseMarkdownNotes } from '../lib/markdown-import'
-import { addEntryToScene, getOrCreateScene } from '../lib/scenes'
+import { readMarkdownSyncFile } from '../lib/markdown-sync'
 
 const app = new Hono()
 
@@ -32,6 +37,8 @@ const commitItem = z.object({
 
 const commitInput = z.object({
   items: z.array(commitItem).min(1, '没有选中任何词条').max(5000),
+  /** 用 Markdown 内容更新已存在词条；复习开关和学习状态保持不变 */
+  updateExisting: z.boolean().optional(),
 })
 
 app.post('/api/import/markdown/preview', async (c) => {
@@ -70,57 +77,28 @@ app.post('/api/import/markdown/preview', async (c) => {
 })
 
 app.post('/api/import/markdown/commit', async (c) => {
-  const { items } = commitInput.parse(await c.req.json())
-
-  const result: ImportCommitResult = {
-    created: 0,
-    skipped: 0,
-    scenes: [],
-    entryIds: [],
-  }
-  const seen = new Set<string>()
-  const sceneNames = new Set<string>()
-
-  db.transaction(() => {
-    const existing = loadExistingEntryKeys()
-    for (const item of items) {
-      const key = entryKey(item.text)
-      if (existing.has(key) || seen.has(key)) {
-        result.skipped += 1
-        continue
-      }
-      seen.add(key)
-
-      const entry = insertEntry(
-        {
-          type: item.type,
-          text: item.text,
-          meaning: item.meaning ?? null,
-          englishDefinition: item.englishDefinition ?? null,
-          explanation: item.explanation ?? null,
-          examples: item.examples ?? [],
-          notes: item.notes ?? null,
-          tags: item.tags ?? [],
-          phonetic: item.phonetic ?? null,
-        },
-        {
-          source: 'markdown-import',
-          reviewEnabled: item.reviewEnabled ?? (item.scene ? false : true),
-        },
-      )
-      result.created += 1
-      result.entryIds.push(entry.id)
-
-      if (item.scene) {
-        const scene = getOrCreateScene(item.scene)
-        sceneNames.add(scene.name)
-        addEntryToScene(scene.id, entry.id, item.section ?? null, item.subsection ?? null)
-      }
-    }
-  })()
-
-  result.scenes = [...sceneNames].sort((a, b) => a.localeCompare(b, 'zh-CN'))
+  const input = commitInput.parse(await c.req.json())
+  const result = commitMarkdownItems(input.items as ImportCommitItem[], {
+    updateExisting: input.updateExisting,
+  })
   return c.json(result, 201)
+})
+
+/** 读取设置里配置的本地 Markdown 文件并同步；已有词条会被关联/更新。 */
+app.post('/api/import/markdown/sync', async (c) => {
+  try {
+    const file = await readMarkdownSyncFile()
+    const parsed = parseMarkdownNotes(file.markdown)
+    const result: MarkdownSyncResult = {
+      ...commitMarkdownItems(parsed.items, { updateExisting: true }),
+      fileName: file.fileName,
+      warnings: parsed.warnings,
+    }
+    return c.json(result)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    return c.json({ error: message }, 400)
+  }
 })
 
 export default app

@@ -282,9 +282,29 @@ export interface ImportCommitItem {
 
 export interface ImportCommitResult {
   created: number
+  /** 已存在词条被关联到场景的次数 */
+  linked: number
+  /** 已存在词条内容被更新的次数 */
+  updated: number
   skipped: number
   scenes: string[]
   entryIds: number[]
+}
+
+export interface ImportCommitInput {
+  items: ImportCommitItem[]
+  /** 同步时用 Markdown 内容更新已有词条；复习开关和学习状态保持不变 */
+  updateExisting?: boolean
+}
+
+export interface MarkdownSyncSettings {
+  /** 服务端文件路径；null 表示未配置 */
+  path: string | null
+}
+
+export interface MarkdownSyncResult extends ImportCommitResult {
+  fileName: string
+  warnings: string[]
 }
 
 /* ------------------------------------------------------------------ */
