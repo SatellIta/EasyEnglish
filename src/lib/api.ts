@@ -3,6 +3,7 @@ import type {
   AiPersonaSettings,
   AiSettings,
   AiTeachingSettings,
+  AiWordExplanation,
   AnkiImportOptions,
   AnkiImportPreview,
   AnkiImportResult,
@@ -43,6 +44,7 @@ import type {
   SceneSummary,
   SummaryResult,
   TagListResult,
+  WordLookupResult,
 } from '@shared/types'
 import { localizeServerError, t } from '@/i18n'
 
@@ -169,6 +171,13 @@ export const api = {
         })}`,
       ),
     get: (id: number) => request<Entry>(`/entries/${id}`),
+    lookup: (text: string) =>
+      request<WordLookupResult>(`/entries/lookup?text=${encodeURIComponent(text)}`),
+    explain: (text: string) =>
+      request<{ draft: AiWordExplanation }>('/entries/explain', {
+        method: 'POST',
+        body: JSON.stringify({ text }),
+      }),
     create: (input: EntryInput) =>
       request<Entry>('/entries', { method: 'POST', body: JSON.stringify(input) }),
     update: (id: number, input: Partial<EntryInput>) =>

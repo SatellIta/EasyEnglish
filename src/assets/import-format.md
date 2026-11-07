@@ -70,6 +70,18 @@ deposit = 存款
 
 多个例句用 ` / `、`；` 或 `<br>` 分隔；多个标签用逗号、分号或斜杠分隔。
 
+### 标题分组与标签
+
+`# words`、`# collocations`、`# sentences` 下面的 `##` 和 `###` 标题会同时作为预览分组和**标签**保存：
+
+```md
+# sentences
+## Expression
+If only I had known.
+```
+
+上面这条词条会带上标签 `Expression`。三个普通分类都适用；场景（`# Scenery`）里的标题用于场景结构，不会变成标签。
+
 ## 3. Scenery 场景
 
 推荐使用三级结构：场景 → 片段 → 类型。

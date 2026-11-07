@@ -95,6 +95,7 @@ const EXACT_ERRORS: Record<string, MessageKey> = {
   人格名称不能为空: 'api.personaNameRequired',
   人格提示词不能为空: 'api.personaPromptRequired',
   'AI 没有返回可用的例句，请稍后重试。': 'api.examplesEmpty',
+  'AI 没有返回可用的释义，请稍后重试。': 'api.explainEmpty',
   '请选择要导入的 Anki 文件': 'api.ankiNoFile',
   '包内没有找到 Anki 数据库': 'api.ankiNoCollection',
   '导入会话已过期，请重新选择文件': 'api.ankiSessionExpired',
@@ -151,6 +152,9 @@ export function localizeServerError(raw: string): string {
   }
   if (raw.startsWith('生成例句失败：')) {
     return t('api.examplesFailed', { message: raw.slice('生成例句失败：'.length) })
+  }
+  if (raw.startsWith('生成释义失败：')) {
+    return t('api.explainFailed', { message: raw.slice('生成释义失败：'.length) })
   }
 
   const sceneExists = raw.match(/场景「(.+)」已存在/)
