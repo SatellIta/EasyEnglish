@@ -445,7 +445,7 @@ onMounted(bootstrap)
                 :entry="item.entry"
                 :scene-id="activeScene.scene.id"
                 :section="null"
-                :subsection="item.subsection"
+                :subsection="null"
                 :show-scene-refs="false"
                 @open="emit('open', $event)"
                 @edit="emit('edit', $event)"

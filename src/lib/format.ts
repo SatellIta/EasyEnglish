@@ -55,15 +55,16 @@ export function truncate(text: string, max = 120): string {
 
 export interface DefinitionPreview {
   text: string
-  kind: 'meaning' | 'english'
+  kind: 'meaning' | 'english' | 'explanation'
 }
 
 /**
  * 缩略释义按界面语言取默认值：
- * 英文界面优先英英释义，中文界面优先中文释义；缺失时回退到另一种。
+ * 英文界面优先英英释义，中文界面优先中文释义；缺失时回退到另一种，
+ * 最后回退到补充解释（例如 `word = a sentence explaining it` 的写入结果）。
  */
 export function definitionPreview(
-  entry: Pick<Entry, 'meaning' | 'englishDefinition'>,
+  entry: Pick<Entry, 'meaning' | 'englishDefinition' | 'explanation'>,
   max = 180,
 ): DefinitionPreview | null {
   const englishFirst = locale.value === 'en'
@@ -77,6 +78,9 @@ export function definitionPreview(
     if (entry.englishDefinition) {
       return { text: truncate(entry.englishDefinition, max), kind: 'english' }
     }
+  }
+  if (entry.explanation) {
+    return { text: truncate(entry.explanation, max), kind: 'explanation' }
   }
   return null
 }

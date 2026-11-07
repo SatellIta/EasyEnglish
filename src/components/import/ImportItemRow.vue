@@ -34,9 +34,20 @@ const types: EntryType[] = ['word', 'phrase', 'sentence']
         </span>
       </div>
       <p v-if="props.item.meaning" class="item-meaning">{{ props.item.meaning }}</p>
+      <p v-if="props.item.phonetic" class="item-phonetic">{{ props.item.phonetic }}</p>
+      <p v-if="props.item.englishDefinition" class="item-definition">
+        <span class="item-label">{{ t('import.item.definition') }}</span>
+        {{ props.item.englishDefinition }}
+      </p>
       <p v-if="props.item.explanation" class="item-explain">
         {{ props.item.explanation }}
       </p>
+      <div v-if="props.item.examples.length" class="item-examples">
+        <span class="item-label">{{ t('import.item.examples') }}</span>
+        <ul>
+          <li v-for="example in props.item.examples" :key="example">{{ example }}</li>
+        </ul>
+      </div>
       <p v-if="props.item.notes" class="item-notes">{{ t('import.item.notes', { notes: props.item.notes }) }}</p>
     </div>
     <select v-model="props.item.type" class="select item-type" :aria-label="t('import.item.type')">
@@ -105,6 +116,31 @@ const types: EntryType[] = ['word', 'phrase', 'sentence']
   color: var(--muted);
   line-height: 1.55;
   overflow-wrap: anywhere;
+}
+.item-phonetic {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--muted);
+  font-style: italic;
+}
+.item-definition,
+.item-examples {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--muted);
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+.item-label {
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+.item-examples ul {
+  margin: 2px 0 0;
+  padding-left: 17px;
+}
+.item-examples li {
+  margin: 0;
 }
 .duplicate-tag {
   color: var(--warning);

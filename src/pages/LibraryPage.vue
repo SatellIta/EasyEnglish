@@ -135,13 +135,13 @@ onMounted(() => {
       </div>
       <div class="head-actions">
         <button class="btn btn-ghost" @click="ankiOpen = true">
-          <Icon name="upload" :size="16" /> {{ t('library.importAnki') }}
+          <Icon name="download" :size="16" /> {{ t('library.importAnki') }}
         </button>
         <RouterLink to="/import" class="btn btn-ghost">
-          <Icon name="upload" :size="16" /> {{ t('library.import') }}
+          <Icon name="download" :size="16" /> {{ t('library.import') }}
         </RouterLink>
         <button class="btn btn-ghost" @click="exportOpen = true">
-          <Icon name="download" :size="16" /> {{ t('export.title') }}
+          <Icon name="upload" :size="16" /> {{ t('export.title') }}
         </button>
         <button class="btn btn-ghost" @click="bulkOpen = true">
           <Icon name="trash" :size="16" /> {{ t('library.bulkDelete.open') }}

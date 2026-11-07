@@ -265,6 +265,8 @@ export const zh = {
   'scene.picker.add': '添加 {count} 条',
   'import.item.select': '选择 {text}',
   'import.item.exists': '已存在',
+  'import.item.definition': '英英释义：',
+  'import.item.examples': '例句：',
   'import.item.notes': '笔记：{notes}',
   'import.item.type': '词条类型',
   'entryCard.notReview': '不进入复习',
@@ -416,7 +418,7 @@ export const zh = {
   'export.scenes': '场景',
   'export.noScenes': '还没有场景。',
   'export.formatHint':
-    '导出格式：常规词条使用 # words / # collocations / # sentences；场景使用 # Scenery → ## 场景名 → ### 单词/短语/句子。表格的「补充」列会合并解释、例句、笔记和标签。',
+    '导出格式：常规词条使用 # words / # collocations / # sentences；场景使用 # Scenery → ## 场景名 → ### 片段 → #### 单词/短语/句子。表格使用具名列，含义、英英释义、例句、补充、笔记、音标和标签分别输出。',
   'export.cancel': '取消',
   'export.exporting': '导出中…',
   'export.submit': '导出 Markdown（{count} 条）',
@@ -566,7 +568,7 @@ export const zh = {
   'import.title': '导入 Markdown',
   'import.helpTitle': 'Markdown 格式说明',
   'import.subtitle':
-    '识别 # words / # collocations / # sentences / # Scenery。# Scenery 下 H2 是场景，H3 是单词/短语/句子分类；表格只取前三列。',
+    '识别 # words / # collocations / # sentences / # Scenery。# Scenery 下 H2 是场景，H3 是片段，H4 是单词/短语/句子分类；表格支持具名列，也兼容旧三列。',
   'import.step1': '1. 选择或粘贴笔记',
   'import.step1Hint': '支持 .md / .markdown / 纯文本，单次最大 2 MB。',
   'import.chooseFile': '选择文件',
@@ -1113,6 +1115,8 @@ export const en: Record<MessageKey, string> = {
   'scene.picker.add': 'Add {count}',
   'import.item.select': 'Select {text}',
   'import.item.exists': 'Already exists',
+  'import.item.definition': 'Definition:',
+  'import.item.examples': 'Examples:',
   'import.item.notes': 'Notes: {notes}',
   'import.item.type': 'Entry type',
   'entryCard.notReview': 'Not in review',
@@ -1271,7 +1275,7 @@ export const en: Record<MessageKey, string> = {
   'export.scenes': 'Scenes',
   'export.noScenes': 'No scenes yet.',
   'export.formatHint':
-    'Export format: regular entries use # words / # collocations / # sentences; scenes use # Scenery → ## scene name → ### word/phrase/sentence. The Supplement column merges explanation, examples, notes and tags.',
+    'Export format: regular entries use # words / # collocations / # sentences; scenes use # Scenery → ## scene name → ### segment → #### Word/Phrase/Sentence. Tables use named columns, with meaning, English definition, examples, explanation, notes, phonetic and tags kept separate.',
   'export.cancel': 'Cancel',
   'export.exporting': 'Exporting…',
   'export.submit': 'Export Markdown ({count})',
@@ -1430,7 +1434,7 @@ export const en: Record<MessageKey, string> = {
   'import.title': 'Import Markdown',
   'import.helpTitle': 'Markdown format help',
   'import.subtitle':
-    'Recognizes # words / # collocations / # sentences / # Scenery. H2 under # Scenery is a scene, H3 is the word/phrase/sentence group; tables use only the first three columns.',
+    'Recognizes # words / # collocations / # sentences / # Scenery. H2 is a scene, H3 a segment, H4 the word/phrase/sentence group; tables support named columns and the legacy three-column layout.',
   'import.step1': '1. Choose or paste notes',
   'import.step1Hint': 'Supports .md / .markdown / plain text, up to 2 MB.',
   'import.chooseFile': 'Choose file',

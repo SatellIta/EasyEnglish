@@ -225,10 +225,14 @@ export interface ImportItem {
   type: EntryType
   text: string
   meaning: string | null
+  /** 英英释义，来自表格的「英英释义」列或续行 */
+  englishDefinition: string | null
   explanation: string | null
   examples: string[]
   notes: string | null
   tags: string[]
+  /** 音标，来自表格的「音标」列或续行 */
+  phonetic: string | null
   /** 一级标题，例如 words / collocations / sentences / Scenery */
   category: string
   /** 二三级标题路径，用于普通词条分组 */
@@ -264,10 +268,12 @@ export interface ImportCommitItem {
   type: EntryType
   text: string
   meaning?: string | null
+  englishDefinition?: string | null
   explanation?: string | null
   examples?: string[]
   notes?: string | null
   tags?: string[]
+  phonetic?: string | null
   scene?: string | null
   section?: string | null
   subsection?: string | null

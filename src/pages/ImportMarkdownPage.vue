@@ -9,7 +9,6 @@ import type {
 } from '@shared/types'
 import importFormatHelp from '@/assets/import-format.md?raw'
 import importFormatHelpEn from '@/assets/import-format.en.md?raw'
-import AnkiImportModal from '@/components/AnkiImportModal.vue'
 import BaseModal from '@/components/BaseModal.vue'
 import Icon from '@/components/Icon.vue'
 import ImportItemRow from '@/components/import/ImportItemRow.vue'
@@ -58,7 +57,6 @@ const expanded = ref<Set<string>>(new Set())
 const sceneReview = ref(false)
 const commitResult = ref<ImportCommitResult | null>(null)
 const helpOpen = ref(false)
-const ankiOpen = ref(false)
 const helpContent = computed(() =>
   locale.value === 'en' ? importFormatHelpEn : importFormatHelp,
 )
@@ -273,10 +271,12 @@ async function commit() {
       type: item.type,
       text: item.text,
       meaning: item.meaning,
+      englishDefinition: item.englishDefinition,
       explanation: item.explanation,
       examples: item.examples,
       notes: item.notes,
       tags: item.tags,
+      phonetic: item.phonetic,
       scene: item.scene,
       section: item.section,
       subsection: item.subsection,
@@ -317,9 +317,6 @@ function reset() {
         </p>
       </div>
       <div class="import-actions">
-        <button class="btn btn-ghost" type="button" @click="ankiOpen = true">
-          <Icon name="upload" :size="16" /> {{ t('library.importAnki') }}
-        </button>
         <button
           class="icon-btn"
           type="button"
@@ -567,8 +564,6 @@ function reset() {
         </button>
       </template>
     </BaseModal>
-
-    <AnkiImportModal :open="ankiOpen" @close="ankiOpen = false" />
   </div>
 </template>
 
