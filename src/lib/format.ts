@@ -1,3 +1,4 @@
+import type { Entry } from '@shared/types'
 import { locale, t } from '@/i18n'
 
 function intlLocale(): string {
@@ -50,4 +51,32 @@ export function stageLabel(stage: number): string {
 
 export function truncate(text: string, max = 120): string {
   return text.length > max ? `${text.slice(0, max)}…` : text
+}
+
+export interface DefinitionPreview {
+  text: string
+  kind: 'meaning' | 'english'
+}
+
+/**
+ * 缩略释义按界面语言取默认值：
+ * 英文界面优先英英释义，中文界面优先中文释义；缺失时回退到另一种。
+ */
+export function definitionPreview(
+  entry: Pick<Entry, 'meaning' | 'englishDefinition'>,
+  max = 180,
+): DefinitionPreview | null {
+  const englishFirst = locale.value === 'en'
+  if (englishFirst) {
+    if (entry.englishDefinition) {
+      return { text: truncate(entry.englishDefinition, max), kind: 'english' }
+    }
+    if (entry.meaning) return { text: entry.meaning, kind: 'meaning' }
+  } else {
+    if (entry.meaning) return { text: entry.meaning, kind: 'meaning' }
+    if (entry.englishDefinition) {
+      return { text: truncate(entry.englishDefinition, max), kind: 'english' }
+    }
+  }
+  return null
 }

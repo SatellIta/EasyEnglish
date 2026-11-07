@@ -1,10 +1,11 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { Entry } from '@shared/types'
 import Icon from '@/components/Icon.vue'
 import SpeakButton from '@/components/SpeakButton.vue'
 import TypeBadge from '@/components/TypeBadge.vue'
 import { t } from '@/i18n'
-import { formatDue, stageLabel, truncate } from '@/lib/format'
+import { definitionPreview, formatDue, stageLabel, truncate } from '@/lib/format'
 
 const props = defineProps<{
   entry: Entry
@@ -21,6 +22,11 @@ const emit = defineEmits<{
   remove: [entry: Entry]
   removeScene: [entry: Entry]
 }>()
+
+/** 缩略释义：英文界面优先英英释义，中文界面优先中文释义。 */
+const preview = computed(() =>
+  definitionPreview(props.entry),
+)
 </script>
 
 <template>
@@ -49,9 +55,8 @@ const emit = defineEmits<{
       </div>
 
       <p v-if="entry.phonetic" class="lib-phonetic">{{ entry.phonetic }}</p>
-      <p v-if="entry.meaning" class="lib-meaning">{{ entry.meaning }}</p>
-      <p v-else-if="entry.englishDefinition" class="lib-explain">
-        {{ truncate(entry.englishDefinition, 180) }}
+      <p v-if="preview" class="lib-meaning" :class="{ english: preview.kind === 'english' }">
+        {{ preview.text }}
       </p>
       <div v-if="entry.images.length" class="lib-images">
         <img
@@ -185,6 +190,11 @@ const emit = defineEmits<{
   margin: 8px 0 0;
   font-size: 14px;
   color: var(--ink-soft);
+}
+.lib-meaning.english {
+  font-size: 13.5px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
 }
 .lib-phonetic {
   margin: 5px 0 0;
