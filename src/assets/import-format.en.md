@@ -70,6 +70,18 @@ Each `>` line becomes a separate example. In `A = B`, `B` is always the explanat
 
 Separate multiple examples with ` / `, `；` or `<br>`; separate tags with commas, semicolons or slashes.
 
+### Headings as groups and tags
+
+Under `# words`, `# collocations` and `# sentences`, every `##` and `###` heading is used both as a preview group and as a **tag**:
+
+```md
+# sentences
+## Expression
+If only I had known.
+```
+
+The entry above gets the tag `Expression`. This works in all three regular categories. Inside `# Scenery`, headings describe the scene structure and never become tags.
+
 ## 3. Scenery scenes
 
 The recommended structure is scene → segment → type:

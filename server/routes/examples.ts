@@ -1,10 +1,13 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
+import type { AiWordExplanation } from '../../shared/types'
 import { completeChat } from '../ai/client'
 import { getAiConfig, isConfigured } from '../ai/config'
 import {
   buildExampleSystemPrompt,
   buildExampleUserPrompt,
+  buildWordExplainSystemPrompt,
+  buildWordExplainUserPrompt,
 } from '../ai/prompts'
 import { db } from '../db'
 import { getAiTeachingSettings } from '../lib/ai-teaching'
@@ -53,6 +56,117 @@ function parseExamples(raw: string): Array<{ en: string; zh: string }> {
 function exampleLead(text: string): string {
   return text.split(/\s+[—–-]\s+/)[0] ?? text
 }
+
+const wordExplainSchema = z.object({
+  meaning: z.string().trim().max(4000).default(''),
+  englishDefinition: z.string().trim().max(8000).default(''),
+  explanation: z.string().trim().max(8000).default(''),
+  phonetic: z.string().trim().max(200).default(''),
+  examples: z
+    .array(
+      z.object({
+        en: z.string().trim().min(1).max(1000),
+        zh: z.string().trim().max(1000).default(''),
+      }),
+    )
+    .max(6)
+    .default([]),
+})
+
+/** 从模型输出中提取并清洗单词草稿；格式不合格时返回 null。 */
+function parseWordExplanation(
+  raw: string,
+  mode: 'bilingual' | 'english',
+): AiWordExplanation | null {
+  let text = raw.trim()
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i)
+  if (fenced) text = fenced[1].trim()
+
+  const start = text.indexOf('{')
+  const end = text.lastIndexOf('}')
+  if (start < 0 || end <= start) return null
+
+  try {
+    const parsed = wordExplainSchema.parse(JSON.parse(text.slice(start, end + 1)))
+    const examples = parsed.examples
+      .map((item) => (mode === 'english' || !item.zh ? item.en : `${item.en} — ${item.zh}`))
+      .filter(Boolean)
+      .slice(0, 3)
+
+    const draft: AiWordExplanation = {
+      text: '',
+      meaning: parsed.meaning || null,
+      englishDefinition: parsed.englishDefinition || null,
+      explanation: parsed.explanation || null,
+      examples,
+      phonetic: parsed.phonetic || null,
+    }
+    if (!draft.meaning && !draft.englishDefinition && !draft.explanation && !examples.length) {
+      return null
+    }
+    return draft
+  } catch {
+    return null
+  }
+}
+
+const explainInput = z.object({
+  text: z.string().trim().min(1, '内容不能为空').max(200),
+})
+
+/** 词条详情里点击一个词库中不存在的单词时，让 AI 生成一份草稿。 */
+app.post('/api/entries/explain', async (c) => {
+  const { text } = explainInput.parse(await c.req.json())
+
+  if (!isConfigured(getAiConfig())) {
+    return c.json({ error: 'AI 尚未配置，请先到「设置」页填写 Base URL、模型和 API Key。' }, 400)
+  }
+
+  const existingRow = db
+    .prepare('SELECT id FROM entries WHERE normalized_text = ? LIMIT 1')
+    .get(normalizeEntryText(text)) as { id: number } | undefined
+  if (existingRow) {
+    const existing = getEntryById(existingRow.id)
+    return c.json(
+      {
+        error: `词库中已存在相同的英文内容「${existing?.text ?? text}」。`,
+        existingEntryId: existingRow.id,
+      },
+      409,
+    )
+  }
+
+  const teaching = getAiTeachingSettings()
+  try {
+    const raw = await completeChat(
+      [
+        {
+          role: 'system',
+          content: buildWordExplainSystemPrompt(teaching.explanationMode),
+        },
+        {
+          role: 'user',
+          content: buildWordExplainUserPrompt({
+            text,
+            explanationMode: teaching.explanationMode,
+          }),
+        },
+      ],
+      { temperature: 0.4, maxTokens: 900 },
+    )
+
+    const draft = parseWordExplanation(raw, teaching.explanationMode)
+    if (!draft) {
+      return c.json({ error: 'AI 没有返回可用的释义，请稍后重试。' }, 502)
+    }
+
+    return c.json({ draft: { ...draft, text } })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    return c.json({ error: `生成释义失败：${message}` }, 502)
+  }
+})
+
 
 app.post('/api/entries/:id/examples', async (c) => {
   const id = Number(c.req.param('id'))

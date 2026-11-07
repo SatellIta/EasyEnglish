@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Entry } from '@shared/types'
+import ClickableText from '@/components/ClickableText.vue'
 import { t } from '@/i18n'
 
 withDefaults(
@@ -8,9 +9,23 @@ withDefaults(
     showPhonetic?: boolean
     showImages?: boolean
     showTags?: boolean
+    /** 详细预览里允许点击单词 */
+    interactive?: boolean
+    selectedWord?: string | null
   }>(),
-  { showPhonetic: true, showImages: true, showTags: true },
+  {
+    showPhonetic: true,
+    showImages: true,
+    showTags: true,
+    interactive: false,
+    selectedWord: null,
+  },
 )
+
+const emit = defineEmits<{
+  selectWord: [word: string]
+  openWord: [word: string]
+}>()
 </script>
 
 <template>
@@ -34,12 +49,28 @@ withDefaults(
 
     <div v-if="entry.englishDefinition" class="detail-block">
       <h3>{{ t('learn.englishDefinition') }}</h3>
-      <p class="english-def">{{ entry.englishDefinition }}</p>
+      <p v-if="!interactive" class="english-def">{{ entry.englishDefinition }}</p>
+      <p v-else class="english-def">
+        <ClickableText
+          :text="entry.englishDefinition"
+          :selected="selectedWord"
+          @select="emit('selectWord', $event)"
+          @open="emit('openWord', $event)"
+        />
+      </p>
     </div>
 
     <div v-if="entry.explanation" class="detail-block">
       <h3>{{ t('learn.explanation') }}</h3>
-      <p class="pre-wrap">{{ entry.explanation }}</p>
+      <p v-if="!interactive" class="pre-wrap">{{ entry.explanation }}</p>
+      <p v-else class="pre-wrap">
+        <ClickableText
+          :text="entry.explanation"
+          :selected="selectedWord"
+          @select="emit('selectWord', $event)"
+          @open="emit('openWord', $event)"
+        />
+      </p>
     </div>
 
     <div v-if="entry.examples.length" class="detail-block">
@@ -48,7 +79,16 @@ withDefaults(
         <slot name="examples-action" />
       </div>
       <ul>
-        <li v-for="(example, index) in entry.examples" :key="index">{{ example }}</li>
+        <li v-for="(example, index) in entry.examples" :key="index">
+          <ClickableText
+            v-if="interactive"
+            :text="example"
+            :selected="selectedWord"
+            @select="emit('selectWord', $event)"
+            @open="emit('openWord', $event)"
+          />
+          <template v-else>{{ example }}</template>
+        </li>
       </ul>
     </div>
 

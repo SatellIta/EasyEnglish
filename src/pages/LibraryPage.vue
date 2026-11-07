@@ -228,6 +228,7 @@ onMounted(() => {
       :entry="detail"
       @close="detail = null"
       @edit="editFromDetail"
+      @created="refresh"
     />
 
     <ExportModal :open="exportOpen" @close="exportOpen = false" />

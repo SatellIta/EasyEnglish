@@ -59,7 +59,7 @@ If only ... — 要是...就好了
 - 右侧含中文 → `meaning`
 - 右侧不含中文 → `explanation`
 
-非场景分类的 H2/H3 会进入预览分组，并作为标签保存。
+非场景分类的 H2/H3 会进入预览分组，并作为标签保存。`# words`、`# collocations`、`# sentences` 三个分类都适用；例如 `# sentences` 下的 `## Expression` 会成为标签 `Expression`。场景（`# Scenery`）里的标题只用于场景结构，不会变成标签。
 
 ### 续行
 

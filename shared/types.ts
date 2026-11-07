@@ -139,6 +139,22 @@ export interface EntryInput {
   sourceMessageId?: number | null
 }
 
+/** 详情页点击单词后的查询结果；`entry` 为 null 表示词库里还没有这个词。 */
+export interface WordLookupResult {
+  text: string
+  entry: Entry | null
+}
+
+/** AI 生成的单词草稿，用户确认后才写入词库。 */
+export interface AiWordExplanation {
+  text: string
+  meaning: string | null
+  englishDefinition: string | null
+  explanation: string | null
+  examples: string[]
+  phonetic: string | null
+}
+
 export interface Scene {
   id: number
   name: string

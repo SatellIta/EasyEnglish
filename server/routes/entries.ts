@@ -294,6 +294,25 @@ app.post('/api/entries/bulk', async (c) => {
   return c.json(result, 201)
 })
 
+/**
+ * 详情页点击单词时按规范化英文内容查词。
+ * 必须注册在 `/api/entries/:id` 之前，避免把 "lookup" 当成 ID。
+ */
+app.get('/api/entries/lookup', (c) => {
+  const text = (c.req.query('text') ?? '').trim()
+  if (!text) return c.json({ error: '内容不能为空' }, 400)
+  const key = normalizeEntryText(text)
+  const row = key
+    ? (db
+        .prepare('SELECT id FROM entries WHERE normalized_text = ? LIMIT 1')
+        .get(key) as { id: number } | undefined)
+    : undefined
+  return c.json({
+    text,
+    entry: row ? getEntryById(row.id) : null,
+  })
+})
+
 app.get('/api/entries/:id', (c) => {
   const id = Number(c.req.param('id'))
   if (!Number.isInteger(id) || id <= 0) return c.json({ error: '无效的词条 ID' }, 400)

@@ -106,6 +106,8 @@ FTS5 虚拟表，`tokenize='trigram'`，内容来自 entries，通过 INSERT/UPD
 | POST | `/api/entries/bulk-delete/preview` | body `{ ids }` 或 `{ filter }`；返回匹配条数，不删除 |
 | POST | `/api/entries/bulk-delete` | 同预览条件；删除词条并级联清理复习状态/日志/场景关联 |
 | GET | `/api/entries/:id` | 详情 |
+| GET | `/api/entries/lookup?text=` | 按规范化英文内容精确查词；返回 `{ text, entry }`，未命中时 `entry` 为 `null`（详情页点词使用） |
+| POST | `/api/entries/explain` | body `{ text }`；让 AI 为一个尚未入库的单词生成释义草稿（不写入词库） |
 | PATCH | `/api/entries/:id` | 部分更新；改成已存在的英文内容时返回 409 |
 | DELETE | `/api/entries/:id` | 删除（级联复习状态/日志） |
 
@@ -311,6 +313,8 @@ Anki 包解析在 `server/lib/import/`：
 主题与模式由 `src/stores/theme.ts` 管理（`theme` / `colorMode`，`setTheme` / `setColorMode`），分别持久化在 `localStorage` 的 `easyenglish.theme` 和 `easyenglish.colorMode`；`index.html` 的内联脚本在首屏绘制前恢复两者，避免闪烁。结构样式在 `src/styles/main.css`，两套主题的浅色与 `[data-mode="dark"]` 深色变量都在 `src/styles/themes/`。设置页「外观」分类负责切换视觉主题与深浅色，侧栏底部按钮只切换深浅色。深色覆盖依赖 token；在 `main.css` 中新增颜色时应使用变量，避免写死浅色值。
 
 词库有四个视图：按日期、按类型、按标签、按场景。标签视图用 `/api/tags` 展示 Anki 标签分组，进入分组后可按最新 / 最早 / 字典升降序排列；点击词条标题会打开 `EntryDetailModal`，直接展示完整的中文释义、英英释义、音标、例句、图片和标签，并可跳转编辑。
+
+详情弹窗里的短语、句子、英英释义、补充说明和例句使用 `ClickableText`：第一次点击单词会框选高亮，再点同一个词会按规范化英文内容查词。已存在的词条直接在当前弹窗中打开；不存在的词会显示空状态，提供「问 AI」（`POST /api/entries/explain` 生成草稿）和「加入词库」按钮，并提示可以导入 Anki 词库补充资料。
 
 ## 扩展点
 

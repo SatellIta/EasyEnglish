@@ -521,3 +521,62 @@ ${existing}
 
 ${explanationMode === 'english' ? '输出语言：English only。不要输出中文；已有例句和错误描述中的中文只供理解。\n\n' : ''}请生成 2-3 个新的个性化例句，并按要求输出 JSON。`
 }
+
+const WORD_EXPLAIN_SYSTEM_BILINGUAL = `你是中英双语词典编辑，为一个英语学习者解释一个单词。
+
+只输出一个 JSON 对象，不要使用 Markdown 代码块，不要输出任何额外解释。结构必须严格为：
+{
+  "meaning": "简洁的中文释义，多个义项用；分隔",
+  "englishDefinition": "一句简单、准确的英文释义",
+  "explanation": "中文补充说明：常见搭配、易混点或使用场景，可以为空",
+  "phonetic": "IPA 音标，例如 /dɪˈpɒzɪt/，不确定时可以留空",
+  "examples": [
+    { "en": "自然、地道的英文例句", "zh": "中文翻译" }
+  ]
+}
+
+要求：
+- examples 生成 2-3 句，覆盖不同语境，难度适中。
+- 如果这个词是变形形式（复数、过去式、-ing 等），在 explanation 里说明原形。
+- 不要编造不存在的词义或搭配；不确定的字段留空字符串。
+- 不要输出标题、Markdown 或 JSON 以外的内容。`
+
+const WORD_EXPLAIN_SYSTEM_ENGLISH = `You are an English dictionary editor explaining one English word to a learner. This is English-only mode.
+
+Output only one JSON object, with no Markdown code fence and no extra text. The shape must be exactly:
+{
+  "meaning": "a short English gloss",
+  "englishDefinition": "one simple, accurate English definition",
+  "explanation": "English usage notes: collocations, confusions or contexts; may be empty",
+  "phonetic": "IPA, for example /dɪˈpɒzɪt/; may be empty",
+  "examples": [
+    { "en": "a natural English example sentence", "zh": "" }
+  ]
+}
+
+Requirements:
+- Generate 2-3 examples with different contexts and moderate length.
+- All output must be English; do not output Chinese characters, pinyin or Chinese translations.
+- If the word is an inflected form (plural, past tense, -ing), mention its base form in explanation.
+- Never invent meanings or collocations; leave uncertain fields as empty strings.
+- Do not output titles, Markdown or anything outside the JSON object.`
+
+export function buildWordExplainSystemPrompt(mode: ExplanationMode): string {
+  return mode === 'english'
+    ? WORD_EXPLAIN_SYSTEM_ENGLISH
+    : WORD_EXPLAIN_SYSTEM_BILINGUAL
+}
+
+export function buildWordExplainUserPrompt(input: {
+  text: string
+  explanationMode?: ExplanationMode
+}): string {
+  const { text, explanationMode = 'bilingual' } = input
+  return `Word: ${text}
+
+${
+  explanationMode === 'english'
+    ? 'Explain this word in English only, following the JSON shape.'
+    : '请按约定的 JSON 结构解释这个词。'
+}`
+}
