@@ -7,19 +7,23 @@ import type {
   AnkiImportResult,
   AnkiNotetypeSummary,
   AnkiWarning,
+  SharedDeckSummary,
 } from '@shared/types'
 import BaseModal from '@/components/BaseModal.vue'
 import Icon from '@/components/Icon.vue'
-import { t } from '@/i18n'
+import { locale, t } from '@/i18n'
 import { api, errorMessage } from '@/lib/api'
 
 type Step = 'select' | 'preview' | 'importing' | 'done'
+type SourceTab = 'file' | 'browse'
 type ListKey = 'examples' | 'explanation' | 'notes' | 'tagFields'
 
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{ close: []; imported: [] }>()
 
 const step = ref<Step>('select')
+const sourceTab = ref<SourceTab>('file')
+const previewSource = ref<SourceTab>('file')
 const fileInput = ref<HTMLInputElement | null>(null)
 const dragging = ref(false)
 const file = ref<File | null>(null)
@@ -31,6 +35,22 @@ const importId = ref('')
 const activeId = ref<number | null>(null)
 const selectedNotetypes = ref<Set<number>>(new Set())
 const mappings = ref<Record<string, AnkiFieldMapping>>({})
+
+const sharedSearch = ref('english')
+const sharedSort = ref<'rating' | 'updated'>('rating')
+const sharedPage = ref(1)
+const sharedPageSize = 20
+const sharedItems = ref<SharedDeckSummary[]>([])
+const sharedTotal = ref(0)
+const sharedHasMore = ref(false)
+const sharedLoading = ref(false)
+const sharedError = ref('')
+const sharedDownloadingId = ref<number | null>(null)
+let sharedRequestToken = 0
+
+const sharedTotalPages = computed(() =>
+  Math.max(1, Math.ceil(sharedTotal.value / sharedPageSize)),
+)
 
 const options = ref<AnkiImportOptions>({
   useAnkiTags: true,
@@ -83,7 +103,10 @@ watch(
 )
 
 function reset() {
+  sharedRequestToken += 1
   step.value = 'select'
+  sourceTab.value = 'file'
+  previewSource.value = 'file'
   file.value = null
   preview.value = null
   result.value = null
@@ -93,6 +116,15 @@ function reset() {
   activeId.value = null
   selectedNotetypes.value = new Set()
   mappings.value = {}
+  sharedSearch.value = 'english'
+  sharedSort.value = 'rating'
+  sharedPage.value = 1
+  sharedItems.value = []
+  sharedTotal.value = 0
+  sharedHasMore.value = false
+  sharedLoading.value = false
+  sharedError.value = ''
+  sharedDownloadingId.value = null
   if (fileInput.value) fileInput.value.value = ''
 }
 
@@ -124,6 +156,7 @@ async function previewFile(nextFile: File) {
     return
   }
   file.value = nextFile
+  previewSource.value = 'file'
   loading.value = true
   error.value = ''
   try {
@@ -204,7 +237,7 @@ async function cancelSession() {
 }
 
 async function close() {
-  if (step.value === 'importing') return
+  if (step.value === 'importing' || sharedDownloadingId.value !== null) return
   if (step.value === 'preview') await cancelSession()
   reset()
   emit('close')
@@ -212,7 +245,92 @@ async function close() {
 
 async function backToSelect() {
   await cancelSession()
+  if (previewSource.value === 'browse') {
+    step.value = 'select'
+    sourceTab.value = 'browse'
+    preview.value = null
+    result.value = null
+    importId.value = ''
+    error.value = ''
+    loading.value = false
+    return
+  }
   reset()
+}
+
+function openBrowse() {
+  sourceTab.value = 'browse'
+  if (!sharedItems.value.length && !sharedLoading.value) loadShared(true)
+}
+
+async function loadShared(resetPage = false) {
+  if (resetPage) sharedPage.value = 1
+  const token = ++sharedRequestToken
+  sharedLoading.value = true
+  sharedError.value = ''
+  try {
+    const data = await api.ankiShared.list({
+      search: sharedSearch.value.trim() || 'english',
+      sort: sharedSort.value,
+      page: sharedPage.value,
+      pageSize: sharedPageSize,
+    })
+    if (token !== sharedRequestToken) return
+    sharedItems.value = data.items
+    sharedTotal.value = data.total
+    sharedHasMore.value = data.hasMore
+  } catch (caught) {
+    if (token === sharedRequestToken) {
+      sharedError.value = errorMessage(caught) || t('anki.browseError')
+      sharedItems.value = []
+      sharedTotal.value = 0
+      sharedHasMore.value = false
+    }
+  } finally {
+    if (token === sharedRequestToken) sharedLoading.value = false
+  }
+}
+
+function onSharedSortChange() {
+  loadShared(true)
+}
+
+function prevSharedPage() {
+  if (sharedPage.value <= 1 || sharedLoading.value) return
+  sharedPage.value -= 1
+  loadShared()
+}
+
+function nextSharedPage() {
+  if (!sharedHasMore.value || sharedLoading.value) return
+  sharedPage.value += 1
+  loadShared()
+}
+
+async function downloadShared(deck: SharedDeckSummary) {
+  if (sharedDownloadingId.value !== null) return
+  sharedDownloadingId.value = deck.id
+  error.value = ''
+  try {
+    const data = await api.ankiShared.download(deck.id)
+    previewSource.value = 'browse'
+    initFromPreview(data)
+    step.value = 'preview'
+  } catch (caught) {
+    error.value = errorMessage(caught)
+  } finally {
+    sharedDownloadingId.value = null
+  }
+}
+
+function formatSharedDate(value: string): string {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleDateString(locale.value === 'en' ? 'en-US' : 'zh-CN', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  })
 }
 
 async function commit() {
@@ -243,7 +361,31 @@ async function commit() {
       <p v-if="error" class="banner banner-error">{{ error }}</p>
 
       <template v-if="step === 'select'">
+        <div class="source-tabs" role="tablist">
+          <button
+            type="button"
+            class="source-tab"
+            :class="{ active: sourceTab === 'file' }"
+            role="tab"
+            :aria-selected="sourceTab === 'file'"
+            @click="sourceTab = 'file'"
+          >
+            <Icon name="upload" :size="16" /> {{ t('anki.tabFile') }}
+          </button>
+          <button
+            type="button"
+            class="source-tab"
+            :class="{ active: sourceTab === 'browse' }"
+            role="tab"
+            :aria-selected="sourceTab === 'browse'"
+            @click="openBrowse"
+          >
+            <Icon name="search" :size="16" /> {{ t('anki.tabBrowse') }}
+          </button>
+        </div>
+
         <div
+          v-if="sourceTab === 'file'"
           class="drop-zone"
           :class="{ dragging, busy: loading }"
           @dragover.prevent="dragging = true"
@@ -267,6 +409,90 @@ async function commit() {
           </button>
           <p class="hint">{{ t('anki.fileHint') }}</p>
         </div>
+
+        <template v-else>
+          <div class="shared-toolbar">
+            <div class="search-box">
+              <Icon name="search" :size="17" />
+              <input
+                v-model="sharedSearch"
+                class="search-input"
+                :aria-label="t('anki.search')"
+                :placeholder="t('anki.searchPlaceholder')"
+                @keydown.enter.prevent="loadShared(true)"
+              />
+            </div>
+            <button type="button" class="btn btn-primary" @click="loadShared(true)">
+              <Icon name="search" :size="15" /> {{ t('anki.search') }}
+            </button>
+            <select v-model="sharedSort" class="select" @change="onSharedSortChange">
+              <option value="rating">{{ t('anki.sortRating') }}</option>
+              <option value="updated">{{ t('anki.sortUpdated') }}</option>
+            </select>
+          </div>
+          <p class="hint">
+            {{ t('anki.browseHint') }} {{ t('anki.downloadHint') }}
+          </p>
+          <p v-if="sharedError" class="banner banner-error">{{ sharedError }}</p>
+          <div v-if="sharedLoading" class="shared-empty">{{ t('common.loading') }}</div>
+          <div v-else-if="!sharedItems.length" class="shared-empty">
+            {{ t('anki.browseEmpty') }}
+          </div>
+          <div v-else class="shared-list">
+            <article v-for="deck in sharedItems" :key="deck.id" class="shared-deck">
+              <div class="shared-main">
+                <h4>{{ deck.title }}</h4>
+                <p class="muted small">
+                  {{ t('anki.sharedNotes', { count: deck.notes }) }}
+                  <template v-if="deck.audio">
+                    · {{ t('anki.sharedAudio', { count: deck.audio }) }}
+                  </template>
+                  <template v-if="deck.images">
+                    · {{ t('anki.sharedImages', { count: deck.images }) }}
+                  </template>
+                </p>
+                <p class="muted small">
+                  {{ t('anki.updatedAt', { date: formatSharedDate(deck.mtime) }) }} ·
+                  {{ t('anki.rating') }} {{ deck.thumbsUp }} / {{ deck.thumbsDown }}
+                </p>
+              </div>
+              <button
+                type="button"
+                class="btn btn-primary btn-sm"
+                :disabled="sharedDownloadingId !== null"
+                @click="downloadShared(deck)"
+              >
+                <Icon :name="sharedDownloadingId === deck.id ? 'refresh' : 'download'" :size="15" />
+                {{
+                  sharedDownloadingId === deck.id
+                    ? t('anki.downloading')
+                    : t('anki.downloadPreview')
+                }}
+              </button>
+            </article>
+          </div>
+          <div v-if="sharedItems.length" class="shared-pager">
+            <button
+              type="button"
+              class="btn btn-ghost btn-sm"
+              :disabled="sharedPage <= 1 || sharedLoading"
+              @click="prevSharedPage"
+            >
+              <Icon name="chevron-left" :size="14" /> {{ t('anki.prevPage') }}
+            </button>
+            <span class="muted small">
+              {{ t('anki.page', { page: sharedPage, pages: sharedTotalPages }) }}
+            </span>
+            <button
+              type="button"
+              class="btn btn-ghost btn-sm"
+              :disabled="!sharedHasMore || sharedLoading"
+              @click="nextSharedPage"
+            >
+              {{ t('anki.nextPage') }} <Icon name="chevron-right" :size="14" />
+            </button>
+          </div>
+        </template>
       </template>
 
       <template v-else-if="step === 'preview' && preview">
@@ -275,6 +501,9 @@ async function commit() {
             <strong>{{ t('anki.fileInfo', { name: preview.fileName, size: formatBytes(preview.fileSize) }) }}</strong>
             <p class="muted small">
               {{ formatLabel(preview) }} · {{ t('anki.schema') }} {{ preview.schemaVersion }}
+            </p>
+            <p v-if="preview.sharedDeck" class="muted small">
+              {{ t('anki.sharedSource', { title: preview.sharedDeck.title }) }}
             </p>
           </div>
           <div class="preview-counts">
@@ -520,7 +749,7 @@ async function commit() {
       </template>
       <template v-else-if="step === 'preview'">
         <button class="btn btn-ghost" type="button" @click="backToSelect">
-          {{ t('anki.back') }}
+          {{ previewSource === 'browse' ? t('anki.backToBrowse') : t('anki.back') }}
         </button>
         <button class="btn btn-primary" type="button" :disabled="!canImport" @click="commit">
           <Icon name="upload" :size="16" /> {{ t('anki.start') }}
@@ -538,6 +767,112 @@ async function commit() {
   display: flex;
   flex-direction: column;
   gap: 18px;
+}
+.source-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 6px;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  box-shadow: var(--shadow-inset-sm);
+}
+.source-tab {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  transition: box-shadow var(--transition), color var(--transition);
+}
+.source-tab.active {
+  background: var(--bg);
+  color: var(--accent-strong);
+  box-shadow: var(--shadow-raised-sm);
+}
+.shared-toolbar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.shared-toolbar .search-box {
+  flex: 1;
+  min-width: 220px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--muted);
+  box-shadow: var(--shadow-inset);
+}
+.shared-toolbar .search-input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--ink);
+}
+.shared-toolbar .select {
+  width: auto;
+  min-width: 150px;
+}
+.shared-empty {
+  padding: 32px 16px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+.shared-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 46vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.shared-deck {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  box-shadow: var(--shadow-inset-sm);
+}
+.shared-main {
+  min-width: 0;
+}
+.shared-main h4 {
+  margin: 0 0 5px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.shared-main p {
+  margin: 0;
+  line-height: 1.5;
+}
+.shared-deck .btn {
+  flex: 0 0 auto;
+}
+.shared-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding-top: 4px;
 }
 .drop-zone {
   display: flex;
@@ -814,6 +1149,13 @@ async function commit() {
   .notetype-row {
     flex-direction: column;
     align-items: flex-start;
+  }
+  .shared-deck {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .shared-toolbar .select {
+    width: 100%;
   }
 }
 </style>

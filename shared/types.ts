@@ -354,6 +354,34 @@ export interface AnkiImportPreview {
   sample: AnkiSampleNote[]
   warnings: AnkiWarning[]
   defaultNotetypeId: number | null
+  /** 从 AnkiWeb 共享牌组下载时携带来源信息 */
+  sharedDeck?: SharedDeckRef | null
+}
+
+export interface SharedDeckRef {
+  id: number
+  title: string
+  url: string
+}
+
+export interface SharedDeckSummary {
+  id: number
+  title: string
+  thumbsUp: number
+  thumbsDown: number
+  /** 最后更新时间（ISO） */
+  mtime: string
+  notes: number
+  audio: number
+  images: number
+}
+
+export interface SharedDeckPage {
+  items: SharedDeckSummary[]
+  total: number
+  page: number
+  pageSize: number
+  hasMore: boolean
 }
 
 export interface AnkiImportOptions {

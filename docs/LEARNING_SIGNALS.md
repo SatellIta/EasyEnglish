@@ -191,10 +191,17 @@ API 的 `Entry` DTO 同步增加 `errorRate`、`errorSamples`、`sourceSessionId
   - 不认识：`stage = 0`、立即到期。
 - 学习过程不调用 AI；释义、英英释义、例句和图片全部来自用户导入或手动维护的词库。
 
-## 17. 暂不包含
+## 17. AnkiWeb 共享牌组
+
+- `GET /api/anki-shared/decks?search=&sort=rating|updated&page=&pageSize=`：服务端请求 AnkiWeb 的 protobuf 接口 `/svc/shared/list-decks`，解码出 id、标题、赞/踩、更新时间、笔记/音频/图片数量，再按评分或更新时间排序分页；同一搜索缓存 5 分钟。
+- `POST /api/anki-shared/download { deckId }`：先请求 `/svc/shared/item-info` 取 `download_key` 和大小，再请求 `/svc/shared/download-deck/<id>?t=<key>`。只接受 `.apkg`，限制 200MB，保存到临时导入会话后复用上传导入的预览/提交逻辑。
+- AnkiWeb 对匿名搜索和下载有频率限制（HTTP 429）。服务端返回可本地化的提示，界面不会把它当成普通失败弹窗；稍后重试或在浏览器登录 AnkiWeb 即可。
+- `ANKIWEB_BASE_URL` 仅用于本地 mock 测试，生产环境保持默认的 `https://ankiweb.net`。
+
+## 18. 暂不包含
 
 - 音素级发音评分与可视化
 - 云端 ASR / 音频上传
 - 场景对话结果自动回写复习调度
-- Anki 官方共享牌组网页浏览 / 下载
 - Anki 音频与 SVG 图片提取
+- AnkiWeb 登录态 / 私人共享牌组

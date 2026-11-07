@@ -35,6 +35,7 @@ import type {
   SceneDetail,
   SceneInput,
   SceneSummary,
+  SharedDeckPage,
   SummaryResult,
 } from '@shared/types'
 import { localizeServerError, t } from '@/i18n'
@@ -295,6 +296,23 @@ export const api = {
       request<LearnCompleteResult>('/learn/complete', {
         method: 'POST',
         body: JSON.stringify(input),
+      }),
+  },
+
+  ankiShared: {
+    list: (params: { search: string; sort?: 'rating' | 'updated'; page?: number; pageSize?: number }) =>
+      request<SharedDeckPage>(
+        `/anki-shared/decks${toQuery({
+          search: params.search,
+          sort: params.sort,
+          page: params.page,
+          pageSize: params.pageSize,
+        })}`,
+      ),
+    download: (deckId: number) =>
+      request<AnkiImportPreview>('/anki-shared/download', {
+        method: 'POST',
+        body: JSON.stringify({ deckId }),
       }),
   },
 

@@ -174,6 +174,19 @@ export function inferEntryType(text: string, isCloze = false): EntryType {
   return compact.split(/\s+/).length > 1 ? 'phrase' : 'word'
 }
 
+/** 中文词库常用「【例】」「例：」内嵌例句，顺手抽出来。 */
+export function extractInlineExamples(text: string): string[] {
+  const results: string[] = []
+  const regex = /(?:【例】|例句[：:]|例[：:])\s*([^\n【]+)/g
+  let match: RegExpExecArray | null
+  while ((match = regex.exec(text)) !== null) {
+    const value = match[1].trim().replace(/[；;]\s*$/, '')
+    if (value.length >= 3) results.push(value)
+    if (results.length >= FIELD_LIMITS.examples) break
+  }
+  return results
+}
+
 function normalizeName(name: string): string {
   return name.trim().toLowerCase().replace(/\s+/g, ' ')
 }
@@ -220,18 +233,12 @@ export function autoMapFields(fields: AnkiFieldInfo[]): AnkiFieldMapping {
   }
   used.add(text)
 
-  let meaning = pickField(sorted, MEANING_NAMES, used)
-  if (meaning === null) {
-    const fallback = sorted.find((field) => !used.has(field.ord))
-    meaning = fallback ? fallback.ord : null
-  }
-  if (meaning !== null) used.add(meaning)
+  // 先映射语义明确的字段，避免「音标」「图片」等被 meaning 的兜底抢走。
+  const phonetic = pickField(sorted, PHONETIC_NAMES, used)
+  if (phonetic !== null) used.add(phonetic)
 
   const englishDefinition = pickField(sorted, ENGLISH_DEFINITION_NAMES, used)
   if (englishDefinition !== null) used.add(englishDefinition)
-
-  const phonetic = pickField(sorted, PHONETIC_NAMES, used)
-  if (phonetic !== null) used.add(phonetic)
 
   const image = pickField(sorted, IMAGE_NAMES, used)
   if (image !== null) used.add(image)
@@ -240,9 +247,18 @@ export function autoMapFields(fields: AnkiFieldInfo[]): AnkiFieldMapping {
     ...pickFields(sorted, EXAMPLE_NAMES, used),
     ...pickFields(sorted, COLLINS_NAMES, used),
   ]
-  const notes = pickFields(sorted, NOTES_NAMES, used)
-  const explanation = pickFields(sorted, EXPLANATION_NAMES, used)
   const tagFields = pickFields(sorted, TAG_FIELD_NAMES, used)
+  const notes = pickFields(sorted, NOTES_NAMES, used)
+
+  // 中文释义先按字段名精确匹配；没有明确字段时，取第一个还没被占用的字段。
+  let meaning = pickField(sorted, MEANING_NAMES, used)
+  if (meaning === null) {
+    const fallback = sorted.find((field) => !used.has(field.ord))
+    meaning = fallback ? fallback.ord : null
+  }
+  if (meaning !== null) used.add(meaning)
+
+  const explanation = pickFields(sorted, EXPLANATION_NAMES, used)
 
   return {
     text,
@@ -377,17 +393,6 @@ export function mapAnkiNote(
       )
     }
   }
-  const examples: string[] = []
-  const seenExamples = new Set<string>()
-  for (const example of exampleValues) {
-    const value = truncate(example, FIELD_LIMITS.exampleLength)
-    const key = value.toLowerCase()
-    if (!value || seenExamples.has(key)) continue
-    seenExamples.add(key)
-    examples.push(value)
-    if (examples.length >= FIELD_LIMITS.examples) break
-  }
-
   const explanationParts: string[] = []
   for (const index of mapping.explanation) {
     const value = fieldText(index)
@@ -404,6 +409,21 @@ export function mapAnkiNote(
 
   const notesParts = mapping.notes.map((index) => fieldText(index)).filter(Boolean)
   const notes = truncate(notesParts.join('\n\n'), FIELD_LIMITS.notes) || null
+
+  // 从补充说明 / 笔记里识别「【例】」「例：」形式的例句。
+  exampleValues.push(...extractInlineExamples(explanationParts.join('\n')))
+  exampleValues.push(...extractInlineExamples(notesParts.join('\n')))
+
+  const examples: string[] = []
+  const seenExamples = new Set<string>()
+  for (const example of exampleValues) {
+    const value = truncate(example, FIELD_LIMITS.exampleLength)
+    const key = value.toLowerCase()
+    if (!value || seenExamples.has(key)) continue
+    seenExamples.add(key)
+    examples.push(value)
+    if (examples.length >= FIELD_LIMITS.examples) break
+  }
 
   const tags: string[] = []
   if (options.useAnkiTags) {

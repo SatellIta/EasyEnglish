@@ -42,7 +42,7 @@ import { nowIso } from '../lib/time'
 const app = new Hono()
 
 export const IMPORTS_ROOT = resolve(process.cwd(), 'data/imports')
-const MAX_UPLOAD_BYTES = 200 * 1024 * 1024
+export const MAX_UPLOAD_BYTES = 200 * 1024 * 1024
 const MAX_ERRORS = 100
 const SESSION_TTL_MS = 60 * 60 * 1000
 const IMPORT_ID_PATTERN = /^[a-zA-Z0-9-]+$/
@@ -88,7 +88,7 @@ export function cleanupOldImportSessions(maxAgeMs = SESSION_TTL_MS): void {
   }
 }
 
-function sessionDir(importId: string): string {
+export function sessionDir(importId: string): string {
   return join(IMPORTS_ROOT, importId)
 }
 
@@ -145,6 +145,69 @@ function buildSample(
   }
 }
 
+export interface BuildPreviewInput {
+  importId: string
+  dir: string
+  zipPath: string
+  fileName: string
+  fileSize: number
+  sharedDeck?: AnkiImportPreview['sharedDeck']
+}
+
+/** 从已保存的导入会话构建预览；上传和 AnkiWeb 下载共用。 */
+export function buildAnkiPreview(input: BuildPreviewInput): AnkiImportPreview {
+  const files = prepareAnkiPackage(input.zipPath, input.dir)
+  const db = openAnkiDatabase(files.sqlitePath)
+  try {
+    const metadata = readAnkiMetadata(db, files)
+    const notetypes: AnkiNotetypeSummary[] = metadata.notetypes
+      .filter((notetype) => notetype.noteCount > 0 && notetype.fields.length > 0)
+      .map((notetype) => notetypeRecordToSummary(notetype, autoMapFields(notetype.fields)))
+    if (!notetypes.length) {
+      throw new Error('包内没有找到可导入的笔记')
+    }
+    const byId = new Map(notetypes.map((notetype) => [notetype.id, notetype]))
+    const sample = readSampleNotes(db, metadata, 5)
+      .map((note) => buildSample(note, byId))
+      .filter((item): item is AnkiSampleNote => item !== null)
+
+    const warnings: AnkiImportPreview['warnings'] = []
+    if (metadata.mediaCount > 0) {
+      warnings.push({ code: 'media', count: metadata.mediaCount })
+      if (metadata.mediaMap.size === 0) {
+        warnings.push({ code: 'mediaIndex' })
+      }
+    }
+    if (metadata.schemaVersion && metadata.schemaVersion < 18) {
+      warnings.push({ code: 'legacySchema', version: metadata.schemaVersion })
+    }
+
+    const defaultNotetypeId =
+      [...notetypes].sort((a, b) => b.noteCount - a.noteCount)[0]?.id ?? null
+
+    return {
+      importId: input.importId,
+      fileName: input.fileName,
+      fileSize: input.fileSize,
+      packageVersion: metadata.packageVersion,
+      schemaVersion: metadata.schemaVersion,
+      decks: metadata.decks,
+      notetypes,
+      totals: {
+        notes: metadata.noteCount,
+        cards: metadata.cardCount,
+        media: metadata.mediaCount,
+      },
+      sample,
+      warnings,
+      defaultNotetypeId,
+      sharedDeck: input.sharedDeck ?? null,
+    }
+  } finally {
+    closeAnkiDatabase(db)
+  }
+}
+
 app.post('/api/import/anki/preview', async (c) => {
   cleanupOldImportSessions()
 
@@ -165,56 +228,14 @@ app.post('/api/import/anki/preview', async (c) => {
   writeFileSync(zipPath, Buffer.from(await file.arrayBuffer()))
 
   try {
-    const files = prepareAnkiPackage(zipPath, dir)
-    const db = openAnkiDatabase(files.sqlitePath)
-    try {
-      const metadata = readAnkiMetadata(db, files)
-      const notetypes: AnkiNotetypeSummary[] = metadata.notetypes
-        .filter((notetype) => notetype.noteCount > 0 && notetype.fields.length > 0)
-        .map((notetype) => notetypeRecordToSummary(notetype, autoMapFields(notetype.fields)))
-      if (!notetypes.length) {
-        throw new Error('包内没有找到可导入的笔记')
-      }
-      const byId = new Map(notetypes.map((notetype) => [notetype.id, notetype]))
-      const sample = readSampleNotes(db, metadata, 5)
-        .map((note) => buildSample(note, byId))
-        .filter((item): item is AnkiSampleNote => item !== null)
-
-      const warnings: AnkiImportPreview['warnings'] = []
-      if (metadata.mediaCount > 0) {
-        warnings.push({ code: 'media', count: metadata.mediaCount })
-        if (metadata.mediaMap.size === 0) {
-          warnings.push({ code: 'mediaIndex' })
-        }
-      }
-      if (metadata.schemaVersion && metadata.schemaVersion < 18) {
-        warnings.push({ code: 'legacySchema', version: metadata.schemaVersion })
-      }
-
-      const defaultNotetypeId =
-        [...notetypes].sort((a, b) => b.noteCount - a.noteCount)[0]?.id ?? null
-
-      const preview: AnkiImportPreview = {
-        importId,
-        fileName: file.name || 'deck.apkg',
-        fileSize: file.size,
-        packageVersion: metadata.packageVersion,
-        schemaVersion: metadata.schemaVersion,
-        decks: metadata.decks,
-        notetypes,
-        totals: {
-          notes: metadata.noteCount,
-          cards: metadata.cardCount,
-          media: metadata.mediaCount,
-        },
-        sample,
-        warnings,
-        defaultNotetypeId,
-      }
-      return c.json(preview)
-    } finally {
-      closeAnkiDatabase(db)
-    }
+    const preview = buildAnkiPreview({
+      importId,
+      dir,
+      zipPath,
+      fileName: file.name || 'deck.apkg',
+      fileSize: file.size,
+    })
+    return c.json(preview)
   } catch (error) {
     rmSync(dir, { recursive: true, force: true })
     return c.json(

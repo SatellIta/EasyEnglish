@@ -139,6 +139,8 @@ FTS5 虚拟表，`tokenize='trigram'`，内容来自 entries，通过 INSERT/UPD
 | POST | `/api/import/anki/preview` | `multipart/form-data` 的 `file`；返回牌组、笔记类型、字段映射、示例和媒体数量 |
 | POST | `/api/import/anki/commit` | body `{ importId, options }`；按映射写入词条并提取图片 |
 | DELETE | `/api/import/anki/:importId` | 删除临时导入会话 |
+| GET | `/api/anki-shared/decks?search=&sort=rating\|updated&page=&pageSize=` | 代理 AnkiWeb 共享牌组列表（protobuf → JSON） |
+| POST | `/api/anki-shared/download` | body `{ deckId }`；下载 `.apkg` 并返回导入预览 |
 | GET | `/api/media/:name` | 读取已提取的本地图片，长缓存 |
 
 Anki 包解析在 `server/lib/import/`：
@@ -149,6 +151,16 @@ Anki 包解析在 `server/lib/import/`：
 - `media-store.ts`：只提取词条引用到的图片，按内容 SHA-256 命名放入 `data/media/`，避免重复；跳过 SVG 和音频。
 
 导入时先按 `source = 'anki'` + `external_id`（GUID）查重，再按规范化英文文本查重。`duplicateMode` 支持 `skip` / `update`（只更新内容，保留复习状态）/ `new`。`.colpkg` 一律合并导入，不删除现有词条。默认 `addToReview = false`：词条写入时 `learned_at = NULL`、`review_enabled = 0`，先进入学习流程。
+
+### AnkiWeb 共享牌组
+
+`server/lib/import/ankiweb.ts` 把 AnkiWeb 的 protobuf 二进制接口解码成普通 JSON：
+
+- `GET /svc/shared/list-decks?search=`：牌组 id、标题、赞/踩、更新时间、笔记/音频/图片数量。AnkiWeb 要求 `search` 非空，服务端默认使用 `english`。
+- `GET /svc/shared/item-info?sharedId=`：标题、大小、下载凭证 `download_key`。
+- `GET /svc/shared/download-deck/<id>?t=<download_key>`：返回 `.apkg`；没有正确凭证会返回 400。
+
+列表结果按 `search` 缓存 5 分钟，服务端负责排序和分页（默认 20 条/页）。下载只接受 `Content-Disposition` 中 `.apkg` 的文件名，限制 200MB，并复用上传导入的 `buildAnkiPreview()`，所以下载后同样进入字段映射预览、提交和去重流程。AnkiWeb 对匿名搜索/下载有频率限制（HTTP 429），界面会显示可重试的提示；`ANKIWEB_BASE_URL` 只用于本地 mock 测试。
 
 ### 复习
 
