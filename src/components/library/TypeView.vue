@@ -7,7 +7,11 @@ import { entryTypeLabel, t } from '@/i18n'
 import { api, errorMessage } from '@/lib/api'
 
 const props = defineProps<{ query: string; refreshToken: number }>()
-const emit = defineEmits<{ edit: [entry: Entry]; remove: [entry: Entry] }>()
+const emit = defineEmits<{
+  open: [entry: Entry]
+  edit: [entry: Entry]
+  remove: [entry: Entry]
+}>()
 
 const types: EntryType[] = ['word', 'phrase', 'sentence']
 const groups = reactive<
@@ -164,6 +168,7 @@ onMounted(load)
               :key="entry.id"
               :entry="entry"
               compact
+              @open="emit('open', $event)"
               @edit="emit('edit', $event)"
               @remove="emit('remove', $event)"
             />

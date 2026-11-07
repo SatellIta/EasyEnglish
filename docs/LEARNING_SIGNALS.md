@@ -184,7 +184,7 @@ API 的 `Entry` DTO 同步增加 `errorRate`、`errorSamples`、`sourceSessionId
 
 ## 16. 学习流程
 
-- `GET /api/learn/queue?size=10` 随机抽取 `learned_at IS NULL` 的词条；每组数量由用户在 `/learn` 页面设置（`localStorage` 的 `easyenglish.learnBatchSize`）。
+- `GET /api/learn/queue?size=10&tag=GRE` 随机抽取 `learned_at IS NULL` 的词条；每组数量由用户在 `/learn` 页面设置（`localStorage` 的 `easyenglish.learnBatchSize`）。可选 `tag` 把抽取范围限制在某个 Anki 标签组（选择保存在 `easyenglish.learnTag`），`GET /api/learn/stats?tag=` 同步返回该组的待学习/已学习/总数。
 - 辨别阶段只显示单词、音标和朗读，用户选择「认识 / 不认识」；学习阶段只显示不认识词条的完整词库内容。
 - `POST /api/learn/complete` 在一个事务里把本组词条标记为已学习、打开每日复习，并写入 `review_states`：
   - 认识：`stage = 1`、`interval_days = 1`、明天到期；

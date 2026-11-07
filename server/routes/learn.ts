@@ -29,15 +29,26 @@ function parseTypes(raw: string | undefined): EntryType[] {
   return types.length ? types : ['word', 'phrase', 'sentence']
 }
 
+/** 可选的标签过滤；只匹配完整标签名。 */
+function readTag(raw: string | undefined): string | null {
+  const tag = (raw ?? '').trim()
+  return tag || null
+}
+
+const TAG_FILTER = 'EXISTS (SELECT 1 FROM json_each(e.tags) WHERE json_each.value = ?)'
+
 app.get('/api/learn/stats', (c) => {
+  const tag = readTag(c.req.query('tag'))
+  const where = tag ? `WHERE ${TAG_FILTER}` : ''
   const row = db
     .prepare(
       `SELECT
          count(*) AS total,
-         sum(CASE WHEN learned_at IS NULL THEN 1 ELSE 0 END) AS unlearned
-       FROM entries`,
+         sum(CASE WHEN e.learned_at IS NULL THEN 1 ELSE 0 END) AS unlearned
+       FROM entries e
+       ${where}`,
     )
-    .get() as { total: number; unlearned: number | null }
+    .get(...(tag ? [tag] : [])) as { total: number; unlearned: number | null }
   const total = Number(row.total ?? 0)
   const unlearned = Number(row.unlearned ?? 0)
   const stats: LearnStats = { total, unlearned, learned: Math.max(total - unlearned, 0) }
@@ -47,22 +58,24 @@ app.get('/api/learn/stats', (c) => {
 app.get('/api/learn/queue', (c) => {
   const size = Math.min(Math.max(Number(c.req.query('size') ?? 10) || 10, 1), 50)
   const types = parseTypes(c.req.query('types'))
+  const tag = readTag(c.req.query('tag'))
   const placeholders = types.map(() => '?').join(', ')
+  const tagClause = tag ? ` AND ${TAG_FILTER}` : ''
 
   const totalRow = db
     .prepare(
       `SELECT count(*) AS n FROM entries e
-       WHERE e.learned_at IS NULL AND e.type IN (${placeholders})`,
+       WHERE e.learned_at IS NULL AND e.type IN (${placeholders})${tagClause}`,
     )
-    .get(...types) as { n: number }
+    .get(...types, ...(tag ? [tag] : [])) as { n: number }
   const rows = db
     .prepare(
       `${ENTRY_SELECT}
-       WHERE e.learned_at IS NULL AND e.type IN (${placeholders})
+       WHERE e.learned_at IS NULL AND e.type IN (${placeholders})${tagClause}
        ORDER BY RANDOM()
        LIMIT ?`,
     )
-    .all(...types, size) as any[]
+    .all(...types, ...(tag ? [tag] : []), size) as any[]
 
   const result: LearnQueue = {
     items: rows.map(mapEntry) as Entry[],

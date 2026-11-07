@@ -87,11 +87,11 @@ watch(
           <button
             class="icon-btn theme-toggle"
             type="button"
-            :title="t(themeStore.isSwiss ? 'theme.switchToNeumorphism' : 'theme.switchToSwiss')"
-            :aria-label="t(themeStore.isSwiss ? 'theme.switchToNeumorphism' : 'theme.switchToSwiss')"
-            @click="themeStore.toggleTheme()"
+            :title="t(themeStore.isDark ? 'theme.toggleToLight' : 'theme.toggleToDark')"
+            :aria-label="t(themeStore.isDark ? 'theme.toggleToLight' : 'theme.toggleToDark')"
+            @click="themeStore.toggleColorMode()"
           >
-            <Icon name="theme" :size="18" />
+            <Icon :name="themeStore.isDark ? 'sun' : 'moon'" :size="18" />
           </button>
         </div>
       </div>

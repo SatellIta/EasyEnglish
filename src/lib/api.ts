@@ -13,6 +13,7 @@ import type {
   DraftEntry,
   Entry,
   EntryInput,
+  EntrySort,
   EntryType,
   ExportInput,
   ExportOptions,
@@ -37,6 +38,7 @@ import type {
   SceneSummary,
   SharedDeckPage,
   SummaryResult,
+  TagListResult,
 } from '@shared/types'
 import { localizeServerError, t } from '@/i18n'
 
@@ -140,6 +142,7 @@ export interface EntryListParams {
   tag?: string
   from?: string
   to?: string
+  sort?: EntrySort
   limit?: number
   offset?: number
 }
@@ -156,6 +159,7 @@ export const api = {
           tag: params.tag,
           from: params.from,
           to: params.to,
+          sort: params.sort,
           limit: params.limit,
           offset: params.offset,
         })}`,
@@ -184,6 +188,10 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ count }),
       }),
+  },
+
+  tags: {
+    list: () => request<TagListResult>('/tags'),
   },
 
   errors: {
@@ -284,12 +292,14 @@ export const api = {
   },
 
   learn: {
-    stats: () => request<LearnStats>('/learn/stats'),
-    queue: (size = 10, types?: EntryType[]) =>
+    stats: (tag?: string) =>
+      request<LearnStats>(`/learn/stats${toQuery({ tag })}`),
+    queue: (size = 10, types?: EntryType[], tag?: string) =>
       request<LearnQueue>(
         `/learn/queue${toQuery({
           size,
           types: types?.length ? types.join(',') : undefined,
+          tag,
         })}`,
       ),
     complete: (input: LearnCompleteInput) =>

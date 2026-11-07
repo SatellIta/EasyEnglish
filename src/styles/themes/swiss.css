@@ -23,6 +23,13 @@
   --warning: #000000;
   --warning-soft: #ffffff;
 
+  /* semantic text / surface tokens */
+  --type-word-ink: #000000;
+  --type-sentence-bg: #f0f0f0;
+  --type-sentence-ink: #000000;
+  --danger-ink: #e30613;
+  --overlay: rgba(0, 0, 0, 0.4);
+
   --radius-sm: 0px;
   --radius: 0px;
   --radius-lg: 0px;
@@ -901,4 +908,640 @@ html[data-theme="swiss"] #app .type-name {
 
 html[data-theme="swiss"] #app .type-head:hover .type-name {
   color: #e30613;
+}
+
+/* ---------- dark mode ----------
+   Black / white / red stays intact: near-black surfaces, near-white ink and
+   1px borders, red accent, sharp corners, no shadows. The [data-mode="dark"]
+   attribute raises specificity above every light rule above. */
+
+:root[data-theme="swiss"][data-mode="dark"] {
+  color-scheme: dark;
+
+  --bg: #111111;
+  --bg-soft: #1a1a1a;
+  --surface: #111111;
+  --surface-2: #1a1a1a;
+  --ink: #f5f5f5;
+  --ink-soft: #d4d4d4;
+  --muted: #a3a3a3;
+  --shadow-dark: transparent;
+  --shadow-light: transparent;
+
+  --accent: #ff0000;
+  --accent-strong: #ff6666;
+  --accent-soft: #2a2a2a;
+  --success: #7fb2ff;
+  --success-soft: #111111;
+  --danger: #ff6666;
+  --danger-soft: #111111;
+  --warning: #f5f5f5;
+  --warning-soft: #111111;
+
+  --border-color: #f5f5f5;
+  --divider-color: #3a3a3a;
+
+  --type-word-ink: #f5f5f5;
+  --type-sentence-bg: #1a1a1a;
+  --type-sentence-ink: #f5f5f5;
+  --danger-ink: #ff6666;
+  --overlay: rgba(0, 0, 0, 0.7);
+
+  --shadow-raised-sm: none;
+  --shadow-raised: none;
+  --shadow-raised-lg: none;
+  --shadow-hover-sm: none;
+  --shadow-hover: none;
+  --shadow-pressed: none;
+  --shadow-inset: none;
+  --shadow-inset-sm: none;
+  --shadow-inset-focus: none;
+}
+
+/* ---------- dark: shell ---------- */
+
+html[data-theme="swiss"][data-mode="dark"] #app .sidebar {
+  border-right-color: #f5f5f5;
+  background: #111111;
+}
+
+html[data-theme="swiss"][data-mode="dark"] .brand-mark {
+  background: #f5f5f5;
+  color: #111111;
+  border-color: #f5f5f5;
+}
+
+html[data-theme="swiss"][data-mode="dark"] .nav-item {
+  background: #111111;
+  color: #f5f5f5;
+  border-left-color: #3a3a3a;
+}
+
+html[data-theme="swiss"][data-mode="dark"] .nav-item:hover {
+  background: #1a1a1a;
+  border-left-color: #ff0000;
+  color: #f5f5f5;
+}
+
+html[data-theme="swiss"][data-mode="dark"] .nav-item.active,
+html[data-theme="swiss"][data-mode="dark"] .nav-item.active:hover {
+  background: #f5f5f5;
+  border-color: #f5f5f5;
+  border-left-color: #ff0000;
+  color: #111111;
+}
+
+html[data-theme="swiss"][data-mode="dark"] .sidebar-note {
+  background: #111111;
+  border-color: #f5f5f5;
+  color: #f5f5f5;
+}
+
+/* ---------- dark: typography ---------- */
+
+html[data-theme="swiss"][data-mode="dark"] .page-head p {
+  color: #a3a3a3;
+}
+
+html[data-theme="swiss"][data-mode="dark"] .today-date {
+  color: #ff6666 !important;
+}
+
+html[data-theme="swiss"][data-mode="dark"] #app .hero-kicker {
+  color: #ff6666;
+}
+
+/* ---------- dark: cards & surfaces ---------- */
+
+html[data-theme="swiss"][data-mode="dark"] .card {
+  background: #111111;
+  border-color: #f5f5f5;
+}
+
+html[data-theme="swiss"][data-mode="dark"] #app .hero,
+html[data-theme="swiss"][data-mode="dark"] #app .stat {
+  background: #111111;
+  border-color: #f5f5f5;
+}
+
+html[data-theme="swiss"][data-mode="dark"] #app .stat-icon {
+  color: #ff6666;
+}
+
+/* ---------- dark: buttons ---------- */
+
+html[data-theme="swiss"][data-mode="dark"] .btn {
+  background: #111111;
+  border-color: #f5f5f5;
+  color: #f5f5f5;
+}
+
+html[data-theme="swiss"][data-mode="dark"] .btn:hover {
+  background: #1a1a1a;
+  border-color: #ff0000;
+  color: #f5f5f5;
+}
+
+html[data-theme="swiss"][data-mode="dark"] .btn-primary {
+  background: #f5f5f5;
+  border-color: #f5f5f5;
+  color: #111111;
+}
+
+html[data-theme="swiss"][data-mode="dark"] .btn-primary:hover {
+  background: #ff0000;
+  border-color: #ff0000;
+  color: #111111;
+}
+
+html[data-theme="swiss"][data-mode="dark"] .btn-soft,
+html[data-theme="swiss"][data-mode="dark"] .btn-ghost {
+  background: #111111;
+  border-color: #f5f5f5;
+  color: #f5f5f5;
+}
+
+html[data-theme="swiss"][data-mode="dark"] .btn-danger {
+  background: #111111;
+  border-color: #ff6666;
+  color: #ff6666;
+}
+
+html[data-theme="swiss"][data-mode="dark"] .icon-btn {
+  background: #111111;
+  border-color: #f5f5f5;
+  color: #f5f5f5;
+}
+
+html[data-theme="swiss"][data-mode="dark"] .icon-btn:hover {
+  background: #1a1a1a;
+  border-color: #ff0000;
+  color: #f5f5f5;
+}
+
+/* ---------- dark: forms ---------- */
+
+html[data-theme="swiss"][data-mode="dark"] #app .input,
+html[data-theme="swiss"][data-mode="dark"] #app .textarea,
+html[data-theme="swiss"][data-mode="dark"] #app .select,
+html[data-theme="swiss"][data-mode="dark"] #app .composer-input,
+html[data-theme="swiss"][data-mode="dark"] .modal-card .input,
+html[data-theme="swiss"][data-mode="dark"] .modal-card .textarea,
+html[data-theme="swiss"][data-mode="dark"] .modal-card .select {
+  background: #1a1a1a;
+  border-color: #f5f5f5;
+  color: #f5f5f5;
+}
+
+html[data-theme="swiss"][data-mode="dark"] #app .input:focus,
+html[data-theme="swiss"][data-mode="dark"] #app .textarea:focus,
+html[data-theme="swiss"][data-mode="dark"] #app .select:focus,
+html[data-theme="swiss"][data-mode="dark"] #app .composer-input:focus,
+html[data-theme="swiss"][data-mode="dark"] .modal-card .input:focus,
+html[data-theme="swiss"][data-mode="dark"] .modal-card .textarea:focus {
+  border-color: #ff6666;
+}
+
+html[data-theme="swiss"][data-mode="dark"] .input::placeholder,
+html[data-theme="swiss"][data-mode="dark"] .textarea::placeholder,
+html[data-theme="swiss"][data-mode="dark"] .composer-input::placeholder {
+  color: #8f8f8f;
+}
+
+html[data-theme="swiss"][data-mode="dark"] #app .search-box {
+  background: #111111;
+  border-color: #f5f5f5;
+  color: #f5f5f5;
+}
+
+html[data-theme="swiss"][data-mode="dark"] #app .search-box:focus-within {
+  border-color: #ff6666;
+}
+
+html[data-theme="swiss"][data-mode="dark"] #app .search-input {
+  color: #f5f5f5;
+}
+
+/* ---------- dark: labels, tags, banners ---------- */
+
+html[data-theme="swiss"][data-mode="dark"] .tag,
+html[data-theme="swiss"][data-mode="dark"] .type-badge {
+  background: #111111;
+  border-color: #f5f5f5;
+  color: #f5f5f5;
+}
+
+html[data-theme="swiss"][data-mode="dark"] .type-word,
+html[data-theme="swiss"][data-mode="dark"] .type-phrase,
+html[data-theme="swiss"][data-mode="dark"] .type-sentence {
+  background: #1a1a1a;
+  color: #f5f5f5;
+}
+
+html[data-theme="swiss"][data-mode="dark"] .banner {
+  background: #111111;
+  border-color: #f5f5f5;
+  color: #f5f5f5;
+}
+
+html[data-theme="swiss"][data-mode="dark"] .banner-error {
+  border-color: #ff6666;
+  color: #ff6666;
+}
+
+html[data-theme="swiss"][data-mode="dark"] .banner-ok {
+  border-color: #7fb2ff;
+  color: #7fb2ff;
+}
+
+html[data-theme="swiss"][data-mode="dark"] .banner-info {
+  border-color: #f5f5f5;
+  color: #f5f5f5;
+}
+
+html[data-theme="swiss"][data-mode="dark"] .link {
+  color: #ff6666;
+}
+
+html[data-theme="swiss"][data-mode="dark"] button:focus-visible,
+html[data-theme="swiss"][data-mode="dark"] a:focus-visible,
+html[data-theme="swiss"][data-mode="dark"] [tabindex]:focus-visible {
+  outline-color: #ff6666;
+}
+
+/* ---------- dark: markdown ---------- */
+
+html[data-theme="swiss"][data-mode="dark"] .markdown {
+  color: #d4d4d4;
+}
+
+html[data-theme="swiss"][data-mode="dark"] .markdown code,
+html[data-theme="swiss"][data-mode="dark"] .markdown pre,
+html[data-theme="swiss"][data-mode="dark"] .markdown blockquote {
+  background: #1a1a1a;
+  border-color: #f5f5f5;
+  color: #f5f5f5;
+}
+
+html[data-theme="swiss"][data-mode="dark"] .markdown blockquote {
+  border-left-color: #f5f5f5;
+}
+
+html[data-theme="swiss"][data-mode="dark"] .markdown th,
+html[data-theme="swiss"][data-mode="dark"] .markdown td {
+  border-color: #f5f5f5;
+}
+
+html[data-theme="swiss"][data-mode="dark"] .markdown th {
+  background: #f5f5f5;
+  color: #111111;
+}
+
+html[data-theme="swiss"][data-mode="dark"] .markdown tr:nth-child(even) td {
+  background: #1a1a1a;
+}
+
+html[data-theme="swiss"][data-mode="dark"] .markdown a {
+  color: #ff6666;
+}
+
+html[data-theme="swiss"][data-mode="dark"] .markdown hr {
+  background: #3a3a3a;
+}
+
+/* ---------- dark: modal ---------- */
+
+html[data-theme="swiss"][data-mode="dark"] .modal-overlay {
+  background: rgba(0, 0, 0, 0.7);
+}
+
+html[data-theme="swiss"][data-mode="dark"] .modal-card {
+  background: #111111;
+  border-color: #f5f5f5;
+}
+
+/* ---------- dark: today ---------- */
+
+html[data-theme="swiss"][data-mode="dark"] #app .entry-text {
+  color: #f5f5f5;
+}
+
+html[data-theme="swiss"][data-mode="dark"] #app .entry-meaning,
+html[data-theme="swiss"][data-mode="dark"] #app .entry-time {
+  color: #a3a3a3;
+}
+
+/* ---------- dark: review ---------- */
+
+html[data-theme="swiss"][data-mode="dark"] #app .filter-chip {
+  background: #111111;
+  border-color: #f5f5f5;
+  color: #f5f5f5;
+}
+
+html[data-theme="swiss"][data-mode="dark"] #app .filter-chip:hover {
+  background: #1a1a1a;
+  border-color: #ff0000;
+}
+
+html[data-theme="swiss"][data-mode="dark"] #app .filter-chip.active,
+html[data-theme="swiss"][data-mode="dark"] #app .filter-chip.active:hover {
+  background: #f5f5f5;
+  border-color: #f5f5f5;
+  color: #111111;
+}
+
+html[data-theme="swiss"][data-mode="dark"] #app .filter-chip.active strong {
+  color: #111111;
+}
+
+html[data-theme="swiss"][data-mode="dark"] #app .progress-track {
+  background: #111111;
+  border-color: #f5f5f5;
+}
+
+html[data-theme="swiss"][data-mode="dark"] #app .reveal-block h3 {
+  color: #f5f5f5;
+}
+
+html[data-theme="swiss"][data-mode="dark"] #app .reveal-block p,
+html[data-theme="swiss"][data-mode="dark"] #app .reveal-block ul {
+  color: #d4d4d4;
+}
+
+html[data-theme="swiss"][data-mode="dark"] #app .done-mark {
+  background: #f5f5f5;
+  color: #111111;
+}
+
+/* ---------- dark: chat ---------- */
+
+html[data-theme="swiss"][data-mode="dark"] #app .welcome-mark {
+  background: #f5f5f5;
+  border-color: #f5f5f5;
+  color: #111111;
+}
+
+html[data-theme="swiss"][data-mode="dark"] #app .suggestion {
+  background: #111111;
+  border-color: #f5f5f5;
+  color: #f5f5f5;
+}
+
+html[data-theme="swiss"][data-mode="dark"] #app .suggestion:hover {
+  background: #1a1a1a;
+  border-color: #ff0000;
+  color: #f5f5f5;
+}
+
+html[data-theme="swiss"][data-mode="dark"] #app .session-item {
+  border-left-color: #3a3a3a;
+}
+
+html[data-theme="swiss"][data-mode="dark"] #app .session-item:hover {
+  background: #1a1a1a;
+  border-left-color: #ff0000;
+}
+
+html[data-theme="swiss"][data-mode="dark"] #app .session-item.active,
+html[data-theme="swiss"][data-mode="dark"] #app .session-item.active:hover {
+  background: #f5f5f5;
+  border-color: #f5f5f5;
+  border-left-color: #ff0000;
+}
+
+html[data-theme="swiss"][data-mode="dark"] #app .session-item.active .session-title {
+  color: #111111;
+}
+
+html[data-theme="swiss"][data-mode="dark"] #app .session-item.active .session-preview,
+html[data-theme="swiss"][data-mode="dark"] #app .session-item.active .session-meta {
+  color: #4a4a4a;
+}
+
+html[data-theme="swiss"][data-mode="dark"] #app .message.user .message-bubble {
+  background: #f5f5f5;
+  color: #111111;
+}
+
+html[data-theme="swiss"][data-mode="dark"] #app .user-text {
+  color: #111111;
+}
+
+html[data-theme="swiss"][data-mode="dark"] #app .composer {
+  background: #111111;
+}
+
+/* ---------- dark: library ---------- */
+
+html[data-theme="swiss"][data-mode="dark"] #app .type-tabs {
+  background: #111111;
+  border-color: #f5f5f5;
+}
+
+html[data-theme="swiss"][data-mode="dark"] #app .type-tab {
+  background: #111111;
+  color: #f5f5f5;
+}
+
+html[data-theme="swiss"][data-mode="dark"] #app .type-tab:hover {
+  background: #1a1a1a;
+  border-color: #ff0000;
+}
+
+html[data-theme="swiss"][data-mode="dark"] #app .type-tab.active,
+html[data-theme="swiss"][data-mode="dark"] #app .type-tab.active:hover {
+  background: #f5f5f5;
+  border-color: #f5f5f5;
+  color: #111111;
+}
+
+html[data-theme="swiss"][data-mode="dark"] #app .lib-row {
+  border-left-color: #3a3a3a;
+}
+
+html[data-theme="swiss"][data-mode="dark"] #app .lib-row:hover {
+  background: #1a1a1a;
+  border-left-color: #ff0000;
+}
+
+html[data-theme="swiss"][data-mode="dark"] #app .lib-title h3 {
+  color: #f5f5f5;
+}
+
+html[data-theme="swiss"][data-mode="dark"] #app .lib-meaning {
+  color: #d4d4d4;
+}
+
+html[data-theme="swiss"][data-mode="dark"] #app .lib-explain,
+html[data-theme="swiss"][data-mode="dark"] #app .review-info {
+  color: #a3a3a3;
+}
+
+/* ---------- dark: settings ---------- */
+
+html[data-theme="swiss"][data-mode="dark"] #app .status-pill {
+  background: #111111;
+  border-color: #f5f5f5;
+  color: #f5f5f5;
+}
+
+html[data-theme="swiss"][data-mode="dark"] #app .status-pill.ok {
+  background: #f5f5f5;
+  border-color: #f5f5f5;
+  color: #111111;
+}
+
+html[data-theme="swiss"][data-mode="dark"] #app .status-pill.warn {
+  background: #111111;
+  border-color: #ff6666;
+  color: #ff6666;
+}
+
+html[data-theme="swiss"][data-mode="dark"] #app .preset {
+  background: #111111;
+  border-color: #f5f5f5;
+  color: #f5f5f5;
+}
+
+html[data-theme="swiss"][data-mode="dark"] #app .preset:hover {
+  background: #1a1a1a;
+  border-color: #ff0000;
+}
+
+html[data-theme="swiss"][data-mode="dark"] #app .info-list code {
+  background: #1a1a1a;
+  border-color: #f5f5f5;
+  color: #f5f5f5;
+}
+
+html[data-theme="swiss"][data-mode="dark"] #app .theme-option {
+  background: #111111;
+  border-color: #f5f5f5;
+}
+
+html[data-theme="swiss"][data-mode="dark"] #app .theme-option:hover {
+  background: #1a1a1a;
+  border-color: #ff0000;
+}
+
+html[data-theme="swiss"][data-mode="dark"] #app .theme-option.active,
+html[data-theme="swiss"][data-mode="dark"] #app .theme-option.active:hover {
+  background: #f5f5f5;
+  border-color: #f5f5f5;
+  color: #111111;
+}
+
+html[data-theme="swiss"][data-mode="dark"] #app .theme-option.active .theme-copy strong,
+html[data-theme="swiss"][data-mode="dark"] #app .theme-option.active .theme-check {
+  color: #111111;
+}
+
+html[data-theme="swiss"][data-mode="dark"] #app .theme-option.active small {
+  color: #4a4a4a;
+}
+
+html[data-theme="swiss"][data-mode="dark"] #app .swatch-neumorphism {
+  border-color: #f5f5f5;
+}
+
+/* ---------- dark: entry form ---------- */
+
+html[data-theme="swiss"][data-mode="dark"] body .type-option {
+  background: #111111;
+  border-color: #f5f5f5;
+  color: #f5f5f5;
+}
+
+html[data-theme="swiss"][data-mode="dark"] body .type-option:hover {
+  background: #1a1a1a;
+  border-color: #ff0000;
+}
+
+html[data-theme="swiss"][data-mode="dark"] body .type-option.active,
+html[data-theme="swiss"][data-mode="dark"] body .type-option.active:hover {
+  background: #f5f5f5;
+  border-color: #f5f5f5;
+  color: #111111;
+}
+
+html[data-theme="swiss"][data-mode="dark"] body .type-option.active small {
+  color: #4a4a4a;
+}
+
+/* ---------- dark: empty & misc ---------- */
+
+html[data-theme="swiss"][data-mode="dark"] .muted,
+html[data-theme="swiss"][data-mode="dark"] .hint {
+  color: #a3a3a3;
+}
+
+html[data-theme="swiss"][data-mode="dark"] * {
+  scrollbar-color: #3a3a3a transparent;
+}
+
+html[data-theme="swiss"][data-mode="dark"] *::-webkit-scrollbar-thumb {
+  background: #3a3a3a;
+}
+
+@media (max-width: 900px) {
+  html[data-theme="swiss"][data-mode="dark"] #app .sidebar {
+    border-bottom-color: #f5f5f5;
+  }
+}
+
+/* ---------- dark: library views (dates / types / scenes) ---------- */
+
+html[data-theme="swiss"][data-mode="dark"] #app .date-card:hover,
+html[data-theme="swiss"][data-mode="dark"] #app .scene-open:hover {
+  background: #1a1a1a;
+  border-color: #ff0000;
+}
+
+html[data-theme="swiss"][data-mode="dark"] #app .dot-word,
+html[data-theme="swiss"][data-mode="dark"] #app .dot-sentence {
+  background: #f5f5f5;
+}
+
+html[data-theme="swiss"][data-mode="dark"] #app .dot-phrase {
+  background: #ff0000;
+}
+
+html[data-theme="swiss"][data-mode="dark"] #app .review-flag.off {
+  color: #ff6666;
+  border-color: #ff6666;
+}
+
+html[data-theme="swiss"][data-mode="dark"] #app .entry-card {
+  background: #111111;
+}
+
+html[data-theme="swiss"][data-mode="dark"] #app .scene-kicker {
+  color: #ff6666;
+}
+
+html[data-theme="swiss"][data-mode="dark"] #app .section-head-row {
+  border-bottom-color: #f5f5f5;
+}
+
+/* ---------- dark: markdown import ---------- */
+
+html[data-theme="swiss"][data-mode="dark"] #app .stat-card.warn strong {
+  color: #ff6666;
+}
+
+html[data-theme="swiss"][data-mode="dark"] #app .group-meta {
+  background: #1a1a1a;
+  border-color: #f5f5f5;
+  color: #f5f5f5;
+}
+
+html[data-theme="swiss"][data-mode="dark"] #app .result-mark {
+  background: #f5f5f5;
+  border-color: #f5f5f5;
+  color: #111111;
+}
+
+html[data-theme="swiss"][data-mode="dark"] #app .type-head:hover .type-name {
+  color: #ff6666;
 }

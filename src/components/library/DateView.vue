@@ -7,7 +7,11 @@ import { entryTypeLabel, locale, t } from '@/i18n'
 import { api, errorMessage } from '@/lib/api'
 
 const props = defineProps<{ query: string; refreshToken: number }>()
-const emit = defineEmits<{ edit: [entry: Entry]; remove: [entry: Entry] }>()
+const emit = defineEmits<{
+  open: [entry: Entry]
+  edit: [entry: Entry]
+  remove: [entry: Entry]
+}>()
 
 const overview = ref<LibraryOverview | null>(null)
 const activeDate = ref<string | null>(null)
@@ -178,6 +182,7 @@ onMounted(bootstrap)
           v-for="entry in shownSearch"
           :key="entry.id"
           :entry="entry"
+          @open="emit('open', $event)"
           @edit="emit('edit', $event)"
           @remove="emit('remove', $event)"
         />
@@ -228,6 +233,7 @@ onMounted(bootstrap)
           v-for="entry in shownEntries"
           :key="entry.id"
           :entry="entry"
+          @open="emit('open', $event)"
           @edit="emit('edit', $event)"
           @remove="emit('remove', $event)"
         />

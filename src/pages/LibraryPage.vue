@@ -3,18 +3,20 @@ import { onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import type { Entry } from '@shared/types'
 import AnkiImportModal from '@/components/AnkiImportModal.vue'
+import EntryDetailModal from '@/components/EntryDetailModal.vue'
 import EntryForm from '@/components/EntryForm.vue'
 import ExportModal from '@/components/ExportModal.vue'
 import Icon from '@/components/Icon.vue'
 import DateView from '@/components/library/DateView.vue'
 import SceneView from '@/components/library/SceneView.vue'
+import TagView from '@/components/library/TagView.vue'
 import TypeView from '@/components/library/TypeView.vue'
 import { t } from '@/i18n'
 import { api, errorMessage } from '@/lib/api'
 import { truncate } from '@/lib/format'
 import { useAppStore } from '@/stores/app'
 
-type ViewMode = 'date' | 'type' | 'scene'
+type ViewMode = 'date' | 'type' | 'tag' | 'scene'
 
 const store = useAppStore()
 
@@ -26,19 +28,26 @@ const formOpen = ref(false)
 const exportOpen = ref(false)
 const ankiOpen = ref(false)
 const editing = ref<Entry | null>(null)
+const detail = ref<Entry | null>(null)
 const error = ref('')
 let timer: number | undefined
 
 const views: Array<{
   value: ViewMode
-  labelKey: 'library.view.date' | 'library.view.type' | 'library.view.scene'
+  labelKey:
+    | 'library.view.date'
+    | 'library.view.type'
+    | 'library.view.tag'
+    | 'library.view.scene'
   hintKey:
     | 'library.view.dateHint'
     | 'library.view.typeHint'
+    | 'library.view.tagHint'
     | 'library.view.sceneHint'
 }> = [
   { value: 'date', labelKey: 'library.view.date', hintKey: 'library.view.dateHint' },
   { value: 'type', labelKey: 'library.view.type', hintKey: 'library.view.typeHint' },
+  { value: 'tag', labelKey: 'library.view.tag', hintKey: 'library.view.tagHint' },
   { value: 'scene', labelKey: 'library.view.scene', hintKey: 'library.view.sceneHint' },
 ]
 
@@ -62,6 +71,15 @@ function openCreate() {
 function openEdit(entry: Entry) {
   editing.value = entry
   formOpen.value = true
+}
+
+function openDetail(entry: Entry) {
+  detail.value = entry
+}
+
+function editFromDetail(entry: Entry) {
+  detail.value = null
+  openEdit(entry)
 }
 
 async function onSaved() {
@@ -153,6 +171,7 @@ onMounted(() => {
       v-if="view === 'date'"
       :query="query"
       :refresh-token="refreshToken"
+      @open="openDetail"
       @edit="openEdit"
       @remove="remove"
     />
@@ -160,6 +179,15 @@ onMounted(() => {
       v-else-if="view === 'type'"
       :query="query"
       :refresh-token="refreshToken"
+      @open="openDetail"
+      @edit="openEdit"
+      @remove="remove"
+    />
+    <TagView
+      v-else-if="view === 'tag'"
+      :query="query"
+      :refresh-token="refreshToken"
+      @open="openDetail"
       @edit="openEdit"
       @remove="remove"
     />
@@ -167,6 +195,7 @@ onMounted(() => {
       v-else
       :query="query"
       :refresh-token="refreshToken"
+      @open="openDetail"
       @edit="openEdit"
       @remove="remove"
       @changed="refresh"
@@ -177,6 +206,12 @@ onMounted(() => {
       :entry="editing"
       @close="formOpen = false"
       @saved="onSaved"
+    />
+
+    <EntryDetailModal
+      :entry="detail"
+      @close="detail = null"
+      @edit="editFromDetail"
     />
 
     <ExportModal :open="exportOpen" @close="exportOpen = false" />

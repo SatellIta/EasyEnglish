@@ -100,7 +100,7 @@ FTS5 虚拟表，`tokenize='trigram'`，内容来自 entries，通过 INSERT/UPD
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| GET | `/api/entries?types=word,phrase&q=&tag=&from=&to=&limit=&offset=` | 列表 + 搜索 + 分页 |
+| GET | `/api/entries?types=word,phrase&q=&tag=&from=&to=&sort=&limit=&offset=` | 列表 + 搜索 + 标签过滤 + 排序 + 分页；`sort` 取 `newest`（默认）/ `oldest` / `alpha` / `alphaDesc` |
 | POST | `/api/entries` | 新建，自动创建复习状态（立即到期）；主要英文内容重复时返回 409 |
 | POST | `/api/entries/bulk` | 批量新建（最多 50）；默认按规范化后的主要英文内容跳过词库中和批次内重复项（不看释义/例句），返回 `count` / `skipped` / `duplicates` |
 | GET | `/api/entries/:id` | 详情 |
@@ -120,6 +120,7 @@ FTS5 虚拟表，`tokenize='trigram'`，内容来自 entries，通过 INSERT/UPD
 | DELETE | `/api/scenes/:id/entries/:entryId` | 从场景移除词条 |
 | GET | `/api/library/overview` | 按本地日期聚合的条数、类型总数、场景列表 |
 | GET | `/api/library/date/:date?type=&q=` | 某一天（本地时区）的词条，可按类型和关键词过滤 |
+| GET | `/api/tags` | 所有标签及总数 / 待学习数（`TagSummary[]`），供词库标签分类与学习页筛选 |
 | GET | `/api/export/options` | 导出分组：常规类型计数（不含场景词条）和场景列表 |
 | POST | `/api/export/markdown` | body `{ types, sceneIds }`，返回 `text/markdown` |
 
@@ -174,8 +175,8 @@ Anki 包解析在 `server/lib/import/`：
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| GET | `/api/learn/stats` | 待学习 / 已学习 / 词库总数 |
-| GET | `/api/learn/queue?size=&types=` | 随机抽取一批 `learned_at IS NULL` 的词条；`size` 限制 1–50 |
+| GET | `/api/learn/stats?tag=` | 待学习 / 已学习 / 词库总数；可选 `tag` 只统计该标签组 |
+| GET | `/api/learn/queue?size=&types=&tag=` | 随机抽取一批 `learned_at IS NULL` 的词条；`size` 限制 1–50，`tag` 只抽该标签组 |
 | POST | `/api/learn/complete` | body `{ known: number[], unknown: number[] }`，标记已学习并写入复习队列 |
 
 ### 对话
@@ -219,10 +220,11 @@ Anki 包解析在 `server/lib/import/`：
 `/learn` 是 Anki 导入词条的入口，也是独立于每日复习的「先认识，再记忆」流程：
 
 1. 设置每组数量（5 / 10 / 20 / 30 / 50，保存在 `localStorage` 的 `easyenglish.learnBatchSize`）。
-2. `GET /api/learn/queue` 随机抽取 `learned_at IS NULL` 的词条。
-3. 辨别阶段：整组逐个显示单词、音标和朗读按钮，用户选择「认识 / 不认识」，不显示释义。
-4. 学习阶段：只展示本组标记为「不认识」的词条，显示词库里的中文释义、英英释义、例句、图片、笔记和标签；内容全部来自用户词库，不调用 AI。
-5. `POST /api/learn/complete`：把本组词条标记为已学习并打开 `review_enabled`。认识的词条在 1 天后到期；不认识的词条立即到期。学习的词条随后进入普通复习队列。
+2. 可选标签筛选：从 `/api/tags` 选择某个 Anki 标签组（保存在 `easyenglish.learnTag`），统计卡片和抽取范围都会随之收窄。
+3. `GET /api/learn/queue?tag=...` 随机抽取 `learned_at IS NULL` 的词条。
+4. 辨别阶段：整组逐个显示单词、音标和朗读按钮，用户选择「认识 / 不认识」，不显示释义。
+5. 学习阶段：只展示本组标记为「不认识」的词条，显示词库里的中文释义、英英释义、例句、图片、笔记和标签；内容全部来自用户词库，不调用 AI。
+6. `POST /api/learn/complete`：把本组词条标记为已学习并打开 `review_enabled`。认识的词条在 1 天后到期；不认识的词条立即到期。学习的词条随后进入普通复习队列。
 
 学习进度只保存在当前页面；中途离开会提示确认，未提交的词条保持「待学习」。
 
@@ -297,12 +299,15 @@ Anki 包解析在 `server/lib/import/`：
 
 ## 主题
 
-界面支持两套主题，通过 `<html data-theme="...">` 切换：
+界面支持两套视觉主题和独立的深浅色模式，通过 `<html data-theme="..." data-mode="...">` 切换：
 
-- `neumorphism`（默认）：新拟物派，浅灰同色系、双光源阴影。
-- `swiss`：瑞士国际风格，白底、黑框、红色强调、直角、无阴影。
+- `neumorphism`（默认）：新拟物派，浅灰同色系、双光源阴影；深色版使用深灰表面与低对比双阴影。
+- `swiss`：瑞士国际风格，白底、黑框、红色强调、直角、无阴影；深色版为近黑底、近白文字与边框，仍以红色为强调色。
+- `data-mode` 取 `light` / `dark`，与视觉主题正交。
 
-主题状态由 `src/stores/theme.ts` 管理，持久化在 `localStorage` 的 `easyenglish.theme`；`index.html` 的内联脚本在首屏绘制前恢复主题，避免闪烁。结构样式在 `src/styles/main.css`，主题变量与覆盖在 `src/styles/themes/`。设置页的「外观」区块和侧栏底部按钮都可以切换。
+主题与模式由 `src/stores/theme.ts` 管理（`theme` / `colorMode`，`setTheme` / `setColorMode`），分别持久化在 `localStorage` 的 `easyenglish.theme` 和 `easyenglish.colorMode`；`index.html` 的内联脚本在首屏绘制前恢复两者，避免闪烁。结构样式在 `src/styles/main.css`，两套主题的浅色与 `[data-mode="dark"]` 深色变量都在 `src/styles/themes/`。设置页「外观」分类负责切换视觉主题与深浅色，侧栏底部按钮只切换深浅色。深色覆盖依赖 token；在 `main.css` 中新增颜色时应使用变量，避免写死浅色值。
+
+词库有四个视图：按日期、按类型、按标签、按场景。标签视图用 `/api/tags` 展示 Anki 标签分组，进入分组后可按最新 / 最早 / 字典升降序排列；点击词条标题会打开 `EntryDetailModal`，直接展示完整的中文释义、英英释义、音标、例句、图片和标签，并可跳转编辑。
 
 ## 扩展点
 

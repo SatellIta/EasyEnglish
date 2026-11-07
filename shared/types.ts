@@ -187,6 +187,20 @@ export interface LibraryOverview {
   scenes: SceneSummary[]
 }
 
+/** 词条列表排序方式 */
+export type EntrySort = 'newest' | 'oldest' | 'alpha' | 'alphaDesc'
+
+/** 标签分类汇总；unlearned 用于学习页的标签筛选 */
+export interface TagSummary {
+  tag: string
+  count: number
+  unlearned: number
+}
+
+export interface TagListResult {
+  items: TagSummary[]
+}
+
 /** 导出选项：常规词条只统计未归入场景的内容 */
 export interface ExportTypeCounts {
   total: number

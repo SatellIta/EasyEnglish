@@ -16,6 +16,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
+  open: [entry: Entry]
   edit: [entry: Entry]
   remove: [entry: Entry]
   removeScene: [entry: Entry]
@@ -34,7 +35,16 @@ const emit = defineEmits<{
 
       <div class="row wrap lib-title">
         <TypeBadge :type="entry.type" />
-        <h3>{{ entry.text }}</h3>
+        <h3>
+          <button
+            class="lib-title-btn"
+            type="button"
+            :title="t('library.detail.open')"
+            @click="emit('open', entry)"
+          >
+            {{ entry.text }}
+          </button>
+        </h3>
         <SpeakButton :text="entry.text" />
       </div>
 
@@ -146,6 +156,20 @@ const emit = defineEmits<{
 }
 .lib-title {
   gap: 9px;
+}
+.lib-title-btn {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+  transition: color var(--transition);
+}
+.lib-title-btn:hover {
+  color: var(--accent-strong);
 }
 .lib-title h3 {
   margin: 0;
