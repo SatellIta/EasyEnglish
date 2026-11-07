@@ -59,6 +59,12 @@ function selectWord(word: string) {
   selectedWord.value = word
 }
 
+/** 点击单词以外的空白区域时取消选中。 */
+function onContentClick(event: MouseEvent) {
+  const target = event.target as HTMLElement | null
+  if (!target?.closest('.word-token')) selectedWord.value = null
+}
+
 async function openWord(word: string) {
   selectedWord.value = word
   ai.value = { loading: false, error: null, draft: null }
@@ -145,7 +151,7 @@ async function addToLibrary() {
     @close="emit('close')"
   >
     <!-- 单词查询视图 -->
-    <div v-if="wordView" class="entry-detail">
+    <div v-if="wordView" class="entry-detail" @click="onContentClick">
       <button class="lookup-back" type="button" @click="backToEntry">
         <Icon name="chevron-left" :size="16" />
         {{ t('lookup.back') }}
@@ -257,7 +263,7 @@ async function addToLibrary() {
     </div>
 
     <!-- 原词条详情 -->
-    <div v-else-if="entry" class="entry-detail">
+    <div v-else-if="entry" class="entry-detail" @click="onContentClick">
       <div class="detail-title">
         <TypeBadge :type="entry.type" />
         <h2>

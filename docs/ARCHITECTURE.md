@@ -55,7 +55,7 @@
 | | `position` | 导入/添加顺序，用于「导入顺序」排列 |
 | | `added_at` | 加入场景时间 |
 
-一个词条可以出现在多个场景里。场景成员关系不改变复习调度：是否进入每日复习只看 `entries.review_enabled`。Markdown 导入的场景词条默认打开该开关；已有词条保留自己的开关。场景详情页提供批量「全部加入复习 / 全部移出复习」，对应 `POST /api/scenes/:id/review`。
+一个词条可以出现在多个场景里。场景成员关系不改变复习调度：是否进入每日复习只看 `entries.review_enabled`。Markdown 导入的场景词条默认打开该开关；已有词条保留自己的开关。场景详情页提供批量「全部加入复习 / 全部移出复习」，对应 `POST /api/scenes/:id/review`。场景视图按 `section`（H3 片段）折叠分组，组内再按 `subsection`（H4 类型）显示为本地化类型徽标；工具栏按钮统一「全部折叠 / 全部展开」。
 
 ### review_states
 
