@@ -8,14 +8,20 @@
     <script>
       ;(function () {
         try {
-          var theme = localStorage.getItem('easyenglish.theme')
-          document.documentElement.dataset.theme = theme === 'swiss' ? 'swiss' : 'neumorphism'
+          var theme = localStorage.getItem('easyenglish.theme') === 'swiss' ? 'swiss' : 'neumorphism'
+          var mode = localStorage.getItem('easyenglish.colorMode') === 'dark' ? 'dark' : 'light'
+          document.documentElement.dataset.theme = theme
+          document.documentElement.dataset.mode = mode
+          var chromeColor = theme === 'swiss'
+            ? (mode === 'dark' ? '#111111' : '#ffffff')
+            : (mode === 'dark' ? '#22262c' : '#e0e5ec')
           var meta = document.querySelector('meta[name="theme-color"]')
-          if (meta && theme === 'swiss') meta.setAttribute('content', '#ffffff')
+          if (meta) meta.setAttribute('content', chromeColor)
           var locale = localStorage.getItem('easyenglish.locale')
           document.documentElement.lang = locale === 'en' ? 'en' : 'zh-CN'
         } catch (error) {
           document.documentElement.dataset.theme = 'neumorphism'
+          document.documentElement.dataset.mode = 'light'
           document.documentElement.lang = 'zh-CN'
         }
       })()

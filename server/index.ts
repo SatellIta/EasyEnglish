@@ -24,6 +24,7 @@ import reviewRoutes from './routes/review'
 import scenesRoutes from './routes/scenes'
 import settingsRoutes from './routes/settings'
 import summaryRoutes from './routes/summary'
+import tagsRoutes from './routes/tags'
 import { MEDIA_DIR } from './lib/import/media-store'
 
 const app = new Hono()
@@ -85,6 +86,7 @@ app.route('/', personasRoutes)
 app.route('/', ankiImportRoutes)
 app.route('/', ankiSharedRoutes)
 app.route('/', learnRoutes)
+app.route('/', tagsRoutes)
 
 app.onError((err, c) => {
   if (err instanceof ZodError) {

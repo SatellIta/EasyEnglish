@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { onBeforeRouteLeave, useRouter } from 'vue-router'
-import type { Entry, LearnCompleteResult, LearnStats } from '@shared/types'
+import type { Entry, LearnCompleteResult, LearnStats, TagSummary } from '@shared/types'
 import AnkiImportModal from '@/components/AnkiImportModal.vue'
 import EntryDetails from '@/components/EntryDetails.vue'
 import Icon from '@/components/Icon.vue'
@@ -14,6 +14,7 @@ import { useAppStore } from '@/stores/app'
 type Phase = 'setup' | 'recognize' | 'study' | 'done'
 
 const BATCH_KEY = 'easyenglish.learnBatchSize'
+const TAG_KEY = 'easyenglish.learnTag'
 const BATCH_OPTIONS = [5, 10, 20, 30, 50]
 
 const router = useRouter()
@@ -21,6 +22,8 @@ const appStore = useAppStore()
 
 const phase = ref<Phase>('setup')
 const batchSize = ref(readBatchSize())
+const selectedTag = ref(readSavedTag())
+const tags = ref<TagSummary[]>([])
 const stats = ref<LearnStats | null>(null)
 const queue = ref<Entry[]>([])
 const index = ref(0)
@@ -65,6 +68,14 @@ function readBatchSize(): number {
   }
 }
 
+function readSavedTag(): string {
+  try {
+    return localStorage.getItem(TAG_KEY) ?? ''
+  } catch {
+    return ''
+  }
+}
+
 watch(batchSize, (value) => {
   try {
     localStorage.setItem(BATCH_KEY, String(value))
@@ -73,9 +84,36 @@ watch(batchSize, (value) => {
   }
 })
 
+watch(selectedTag, (value) => {
+  try {
+    if (value) localStorage.setItem(TAG_KEY, value)
+    else localStorage.removeItem(TAG_KEY)
+  } catch {
+    // ignore private-mode storage errors
+  }
+  if (phase.value === 'setup') loadStats()
+})
+
+async function loadTags() {
+  try {
+    const data = await api.tags.list()
+    tags.value = data.items
+    // 之前选中的标签可能已被删除或改名。
+    if (
+      selectedTag.value &&
+      !data.items.some((item) => item.tag === selectedTag.value)
+    ) {
+      selectedTag.value = ''
+    }
+  } catch {
+    // 标签加载失败不阻塞学习，只是不显示筛选。
+    tags.value = []
+  }
+}
+
 async function loadStats() {
   try {
-    stats.value = await api.learn.stats()
+    stats.value = await api.learn.stats(selectedTag.value || undefined)
   } catch (caught) {
     error.value = errorMessage(caught)
   }
@@ -86,7 +124,11 @@ async function start() {
   error.value = ''
   result.value = null
   try {
-    const data = await api.learn.queue(batchSize.value)
+    const data = await api.learn.queue(
+      batchSize.value,
+      undefined,
+      selectedTag.value || undefined,
+    )
     if (!data.items.length) {
       error.value = t('learn.noWords')
       await loadStats()
@@ -184,6 +226,7 @@ function exit() {
 }
 
 async function onImported() {
+  await loadTags()
   await loadStats()
   appStore.refreshStats().catch(() => {})
 }
@@ -213,9 +256,10 @@ onBeforeRouteLeave(() => {
   return true
 })
 
-onMounted(() => {
+onMounted(async () => {
   window.addEventListener('keydown', onKeydown)
-  loadStats()
+  await loadTags()
+  await loadStats()
 })
 
 onBeforeUnmount(() => {
@@ -257,8 +301,18 @@ onBeforeUnmount(() => {
 
       <section v-if="stats && stats.unlearned === 0" class="card empty-card">
         <div class="empty-mark"><Icon name="learn" :size="30" /></div>
-        <h2>{{ t('learn.emptyTitle') }}</h2>
+        <h2>{{ selectedTag ? t('learn.tagEmpty') : t('learn.emptyTitle') }}</h2>
         <p class="muted">{{ t('learn.emptyHint') }}</p>
+        <div v-if="tags.length" class="field tag-pick">
+          <label for="learn-tag-empty">{{ t('learn.tagLabel') }}</label>
+          <select id="learn-tag-empty" v-model="selectedTag" class="select">
+            <option value="">{{ t('learn.tagAll') }}</option>
+            <option v-for="item in tags" :key="item.tag" :value="item.tag">
+              {{ item.tag }} · {{ t('learn.tagUnlearned', { count: item.unlearned }) }}
+            </option>
+          </select>
+          <span class="hint">{{ t('learn.tagHint') }}</span>
+        </div>
         <div class="setup-actions">
           <button class="btn btn-primary" @click="importOpen = true">
             <Icon name="upload" :size="17" /> {{ t('learn.importAnki') }}
@@ -270,6 +324,17 @@ onBeforeUnmount(() => {
       </section>
 
       <section v-else class="card setup-card">
+        <div v-if="tags.length" class="field">
+          <label for="learn-tag">{{ t('learn.tagLabel') }}</label>
+          <select id="learn-tag" v-model="selectedTag" class="select">
+            <option value="">{{ t('learn.tagAll') }}</option>
+            <option v-for="item in tags" :key="item.tag" :value="item.tag">
+              {{ item.tag }} · {{ t('learn.tagUnlearned', { count: item.unlearned }) }}
+            </option>
+          </select>
+          <span class="hint">{{ t('learn.tagHint') }}</span>
+        </div>
+
         <div class="field">
           <label for="learn-batch-size">{{ t('learn.batchSize') }}</label>
           <select id="learn-batch-size" v-model.number="batchSize" class="select">
@@ -430,6 +495,11 @@ onBeforeUnmount(() => {
   gap: 12px;
   flex-wrap: wrap;
   justify-content: center;
+}
+.tag-pick {
+  width: 100%;
+  max-width: 420px;
+  text-align: left;
 }
 .empty-card {
   max-width: 620px;

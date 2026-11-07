@@ -554,7 +554,7 @@ a:focus-visible,
 
 .type-word {
   background: var(--accent-soft);
-  color: #4338ca;
+  color: var(--type-word-ink);
 }
 
 .type-phrase {
@@ -563,8 +563,8 @@ a:focus-visible,
 }
 
 .type-sentence {
-  background: #d9e7f4;
-  color: #35597d;
+  background: var(--type-sentence-bg);
+  color: var(--type-sentence-ink);
 }
 
 .banner {
@@ -579,7 +579,7 @@ a:focus-visible,
 
 .banner-error {
   background: var(--danger-soft);
-  color: #7f2f2b;
+  color: var(--danger-ink);
 }
 
 .banner-ok {
@@ -750,7 +750,7 @@ a:focus-visible,
   height: 1px;
   margin: 1.3em 0;
   border: 0;
-  background: #cdd3db;
+  background: var(--divider-color);
 }
 
 .markdown img {
@@ -768,7 +768,7 @@ a:focus-visible,
   align-items: center;
   justify-content: center;
   padding: 18px;
-  background: rgba(51, 51, 51, 0.45);
+  background: var(--overlay);
 }
 
 .modal-card {

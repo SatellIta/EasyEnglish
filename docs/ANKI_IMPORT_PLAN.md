@@ -7,6 +7,7 @@
 > - 图片会提取被词条引用的栅格文件，存到 `data/media/`，通过 `/api/media/:name` 提供；音频和 SVG 跳过。
 > - 导入词条默认 `learned_at = NULL`、`review_enabled = 0`，先进入 `/learn` 学习流程；也可在预览中勾选直接加入每日复习。
 > - 额外实现了 AnkiWeb 官方共享牌组浏览/下载：`server/lib/import/ankiweb.ts` 解码 AnkiWeb 的 protobuf 列表/详情接口，`server/routes/anki-shared.ts` 下载 `.apkg` 并复用导入预览。只接受 `.apkg`，受 AnkiWeb 匿名频率限制。
+> - Anki 标签会随词条导入（`useAnkiTags` 默认开启）。`GET /api/tags` 汇总标签总数/待学习数，词库「按标签」视图和学习页标签筛选都基于它；词库标签视图支持时间/字典排序，点击词条可直接打开完整详情。
 > - 近似保留 Anki 复习进度（`scheduling: 'approximate'`）未实现。
 >
 > 当前代码入口：`server/routes/anki-import.ts`、`server/lib/import/*`、`src/components/AnkiImportModal.vue`、`src/pages/LearnPage.vue`。

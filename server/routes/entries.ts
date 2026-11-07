@@ -40,6 +40,14 @@ const bulkInput = z.object({
   skipDuplicates: z.boolean().optional(),
 })
 
+/** 列表排序白名单；未知值回退到最新优先。 */
+const SORT_SQL: Record<string, string> = {
+  newest: 'e.created_at DESC, e.id DESC',
+  oldest: 'e.created_at ASC, e.id ASC',
+  alpha: 'e.text COLLATE NOCASE ASC, e.id ASC',
+  alphaDesc: 'e.text COLLATE NOCASE DESC, e.id DESC',
+}
+
 app.get('/api/entries', (c) => {
   const rawTypes = c.req.query('types') ?? c.req.query('type') ?? ''
   const types = rawTypes
@@ -51,6 +59,7 @@ app.get('/api/entries', (c) => {
   const tag = c.req.query('tag') ?? ''
   const from = c.req.query('from')
   const to = c.req.query('to')
+  const sort = SORT_SQL[c.req.query('sort') ?? ''] ?? SORT_SQL.newest
   const limit = Math.min(Math.max(Number(c.req.query('limit') ?? 100) || 100, 1), 500)
   const offset = Math.max(Number(c.req.query('offset') ?? 0) || 0, 0)
 
@@ -90,7 +99,7 @@ app.get('/api/entries', (c) => {
     .prepare(`SELECT COUNT(*) AS n FROM entries e ${whereSql}`)
     .get(...params) as { n: number }
   const rows = db
-    .prepare(`${ENTRY_SELECT} ${whereSql} ORDER BY e.created_at DESC, e.id DESC LIMIT ? OFFSET ?`)
+    .prepare(`${ENTRY_SELECT} ${whereSql} ORDER BY ${sort} LIMIT ? OFFSET ?`)
     .all(...params, limit, offset)
 
   return c.json({

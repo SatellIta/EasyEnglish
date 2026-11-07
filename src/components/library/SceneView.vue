@@ -18,6 +18,7 @@ import { api, errorMessage } from '@/lib/api'
 
 const props = defineProps<{ query: string; refreshToken: number }>()
 const emit = defineEmits<{
+  open: [entry: Entry]
   edit: [entry: Entry]
   remove: [entry: Entry]
   changed: []
@@ -446,6 +447,7 @@ onMounted(bootstrap)
                 :section="null"
                 :subsection="item.subsection"
                 :show-scene-refs="false"
+                @open="emit('open', $event)"
                 @edit="emit('edit', $event)"
                 @remove="emit('remove', $event)"
                 @remove-scene="removeFromScene"
