@@ -670,6 +670,8 @@ export const zh = {
   'scene.view.reviewUpdated': '已更新 {count} 条词条的复习设置。',
   'scene.view.sortMemory': '记忆时间',
   'scene.view.sortOrder': '导入顺序',
+  'scene.view.collapseAll': '全部折叠',
+  'scene.view.expandAll': '全部展开',
   'scene.view.emptyItemsTitle': '这个场景还是空的',
   'scene.view.emptyItemsQuery': '场景里没有匹配的词条',
   'scene.view.emptyItemsHint': '从词库添加已有词条，或者直接新建。',
@@ -1587,6 +1589,8 @@ export const en: Record<MessageKey, string> = {
   'scene.view.reviewUpdated': 'Updated review settings for {count} entries.',
   'scene.view.sortMemory': 'Recently learned',
   'scene.view.sortOrder': 'Import order',
+  'scene.view.collapseAll': 'Collapse all',
+  'scene.view.expandAll': 'Expand all',
   'scene.view.emptyItemsTitle': 'This scene is empty',
   'scene.view.emptyItemsQuery': 'No matching entries in this scene',
   'scene.view.emptyItemsHint':

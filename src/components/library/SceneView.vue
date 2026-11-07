@@ -12,6 +12,7 @@ import { entryTypeLabel, t } from '@/i18n'
 import EntryCard from '@/components/EntryCard.vue'
 import EntryForm from '@/components/EntryForm.vue'
 import Icon from '@/components/Icon.vue'
+import TypeBadge from '@/components/TypeBadge.vue'
 import SceneEntryPicker from '@/components/library/SceneEntryPicker.vue'
 import SceneFormModal from '@/components/library/SceneFormModal.vue'
 import { api, errorMessage } from '@/lib/api'
@@ -91,15 +92,59 @@ const filteredItems = computed<SceneEntry[]>(() => {
 
 interface SubsectionGroup {
   key: string
-  name: string
+  label: string
+  type: EntryType | null
   items: SceneEntry[]
 }
 
 interface SectionGroup {
   key: string
-  name: string
+  label: string
   total: number
   subsections: SubsectionGroup[]
+}
+
+/** 旧数据里的类型标题（含常见拼写变体）用于本地化显示。 */
+const TYPE_HEADINGS: Record<string, EntryType> = {
+  word: 'word',
+  words: 'word',
+  vocabulary: 'word',
+  单词: 'word',
+  词汇: 'word',
+  phrase: 'phrase',
+  phrases: 'phrase',
+  collocation: 'phrase',
+  collocations: 'phrase',
+  短语: 'phrase',
+  搭配: 'phrase',
+  sentence: 'sentence',
+  sentences: 'sentence',
+  senteces: 'sentence',
+  句子: 'sentence',
+}
+
+function headingType(name: string): EntryType | null {
+  return TYPE_HEADINGS[name.trim().toLowerCase()] ?? null
+}
+
+/** 场景里出现 words / 单词 这类标题时，按当前界面语言显示。 */
+function groupLabel(name: string): string {
+  const type = headingType(name)
+  return type ? entryTypeLabel(type) : name
+}
+
+/** 折叠的是二级情景（H3 片段）；默认全部展开。 */
+const collapsedSections = ref<Record<string, boolean>>({})
+
+function isSectionCollapsed(key: string): boolean {
+  return Boolean(collapsedSections.value[key])
+}
+
+function toggleSection(key: string) {
+  collapsedSections.value = {
+    ...collapsedSections.value,
+    [key]: !collapsedSections.value[key],
+  }
 }
 
 const allInReview = computed(() => {
@@ -114,7 +159,12 @@ const groups = computed<SectionGroup[]>(() => {
     const sectionKey = sectionName
     let section = sectionMap.get(sectionKey)
     if (!section) {
-      section = { key: sectionKey, name: sectionName, total: 0, subsections: [] }
+      section = {
+        key: sectionKey,
+        label: groupLabel(sectionName),
+        total: 0,
+        subsections: [],
+      }
       sectionMap.set(sectionKey, section)
     }
     section.total += 1
@@ -123,13 +173,35 @@ const groups = computed<SectionGroup[]>(() => {
     const subsectionKey = `${sectionKey}::${subsectionName}`
     let subsection = section.subsections.find((value) => value.key === subsectionKey)
     if (!subsection) {
-      subsection = { key: subsectionKey, name: subsectionName, items: [] }
+      subsection = {
+        key: subsectionKey,
+        label: groupLabel(subsectionName),
+        type: headingType(subsectionName),
+        items: [],
+      }
       section.subsections.push(subsection)
     }
     subsection.items.push(item)
   }
   return [...sectionMap.values()]
 })
+
+const allCollapsed = computed(
+  () =>
+    groups.value.length > 0 &&
+    groups.value.every((section) => isSectionCollapsed(section.key)),
+)
+
+/** 一个按钮在「全部折叠 / 全部展开」之间切换。 */
+function toggleAllSections() {
+  if (allCollapsed.value) {
+    collapsedSections.value = {}
+    return
+  }
+  collapsedSections.value = Object.fromEntries(
+    groups.value.map((section) => [section.key, true]),
+  )
+}
 
 function typeCount(type: EntryType): number {
   if (!activeScene.value) return 0
@@ -202,6 +274,7 @@ async function loadScene(id: number) {
   try {
     activeScene.value = await api.scenes.detail(id)
     activeType.value = 'all'
+    collapsedSections.value = {}
   } catch (caught) {
     error.value = errorMessage(caught)
     activeScene.value = null
@@ -445,23 +518,34 @@ onMounted(bootstrap)
             </span>
           </button>
         </div>
-        <div class="type-tabs sort-tabs">
+        <div class="scene-toolbar-right">
           <button
-            class="type-tab"
-            :class="{ active: sortMode === 'memory' }"
-            :aria-pressed="sortMode === 'memory'"
-            @click="sortMode = 'memory'"
+            v-if="groups.length"
+            class="btn btn-ghost btn-sm"
+            type="button"
+            @click="toggleAllSections"
           >
-            {{ t('scene.view.sortMemory') }}
+            <Icon :name="allCollapsed ? 'chevron-down' : 'chevron-right'" :size="15" />
+            {{ allCollapsed ? t('scene.view.expandAll') : t('scene.view.collapseAll') }}
           </button>
-          <button
-            class="type-tab"
-            :class="{ active: sortMode === 'order' }"
-            :aria-pressed="sortMode === 'order'"
-            @click="sortMode = 'order'"
-          >
-            {{ t('scene.view.sortOrder') }}
-          </button>
+          <div class="type-tabs sort-tabs">
+            <button
+              class="type-tab"
+              :class="{ active: sortMode === 'memory' }"
+              :aria-pressed="sortMode === 'memory'"
+              @click="sortMode = 'memory'"
+            >
+              {{ t('scene.view.sortMemory') }}
+            </button>
+            <button
+              class="type-tab"
+              :class="{ active: sortMode === 'order' }"
+              :aria-pressed="sortMode === 'order'"
+              @click="sortMode = 'order'"
+            >
+              {{ t('scene.view.sortOrder') }}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -473,31 +557,50 @@ onMounted(bootstrap)
 
       <div v-else class="scene-sections">
         <section v-for="section in groups" :key="section.key" class="scene-section card">
-          <header class="section-head-row">
-            <h3>{{ section.name }}</h3>
-            <span class="muted small">{{ t('scene.view.count', { count: section.total }) }}</span>
-          </header>
-
-          <div
-            v-for="subsection in section.subsections"
-            :key="subsection.key"
-            class="subsection"
+          <button
+            class="section-toggle"
+            type="button"
+            :aria-expanded="!isSectionCollapsed(section.key)"
+            @click="toggleSection(section.key)"
           >
-            <h4 v-if="subsection.name">{{ subsection.name }}</h4>
-            <div class="lib-list">
-              <EntryCard
-                v-for="item in subsection.items"
-                :key="item.entry.id"
-                :entry="item.entry"
-                :scene-id="activeScene.scene.id"
-                :section="null"
-                :subsection="null"
-                :show-scene-refs="false"
-                @open="emit('open', $event)"
-                @edit="emit('edit', $event)"
-                @remove="emit('remove', $event)"
-                @remove-scene="removeFromScene"
-              />
+            <Icon
+              name="chevron-down"
+              :size="16"
+              class="section-chevron"
+              :class="{ rotated: isSectionCollapsed(section.key) }"
+            />
+            <span class="section-title">{{ section.label }}</span>
+            <span class="muted small section-total">
+              {{ t('scene.view.count', { count: section.total }) }}
+            </span>
+          </button>
+
+          <div v-show="!isSectionCollapsed(section.key)" class="section-body">
+            <div
+              v-for="subsection in section.subsections"
+              :key="subsection.key"
+              class="subsection"
+            >
+              <div v-if="subsection.label" class="subsection-head">
+                <TypeBadge v-if="subsection.type" :type="subsection.type" />
+                <h4 v-else>{{ subsection.label }}</h4>
+                <span class="muted small">{{ subsection.items.length }}</span>
+              </div>
+              <div class="lib-list">
+                <EntryCard
+                  v-for="item in subsection.items"
+                  :key="item.entry.id"
+                  :entry="item.entry"
+                  :scene-id="activeScene.scene.id"
+                  :section="null"
+                  :subsection="null"
+                  :show-scene-refs="false"
+                  @open="emit('open', $event)"
+                  @edit="emit('edit', $event)"
+                  @remove="emit('remove', $event)"
+                  @remove-scene="removeFromScene"
+                />
+              </div>
             </div>
           </div>
         </section>
@@ -662,7 +765,11 @@ onMounted(bootstrap)
   gap: 12px;
   flex-wrap: wrap;
 }
-.sort-tabs {
+.scene-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
   margin-left: auto;
 }
 .tab-count {
@@ -676,32 +783,67 @@ onMounted(bootstrap)
   gap: 16px;
 }
 .scene-section {
-  padding: 20px 22px;
+  padding: 0;
+  overflow: hidden;
 }
-.section-head-row {
+.section-toggle {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  padding-bottom: 12px;
-  margin-bottom: 14px;
-  border-bottom: 1px solid var(--divider-color, rgba(0, 0, 0, 0.08));
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 18px 22px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--transition);
 }
-.section-head-row h3 {
+.section-toggle:hover {
+  background: var(--bg-soft);
+}
+.section-toggle .section-title {
   margin: 0;
+  flex: 1 1 0;
+  min-width: 0;
   font-size: 17px;
   font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.section-total {
+  flex: 0 0 auto;
+}
+.section-chevron {
+  flex: 0 0 auto;
+  color: var(--muted);
+  transition: transform var(--transition);
+}
+.section-chevron.rotated {
+  transform: rotate(-90deg);
+}
+.section-body {
+  padding: 16px 22px 20px;
+  border-top: 1px solid var(--divider-color, rgba(0, 0, 0, 0.08));
 }
 .subsection + .subsection {
   margin-top: 18px;
 }
-.subsection h4 {
-  margin: 0 0 9px;
+.subsection-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 9px;
+}
+.subsection-head h4 {
+  margin: 0;
   font-size: 11.5px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--muted);
+}
+.subsection-head .muted {
+  font-size: 11.5px;
 }
 .lib-list {
   display: flex;
