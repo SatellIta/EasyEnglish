@@ -6,8 +6,8 @@ import type {
   SceneSuggestion,
   SummaryResult,
 } from '@shared/types'
-import { t } from '@/i18n'
-import { api, errorMessage } from '@/lib/api'
+import { locale, t } from '@/i18n'
+import { ApiError, api, errorMessage } from '@/lib/api'
 import { useAppStore } from '@/stores/app'
 
 type SummaryStatus = 'idle' | 'running' | 'done' | 'error'
@@ -20,6 +20,7 @@ export const useSummaryStore = defineStore('summary', () => {
   const status = ref<SummaryStatus>('idle')
   const result = ref<SummaryResult | null>(null)
   const error = ref('')
+  const notice = ref('')
   const modalOpen = ref(false)
   const adding = ref(false)
   const addNotice = ref('')
@@ -37,6 +38,7 @@ export const useSummaryStore = defineStore('summary', () => {
     const id = ++runId
     status.value = 'running'
     error.value = ''
+    notice.value = ''
     addNotice.value = ''
     addNoticeKind.value = 'ok'
     addError.value = ''
@@ -44,7 +46,7 @@ export const useSummaryStore = defineStore('summary', () => {
     modalOpen.value = false
 
     try {
-      const data = await api.summary.generate()
+      const data = await api.summary.generate(locale.value)
       if (id !== runId) return null
       result.value = data
       status.value = 'done'
@@ -52,6 +54,12 @@ export const useSummaryStore = defineStore('summary', () => {
       return data
     } catch (caught) {
       if (id !== runId) return null
+      // 今天没有对话也没有新词条：只提示，不当作总结失败弹出错误面板。
+      if (caught instanceof ApiError && caught.code === 'no_study') {
+        notice.value = errorMessage(caught)
+        status.value = 'idle'
+        return null
+      }
       error.value = errorMessage(caught)
       status.value = 'error'
       modalOpen.value = true
@@ -200,6 +208,7 @@ export const useSummaryStore = defineStore('summary', () => {
     status,
     result,
     error,
+    notice,
     modalOpen,
     adding,
     addNotice,

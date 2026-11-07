@@ -173,10 +173,6 @@ app.get('/api/summary/today', (c) => {
 })
 
 app.post('/api/summary/today/generate', async (c) => {
-  if (!isConfigured(getAiConfig())) {
-    return c.json({ error: 'AI 尚未配置，请先到「设置」页填写 Base URL、模型和 API Key。' }, 400)
-  }
-
   const { start, end, date } = dayRange()
 
   const messages = db
@@ -195,6 +191,22 @@ app.post('/api/summary/today/generate', async (c) => {
   const addedRows = db
     .prepare(`${ENTRY_SELECT} WHERE e.created_at >= ? AND e.created_at < ? ORDER BY e.created_at ASC`)
     .all(start, end)
+
+  // 今天既没有对话、也没有新增词条时不调用 AI；只复习旧词不足以生成总结。
+  if (!messages.length && !addedRows.length) {
+    return c.json(
+      {
+        error: '今天还没有学习记录。先去对话里问点什么，或添加几个词条吧。',
+        code: 'no_study',
+      },
+      400,
+    )
+  }
+
+  if (!isConfigured(getAiConfig())) {
+    return c.json({ error: 'AI 尚未配置，请先到「设置」页填写 Base URL、模型和 API Key。' }, 400)
+  }
+
   const reviewedRows = db
     .prepare(
       `${ENTRY_SELECT}
@@ -210,10 +222,6 @@ app.post('/api/summary/today/generate', async (c) => {
     return true
   })
 
-  if (!messages.length && !entries.length) {
-    return c.json({ error: '今天还没有学习记录。先去对话里问点什么，或添加几个词条吧。' }, 400)
-  }
-
   const existingTexts = (
     db
       .prepare('SELECT text FROM entries ORDER BY created_at DESC, id DESC LIMIT 120')
@@ -222,6 +230,13 @@ app.post('/api/summary/today/generate', async (c) => {
 
   const existingScenes = listSceneSummaries()
   const teaching = getAiTeachingSettings()
+
+  // 总结是界面级产物：英文界面下必须输出英文，即使解释语言仍是双语。
+  const payload = (await c.req.json().catch(() => null)) as { locale?: unknown } | null
+  const uiLocale = payload?.locale === 'en' ? 'en' : 'zh'
+  const summaryMode =
+    uiLocale === 'en' || teaching.explanationMode === 'english' ? 'english' : 'bilingual'
+
   const sceneById = new Map(
     existingScenes.map((scene) => [scene.id, { id: scene.id, name: scene.name }]),
   )
@@ -235,7 +250,7 @@ app.post('/api/summary/today/generate', async (c) => {
   try {
     const raw = await completeChat(
       [
-        { role: 'system', content: buildSummarySystemPrompt(teaching.explanationMode) },
+        { role: 'system', content: buildSummarySystemPrompt(summaryMode) },
         {
           role: 'user',
           content: buildSummaryUserPrompt({
@@ -248,7 +263,7 @@ app.post('/api/summary/today/generate', async (c) => {
               name: scene.name,
               description: scene.description,
             })),
-            explanationMode: teaching.explanationMode,
+            explanationMode: summaryMode,
           }),
         },
       ],

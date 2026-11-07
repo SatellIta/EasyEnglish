@@ -151,7 +151,7 @@ FTS5 虚拟表，`tokenize='trigram'`，内容来自 entries，通过 INSERT/UPD
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
 | GET | `/api/summary/today` | 读取当天已保存的总结 |
-| POST | `/api/summary/today/generate` | 调 AI 生成/覆盖当天总结 |
+| POST | `/api/summary/today/generate` | 调 AI 生成/覆盖当天总结（可带 `locale`；今天无对话且无新词时返回 `no_study`） |
 | GET | `/api/settings` | 返回 URL、模型、Key 掩码、是否已配置 |
 | PUT | `/api/settings` | 更新设置；`clearApiKey: true` 清除 Key |
 | POST | `/api/settings/test` | 用当前或传入的配置做一次最小请求 |
@@ -234,7 +234,7 @@ FTS5 虚拟表，`tokenize='trigram'`，内容来自 entries，通过 INSERT/UPD
 }
 ```
 
-解析时容忍 Markdown 代码围栏；解析失败则退化为纯 Markdown 总结、候选词条为空。结果按日期 upsert 到 `daily_summaries`。
+生成前先检查：当天既没有对话也没有新增词条（只复习旧词不算）时直接返回 400 `{ code: 'no_study' }`，不调用 AI。请求体可带 `{ locale: 'zh' | 'en' }`；英文界面下强制使用英文总结提示词。解析时容忍 Markdown 代码围栏；解析失败则退化为纯 Markdown 总结、候选词条为空。结果按日期 upsert 到 `daily_summaries`。
 
 候选词条在生成和读取时都会通过 `server/lib/dedupe.ts` 标重：规范化文本会忽略大小写、首尾引号和结尾标点，只以主要英文内容与词库及本批次比较；类型、释义、例句、标签都不参与判重。`POST /api/entries/bulk` 在写入前再次查重，并返回 `skipped` / `duplicates`，所以「全部加入」不会把已有词条重复塞进复习队列。
 

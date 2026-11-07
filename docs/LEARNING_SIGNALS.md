@@ -123,6 +123,8 @@ API 的 `Entry` DTO 同步增加 `errorRate`、`errorSamples`、`sourceSessionId
 - 服务端只接受真实存在的 `sceneId`；模型给出未知 ID 时按 `sceneName` 匹配，匹配不到则丢弃建议。
 - 新场景名如果与已有场景重名，会自动转成 `existing`，避免重复建场景。
 - 候选默认 `sceneAccepted = true`；用户可在「今日」页或总结弹窗里取消勾选。
+- 触发条件：今天至少有一段对话，或至少新增了一个词条；只有复习记录、既无对话也无新词时不调用 AI，直接返回 `code: 'no_study'`，前端显示「今天还没有学习记录」提示。
+- 总结语言由界面语言和 `ai.explanationMode` 共同决定：英文界面下始终输出英文总结（即使解释语言为双语）；中文界面下跟随解释语言设置。英文模式下系统提示词和用户提示词骨架均为英文。
 - 入库时先创建词条，再按建议调用 `POST /api/scenes/:id/entries`；新场景先 `POST /api/scenes`。场景归并失败不会回滚已入库词条。
 - 全英文模式下，summary、entries 的 meaning/explanation、errors 的 pattern/explanation 全部使用英文；只有已有场景的 sceneName 可以保留原中文名。
 
@@ -147,8 +149,9 @@ API 的 `Entry` DTO 同步增加 `errorRate`、`errorSamples`、`sourceSessionId
   7. 当前上下文
 - 全英文模式只锁定「用什么语言解释」：要求模型用简单英文定义、同反义词、搭配和例句解释英文，禁止输出中文；不改变场景、记忆、错误注入和人格/偏好内容。
 - 英文模式会在提示词末尾追加 Final reminder，降低模型回退到中文的概率；记忆和错误数据中的中文会明确标注为「仅供理解，不要输出」。
-- 今日总结和个性化例句也跟随该设置：
+- 今日总结的语言跟随界面语言：英文界面下始终使用英文总结提示词（系统提示词和用户提示词骨架均为英文），不受 `ai.explanationMode` 的双语设置影响；中文界面下则跟随 `ai.explanationMode`（`english` 时仍输出英文）。
   - 总结：summary、词条 meaning/explanation、错误 pattern/explanation 使用英文；已有场景的 sceneName 允许保留中文。
+- 个性化例句跟随该设置：
   - 例句：只生成并追加英文例句，不追加中文翻译。
 
 ## 14. 人格 / 用户偏好层

@@ -287,9 +287,9 @@ const SUMMARY_SYSTEM_PROMPT_BILINGUAL = `你是英语学习内容整理助手。
 - 如果多个候选词条构成一个清晰的新场景，用 "new" 并给出简短 sceneName；单个孤立词条优先用 "none"。
 - scene.section 可选，用于场景内的小节；reason 用一句中文说明。`
 
-const SUMMARY_SYSTEM_PROMPT_ENGLISH = `你是英语学习内容整理助手。本轮是 English-only 模式。你的任务是把学习者今天零散的对话和词条，整理成一份可复习的今日总结，抽取值得长期记忆的英文词条，并记录学习者反复出现的错误。
+const SUMMARY_SYSTEM_PROMPT_ENGLISH = `You are an English-learning content organizer. This session is English-only. Your job is to turn the learner's scattered conversations and saved entries from today into a reviewable daily summary, extract English items worth long-term memorization, and record the learner's recurring mistakes.
 
-只输出一个 JSON 对象，不要使用 Markdown 代码块，不要输出任何额外解释。结构必须严格为：
+Output exactly one JSON object, with no Markdown code fences and no extra commentary. The structure must be:
 {
   "summary": "Markdown summary in English",
   "entries": [
@@ -318,22 +318,22 @@ const SUMMARY_SYSTEM_PROMPT_ENGLISH = `你是英语学习内容整理助手。�
   ]
 }
 
-要求：
-- summary 必须全部使用英文，包含：what the learner studied today, key words/phrases, common mistakes, tomorrow's review plan。使用 Markdown 小标题和列表。
+Requirements:
+- Write the summary entirely in English. Cover what the learner studied today, key words/phrases, common mistakes, and a review plan for tomorrow. Use Markdown headings and lists.
 - Do not output Chinese characters, pinyin, or Chinese translations anywhere in the JSON.
-- entries 只收录今天实际出现过的、值得长期复习的英文内容，去重，最多 12 条。
-- type 只能是 "word"、"phrase" 或 "sentence"。
-- text 必须是英文；meaning 和 explanation 必须用简单英文，不要用中文。
-- explanation 控制在 80 words 以内，优先写搭配或一个短例句。
-- 不要收录过于简单、与学习无关的内容。如果今天没有足够内容，entries 使用空数组。
-- errors 只记录今天对话中真实出现的、值得以后提醒的错误，最多 8 条；没有就使用空数组。
-- pattern 用简短英文概括，同一类错误只出现一次；category 只能是 "grammar"、"usage"、"spelling"、"pronunciation" 或 "other"。
-- correction 和 example 必须是英文；example 尽量保留学习者原句。
-- scene.action 只能是 "existing"、"new" 或 "none"。
-- 归入已有场景时，sceneId 必须来自下方「已有场景」列表，不要编造 ID；sceneName 必须与列表中的名字完全一致。唯一的例外：已有场景名可能是中文，此时 sceneName 可以原样保留中文，但 scene.section 和 scene.reason 仍使用英文。
-- 如果候选词条明显属于某个已有场景，用 "existing" 并填 sceneId。
-- 如果多个候选词条构成一个清晰的新场景，用 "new" 并给出简短英文 sceneName；单个孤立词条优先用 "none"。
-- 用户消息里的中文词条释义、场景说明和错误描述只供你理解，不要复制到 JSON 输出中。`
+- Include only English content that actually appeared today and is worth reviewing long term. Deduplicate and include at most 12 entries.
+- type must be "word", "phrase" or "sentence".
+- text must be English; meaning and explanation must use simple English, never Chinese.
+- Keep explanation under 80 words, preferring a collocation or one short example sentence.
+- Do not include trivial or off-topic content. If there is not enough material today, use an empty entries array.
+- Record only mistakes that actually appeared in today's conversation and are worth reminding the learner about later; at most 8. Use an empty array if there are none.
+- Write pattern as a short English description. Merge repeated instances of the same mistake. category must be "grammar", "usage", "spelling", "pronunciation" or "other".
+- correction and example must be English; keep the learner's original sentence in example whenever possible.
+- scene.action must be "existing", "new" or "none".
+- When assigning an existing scene, sceneId must come from the "Existing scenes" list below; never invent an ID. sceneName must match the list exactly. The only exception: an existing scene name may be Chinese; keep it verbatim in sceneName, but write scene.section and scene.reason in English.
+- If candidate entries clearly belong to an existing scene, use "existing" and set sceneId.
+- If several candidate entries form a clear new scene, use "new" with a short English sceneName; prefer "none" for a single isolated item.
+- Chinese meanings, scene notes and error descriptions in the user message are only for your understanding. Never copy them into the JSON output.`
 
 export function buildSummarySystemPrompt(mode: ExplanationMode): string {
   return mode === 'english'
@@ -358,42 +358,85 @@ export function buildSummaryUserPrompt(input: {
     explanationMode = 'bilingual',
   } = input
 
+  const english = explanationMode === 'english'
+  const none = english ? '(none)' : '（暂无）'
+  const separator = english ? ' | ' : '｜'
+
   const entryLines = entries.length
     ? entries
         .map((entry) => {
-          const parts = [`[${ENTRY_TYPE_LABELS[entry.type]}] ${entry.text}`]
+          const typeLabel = english ? entry.type : ENTRY_TYPE_LABELS[entry.type]
+          const parts = [`[${typeLabel}] ${entry.text}`]
           if (entry.meaning) parts.push(truncate(entry.meaning, 120))
           if (entry.explanation) parts.push(truncate(entry.explanation, 160))
-          if (entry.errorRate >= 0.05) parts.push(`错误率 ${Math.round(entry.errorRate * 100)}%`)
-          return `- ${parts.join('｜')}`
+          if (entry.errorRate >= 0.05) {
+            const rate = Math.round(entry.errorRate * 100)
+            parts.push(english ? `error rate ${rate}%` : `错误率 ${rate}%`)
+          }
+          return `- ${parts.join(separator)}`
         })
         .join('\n')
-    : '（今天没有新增词条）'
+    : english
+      ? '(no entries added today)'
+      : '（今天没有新增词条）'
 
   const existingLines = existingTexts.length
     ? existingTexts.slice(0, 120).map((text) => `- ${truncate(text, 120)}`).join('\n')
-    : '（暂无）'
+    : none
 
   const sceneLines = scenes.length
     ? scenes
         .map((scene) => {
-          const description = scene.description ? `｜${truncate(scene.description, 80)}` : ''
-          return `- id=${scene.id}｜${scene.name}${description}`
+          const description = scene.description
+            ? `${separator}${truncate(scene.description, 80)}`
+            : ''
+          return `- id=${scene.id}${separator}${scene.name}${description}`
         })
         .join('\n')
-    : '（暂无）'
+    : none
 
   // 从最近的消息开始截取，控制提示词长度。
   const picked: string[] = []
   let budget = 12_000
   for (let i = messages.length - 1; i >= 0; i -= 1) {
     const message = messages[i]
-    const line = `${message.role === 'user' ? '学习者' : '助手'}：${truncate(message.content, 1_500)}`
+    const speaker = english
+      ? message.role === 'user'
+        ? 'Learner'
+        : 'Tutor'
+      : message.role === 'user'
+        ? '学习者'
+        : '助手'
+    const line = `${speaker}${english ? ': ' : '：'}${truncate(message.content, 1_500)}`
     if (line.length > budget) break
     picked.push(line)
     budget -= line.length
   }
-  const conversation = picked.length ? picked.reverse().join('\n\n') : '（今天没有对话记录）'
+  const conversation = picked.length
+    ? picked.reverse().join('\n\n')
+    : english
+      ? '(no conversation today)'
+      : '（今天没有对话记录）'
+
+  if (english) {
+    return `Date: ${date}
+
+## Entries added or reviewed today
+${entryLines}
+
+## Entries already in the library (do not recommend duplicates)
+${existingLines}
+
+## Existing scenes (when assigning an existing scene, use only these IDs)
+${sceneLines}
+
+## Today's conversation
+${conversation}
+
+Output language: English only. The summary and every meaning, explanation, error pattern and scene reason must be written in English; do not output Chinese characters. Only an existing Chinese scene name may be kept as-is.
+
+Organize today's study and output JSON as instructed.`
+  }
 
   return `日期：${date}
 
@@ -409,7 +452,7 @@ ${sceneLines}
 ## 今天的对话记录
 ${conversation}
 
-${explanationMode === 'english' ? '输出语言：English only。summary、entries 的 meaning/explanation、errors 的 pattern/explanation 全部使用英文，不要输出中文；只有已有场景的 sceneName 可以保留原中文名。\n\n' : ''}请整理今天的学习内容，并按要求输出 JSON。`
+请整理今天的学习内容，并按要求输出 JSON。`
 }
 
 const EXAMPLE_SYSTEM_PROMPT_BILINGUAL = `你是英语例句生成助手。根据给定词条和学习者的场景、易错点，生成自然、地道、难度适中的英文例句，每句附中文翻译。
