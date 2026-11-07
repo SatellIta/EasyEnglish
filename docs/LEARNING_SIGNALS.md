@@ -93,11 +93,13 @@ API 的 `Entry` DTO 同步增加 `errorRate`、`errorSamples`、`sourceSessionId
 
 ## 8. 迁移版本
 
-当前 `SCHEMA_VERSION = 3`，迁移按顺序执行：
+当前 `SCHEMA_VERSION = 6`，迁移按顺序执行：
 
 - 版本 2：`server/migrations/002_scenes.sql`（场景表与 `review_enabled`）
 - 版本 3：`server/migrations/003_learning_signals.sql`（错误档案、错误率、去重、溯源）
 - 版本 4：`server/migrations/004_scene_chat.sql`（对话绑定场景）
+- 版本 5：`server/migrations/005_personas.sql`（人格）
+- 版本 6：`server/migrations/006_rich_entries.sql`（音标、英英释义、图片、Anki GUID、学习状态）
 
 全新数据库由 `server/schema.sql` 一次建好全部结构；旧库会依次执行缺少的迁移。场景导入、Markdown 导入和总结入库都走 `entry-store`，因此 `normalized_text`、`error_rate` 默认值会自动维护。
 
@@ -123,7 +125,7 @@ API 的 `Entry` DTO 同步增加 `errorRate`、`errorSamples`、`sourceSessionId
 - 服务端只接受真实存在的 `sceneId`；模型给出未知 ID 时按 `sceneName` 匹配，匹配不到则丢弃建议。
 - 新场景名如果与已有场景重名，会自动转成 `existing`，避免重复建场景。
 - 候选默认 `sceneAccepted = true`；用户可在「今日」页或总结弹窗里取消勾选。
-- 触发条件：今天至少有一段对话，或至少新增了一个词条；只有复习记录、既无对话也无新词时不调用 AI，直接返回 `code: 'no_study'`，前端显示「今天还没有学习记录」提示。
+- 触发条件：今天至少有一段对话，或至少学习了一个词条（`learned_at` 在当天）；只有复习记录、或只导入了还没学习的 Anki 词条时不调用 AI，直接返回 `code: 'no_study'`，前端显示「今天还没有学习记录」提示。
 - 总结语言由界面语言和 `ai.explanationMode` 共同决定：英文界面下始终输出英文总结（即使解释语言为双语）；中文界面下跟随解释语言设置。英文模式下系统提示词和用户提示词骨架均为英文。
 - 入库时先创建词条，再按建议调用 `POST /api/scenes/:id/entries`；新场景先 `POST /api/scenes`。场景归并失败不会回滚已入库词条。
 - 全英文模式下，summary、entries 的 meaning/explanation、errors 的 pattern/explanation 全部使用英文；只有已有场景的 sceneName 可以保留原中文名。
@@ -170,8 +172,29 @@ API 的 `Entry` DTO 同步增加 `errorRate`、`errorSamples`、`sourceSessionId
 - 自定义人格可以新增、编辑名称/描述/提示词、删除；删除当前选中人格后回退到第一个人格。
 - 人格层只影响语气、称呼和互动风格，不改变语言模式、事实准确性、纠错规则和输出格式。总结和例句不使用人格层。
 
-## 15. 暂不包含
+## 15. Anki 词库导入
+
+- 支持 `.apkg` / `.colpkg`，集合成员按 `collection.anki21b`（zstd, schema 18）→ `collection.anki21` → `collection.anki2` 的顺序选择；旧版 schema 11 的 `col.models` / `col.decks` 也会读取。
+- 用 Node 内置 `node:sqlite` 只读打开临时 SQLite；Anki 的 `unicase` 排序规则在 `better-sqlite3` 中不可用。
+- 字段清洗：`<br>` / 块级标签 → 换行，`<img>` 收集为图片引用，cloze `{{c1::answer::hint}}` → `answer`，`[sound:]` 移除，HTML 实体解码。
+- 自动映射：单词 / Front → `text`；基本释义 / Back → `meaning`；英英释义 → `englishDefinition`；音标 → `phonetic`；图片 → `images`；考纲 → `tags`；柯林斯英汉 → `examples`；笔记 / 易混 → `notes` / `explanation`。
+- 图片只提取被词条引用的栅格文件，按 SHA-256 命名存到 `data/media/`，通过 `/api/media/:name` 访问；SVG、音频不处理。
+- 去重：Anki GUID（`source = 'anki'` + `external_id`）优先，规范化英文文本兜底。支持跳过 / 更新 / 作为新词。`.colpkg` 只合并，不删除。
+- 默认导入后 `learned_at = NULL`、`review_enabled = 0`，先进入学习流程；导入预览中可勾选「直接加入每日复习」。
+
+## 16. 学习流程
+
+- `GET /api/learn/queue?size=10` 随机抽取 `learned_at IS NULL` 的词条；每组数量由用户在 `/learn` 页面设置（`localStorage` 的 `easyenglish.learnBatchSize`）。
+- 辨别阶段只显示单词、音标和朗读，用户选择「认识 / 不认识」；学习阶段只显示不认识词条的完整词库内容。
+- `POST /api/learn/complete` 在一个事务里把本组词条标记为已学习、打开每日复习，并写入 `review_states`：
+  - 认识：`stage = 1`、`interval_days = 1`、明天到期；
+  - 不认识：`stage = 0`、立即到期。
+- 学习过程不调用 AI；释义、英英释义、例句和图片全部来自用户导入或手动维护的词库。
+
+## 17. 暂不包含
 
 - 音素级发音评分与可视化
 - 云端 ASR / 音频上传
 - 场景对话结果自动回写复习调度
+- Anki 官方共享牌组网页浏览 / 下载
+- Anki 音频与 SVG 图片提取

@@ -188,15 +188,21 @@ app.post('/api/summary/today/generate', async (c) => {
     content: string
   }>
 
+  // 只看今天真正学过的词：Anki 批量导入但还没进入学习流程的词条不算今天的学习内容，
+  // 否则一次导入上万词会把总结提示词撑爆。
   const addedRows = db
-    .prepare(`${ENTRY_SELECT} WHERE e.created_at >= ? AND e.created_at < ? ORDER BY e.created_at ASC`)
+    .prepare(
+      `${ENTRY_SELECT}
+       WHERE e.created_at >= ? AND e.created_at < ? AND e.learned_at IS NOT NULL
+       ORDER BY e.created_at ASC`,
+    )
     .all(start, end)
 
-  // 今天既没有对话、也没有新增词条时不调用 AI；只复习旧词不足以生成总结。
+  // 今天既没有对话、也没有学过新词时不调用 AI；只复习旧词不足以生成总结。
   if (!messages.length && !addedRows.length) {
     return c.json(
       {
-        error: '今天还没有学习记录。先去对话里问点什么，或添加几个词条吧。',
+        error: '今天还没有学习记录。先去对话里问点什么，或学习几个词条吧。',
         code: 'no_study',
       },
       400,

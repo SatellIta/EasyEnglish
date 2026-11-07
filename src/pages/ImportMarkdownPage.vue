@@ -9,6 +9,7 @@ import type {
 } from '@shared/types'
 import importFormatHelp from '@/assets/import-format.md?raw'
 import importFormatHelpEn from '@/assets/import-format.en.md?raw'
+import AnkiImportModal from '@/components/AnkiImportModal.vue'
 import BaseModal from '@/components/BaseModal.vue'
 import Icon from '@/components/Icon.vue'
 import ImportItemRow from '@/components/import/ImportItemRow.vue'
@@ -57,6 +58,7 @@ const expanded = ref<Set<string>>(new Set())
 const sceneReview = ref(false)
 const commitResult = ref<ImportCommitResult | null>(null)
 const helpOpen = ref(false)
+const ankiOpen = ref(false)
 const helpContent = computed(() =>
   locale.value === 'en' ? importFormatHelpEn : importFormatHelp,
 )
@@ -314,15 +316,20 @@ function reset() {
           {{ t('import.subtitle') }}
         </p>
       </div>
-      <button
-        class="icon-btn"
-        type="button"
-        :title="t('import.helpTitle')"
-        :aria-label="t('import.helpTitle')"
-        @click="helpOpen = true"
-      >
-        <Icon name="help" :size="18" />
-      </button>
+      <div class="import-actions">
+        <button class="btn btn-ghost" type="button" @click="ankiOpen = true">
+          <Icon name="upload" :size="16" /> {{ t('library.importAnki') }}
+        </button>
+        <button
+          class="icon-btn"
+          type="button"
+          :title="t('import.helpTitle')"
+          :aria-label="t('import.helpTitle')"
+          @click="helpOpen = true"
+        >
+          <Icon name="help" :size="18" />
+        </button>
+      </div>
     </header>
 
     <p v-if="error" class="banner banner-error">{{ error }}</p>
@@ -560,10 +567,18 @@ function reset() {
         </button>
       </template>
     </BaseModal>
+
+    <AnkiImportModal :open="ankiOpen" @close="ankiOpen = false" />
   </div>
 </template>
 
 <style scoped>
+.import-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
 .import-page {
   max-width: 980px;
   padding-bottom: 96px;

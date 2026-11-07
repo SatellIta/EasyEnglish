@@ -5,6 +5,7 @@ export const router = createRouter({
   routes: [
     { path: '/', redirect: '/today' },
     { path: '/today', name: 'today', component: () => import('@/pages/TodayPage.vue') },
+    { path: '/learn', name: 'learn', component: () => import('@/pages/LearnPage.vue') },
     { path: '/chat/:id?', name: 'chat', component: () => import('@/pages/ChatPage.vue') },
     { path: '/review', name: 'review', component: () => import('@/pages/ReviewPage.vue') },
     { path: '/library', name: 'library', component: () => import('@/pages/LibraryPage.vue') },

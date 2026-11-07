@@ -7,8 +7,15 @@ CREATE TABLE IF NOT EXISTS entries (
   examples TEXT NOT NULL DEFAULT '[]',
   notes TEXT,
   tags TEXT NOT NULL DEFAULT '[]',
+  -- Anki 导入的富字段
+  phonetic TEXT,
+  english_definition TEXT,
+  images TEXT NOT NULL DEFAULT '[]',
+  external_id TEXT,
   source TEXT NOT NULL DEFAULT 'manual',
   review_enabled INTEGER NOT NULL DEFAULT 1,
+  -- 学习流程：NULL 表示还没有通过「认识/不认识」流程学习过
+  learned_at TEXT,
   -- 近期加权错误率（0..1）与参与计算的样本数
   error_rate REAL NOT NULL DEFAULT 0,
   error_samples INTEGER NOT NULL DEFAULT 0,
@@ -25,6 +32,8 @@ CREATE INDEX IF NOT EXISTS idx_entries_created_at ON entries(created_at);
 CREATE INDEX IF NOT EXISTS idx_entries_review_enabled ON entries(review_enabled);
 CREATE INDEX IF NOT EXISTS idx_entries_normalized ON entries(type, normalized_text);
 CREATE INDEX IF NOT EXISTS idx_entries_error_rate ON entries(error_rate);
+CREATE INDEX IF NOT EXISTS idx_entries_external ON entries(source, external_id);
+CREATE INDEX IF NOT EXISTS idx_entries_learned ON entries(learned_at);
 
 -- 场景：用户自定义的联想记忆空间。场景成员不改变复习调度，
 -- 是否进入每日复习由 entries.review_enabled 决定。

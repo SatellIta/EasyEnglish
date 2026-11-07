@@ -64,9 +64,17 @@ export interface Entry {
   examples: string[]
   notes: string | null
   tags: string[]
+  /** 音标，例如 UK [ə; eɪ] US [ə; eɪ] */
+  phonetic: string | null
+  /** 英英释义，例如来自 Anki 词库的 WordNet 释义 */
+  englishDefinition: string | null
+  /** 本地图片地址，例如 /api/media/ab12cd34.jpg */
+  images: string[]
   source: string
   /** 是否进入每日复习队列；场景导入的词条默认不进入 */
   reviewEnabled: boolean
+  /** 是否已经通过学习流程认识过；Anki 导入的词条初始为 null */
+  learnedAt: string | null
   /** 该词条所属的场景（一个词条可以出现在多个场景里） */
   sceneRefs: SceneRef[]
   /** 近期加权错误率 0..1；越高表示越容易错/忘，复习间隔会被压缩 */
@@ -119,6 +127,9 @@ export interface EntryInput {
   examples?: string[]
   notes?: string | null
   tags?: string[]
+  phonetic?: string | null
+  englishDefinition?: string | null
+  images?: string[]
   /** 是否进入每日复习，默认 true */
   reviewEnabled?: boolean
   /** 来源标记，默认 manual */
@@ -254,6 +265,149 @@ export interface ImportCommitResult {
   skipped: number
   scenes: string[]
   entryIds: number[]
+}
+
+/* ------------------------------------------------------------------ */
+/* Anki 词库导入                                                       */
+/* ------------------------------------------------------------------ */
+
+export type AnkiPackageVersion = 'legacy1' | 'legacy2' | 'latest'
+export type AnkiDuplicateMode = 'skip' | 'update' | 'new'
+export type AnkiMediaMode = 'placeholder' | 'strip'
+
+export type AnkiWarningCode =
+  | 'media'
+  | 'mediaIndex'
+  | 'legacySchema'
+  | 'unlearned'
+  | 'mediaMissing'
+
+/** 导入提示用代码传递，界面语言下在客户端本地化。 */
+export interface AnkiWarning {
+  code: AnkiWarningCode
+  count?: number
+  version?: number
+}
+
+export interface AnkiFieldInfo {
+  ord: number
+  name: string
+}
+
+/** 一个 Anki note type（笔记模板）到 EasyEnglish 字段的映射。字段索引从 0 开始。 */
+export interface AnkiFieldMapping {
+  text: number
+  meaning: number | null
+  englishDefinition: number | null
+  phonetic: number | null
+  image: number | null
+  examples: number[]
+  explanation: number[]
+  notes: number[]
+  /** 考纲 / 考试标签等，导入时并入 tags */
+  tagFields: number[]
+}
+
+export interface AnkiNotetypeSummary {
+  id: number
+  name: string
+  fields: AnkiFieldInfo[]
+  noteCount: number
+  isCloze: boolean
+  mapping: AnkiFieldMapping
+}
+
+export interface AnkiMappedSample {
+  text: string
+  meaning: string | null
+  englishDefinition: string | null
+  phonetic: string | null
+  images: string[]
+  examples: string[]
+  explanation: string | null
+  notes: string | null
+  tags: string[]
+  type: EntryType
+}
+
+export interface AnkiSampleNote {
+  notetypeId: number
+  notetypeName: string
+  deck: string | null
+  fields: string[]
+  mapped: AnkiMappedSample
+}
+
+export interface AnkiImportPreview {
+  importId: string
+  fileName: string
+  fileSize: number
+  packageVersion: AnkiPackageVersion
+  schemaVersion: number
+  decks: string[]
+  notetypes: AnkiNotetypeSummary[]
+  totals: {
+    notes: number
+    cards: number
+    media: number
+  }
+  sample: AnkiSampleNote[]
+  warnings: AnkiWarning[]
+  defaultNotetypeId: number | null
+}
+
+export interface AnkiImportOptions {
+  /** 只导入这些 note type；缺省导入全部 */
+  notetypeIds?: number[]
+  /** 覆盖预览中的自动映射；key 是 note type id */
+  mappingByNotetype?: Record<string, AnkiFieldMapping>
+  useAnkiTags: boolean
+  addDeckTag: boolean
+  duplicateMode: AnkiDuplicateMode
+  /** 导入后直接加入每日复习；默认 false，先进入学习流程 */
+  addToReview: boolean
+  media: AnkiMediaMode
+}
+
+export interface AnkiImportResult {
+  imported: number
+  updated: number
+  skipped: number
+  failed: number
+  learned: boolean
+  images: number
+  warnings: AnkiWarning[]
+  errors: Array<{ row: number; message: string }>
+}
+
+/* ------------------------------------------------------------------ */
+/* 学习（识别 + 背词）                                                 */
+/* ------------------------------------------------------------------ */
+
+export interface LearnStats {
+  /** 还没有经过学习流程的词条数 */
+  unlearned: number
+  /** 已经学习过的词条数 */
+  learned: number
+  /** 词库总数 */
+  total: number
+}
+
+export interface LearnQueue {
+  items: Entry[]
+  totalUnlearned: number
+}
+
+export interface LearnCompleteInput {
+  known: number[]
+  unknown: number[]
+}
+
+export interface LearnCompleteResult {
+  learned: number
+  known: number
+  unknown: number
+  skipped: number
 }
 
 export interface ListResponse<T> {

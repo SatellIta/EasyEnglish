@@ -2,6 +2,7 @@
 import { onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import type { Entry } from '@shared/types'
+import AnkiImportModal from '@/components/AnkiImportModal.vue'
 import EntryForm from '@/components/EntryForm.vue'
 import ExportModal from '@/components/ExportModal.vue'
 import Icon from '@/components/Icon.vue'
@@ -23,6 +24,7 @@ const query = ref('')
 const refreshToken = ref(0)
 const formOpen = ref(false)
 const exportOpen = ref(false)
+const ankiOpen = ref(false)
 const editing = ref<Entry | null>(null)
 const error = ref('')
 let timer: number | undefined
@@ -67,6 +69,10 @@ async function onSaved() {
   refresh()
 }
 
+async function onAnkiImported() {
+  refresh()
+}
+
 async function remove(entry: Entry) {
   if (
     !window.confirm(
@@ -98,6 +104,9 @@ onMounted(() => {
         </p>
       </div>
       <div class="head-actions">
+        <button class="btn btn-ghost" @click="ankiOpen = true">
+          <Icon name="upload" :size="16" /> {{ t('library.importAnki') }}
+        </button>
         <RouterLink to="/import" class="btn btn-ghost">
           <Icon name="upload" :size="16" /> {{ t('library.import') }}
         </RouterLink>
@@ -171,6 +180,7 @@ onMounted(() => {
     />
 
     <ExportModal :open="exportOpen" @close="exportOpen = false" />
+    <AnkiImportModal :open="ankiOpen" @close="ankiOpen = false" @imported="onAnkiImported" />
   </div>
 </template>
 

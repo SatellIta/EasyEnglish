@@ -33,12 +33,15 @@ Dev flow: Vite proxies `/api` to `:3001`. Production: `pnpm start` sets `NODE_EN
 
 ### Data layer
 
-SQLite via `better-sqlite3` at `data/easy-english.db` (override with `DB_PATH`). WAL mode, foreign keys on. `server/schema.sql` is applied for fresh databases; versioned migrations live in `server/migrations/` and are applied by `server/db.ts` when `PRAGMA user_version` is behind. Current schema version is **5** (`002_scenes`, `003_learning_signals`, `004_scene_chat`, `005_personas`). To evolve the schema, bump `SCHEMA_VERSION`, add a numbered migration, and reflect the final shape in `schema.sql`.
+SQLite via `better-sqlite3` at `data/easy-english.db` (override with `DB_PATH`). WAL mode, foreign keys on. `server/schema.sql` is applied for fresh databases; versioned migrations live in `server/migrations/` and are applied by `server/db.ts` when `PRAGMA user_version` is behind. Current schema version is **6** (`002_scenes`, `003_learning_signals`, `004_scene_chat`, `005_personas`, `006_rich_entries`). To evolve the schema, bump `SCHEMA_VERSION`, add a numbered migration, and reflect the final shape in `schema.sql`.
+
+Anki media files live in `data/media/` (content-addressed, served at `/api/media/:name`); uploaded Anki packages are unpacked under `data/imports/<uuid>/` and deleted after commit/cancel or after one hour.
 
 Tables: `entries`, `review_states`, `review_logs`, `chat_sessions`, `chat_messages`, `daily_summaries`, `settings`, `scenes`, `scene_entries`, `learner_errors`, `personas`, plus `entries_fts` (FTS5 trigram) kept in sync by triggers.
 
-- `entries.type` is `word | phrase | sentence`; `examples` / `tags` are JSON text.
+- `entries.type` is `word | phrase | sentence`; `examples` / `tags` / `images` are JSON text.
 - `entries.review_enabled` (0/1) decides whether an entry enters `/api/review/queue` and due stats. Scene imports default to 0; manual entries default to 1.
+- Rich Anki fields: `phonetic`, `english_definition`, `images` (local `/api/media/...` URLs), and `external_id` (Anki GUID, used for re-import matching). `learned_at` is NULL for imported entries that still need the Learn flow; manual/summary/Markdown entries are learned immediately. `POST /api/learn/complete` sets `learned_at`, enables review, and schedules known words one day out / unknown words immediately.
 - `entries.error_rate` / `error_samples` store the recency-weighted error rate used by the scheduler; `normalized_text` backs dedupe lookups; `source_session_id` / `source_message_id` link summary-added entries back to the conversation.
 - `scenes` are user-defined associative-memory spaces. `scene_entries` is many-to-many and stores `section` (H3), `subsection` (bold label / lead-in), `position`, and `added_at`. Scene membership never changes review scheduling.
 - `learner_errors` stores recurring mistakes extracted by the daily summary, deduped by normalized `pattern`; `personas` stores the selected/default/custom tutoring personas.
@@ -63,6 +66,16 @@ Tables: `entries`, `review_states`, `review_logs`, `chat_sessions`, `chat_messag
 - Export: `server/routes/export.ts` exposes `GET /api/export/options` and `POST /api/export/markdown`. The Library page's export modal selects unscened type groups and/or scenes; output uses the same H1/H2/H3 + three-column tables, with explanation/examples/notes/tags merged into the supplement column. Review progress is not exported.
 - `docs/SCENERY_IMPORT.md` documents the mapping, export, and trade-offs.
 
+## Anki import and Learn flow
+
+- Import endpoints: `POST /api/import/anki/preview` (multipart `file`), `POST /api/import/anki/commit` (`{ importId, options }`), `DELETE /api/import/anki/:importId`. Uploads are capped at 200MB and unpacked under `data/imports/<uuid>/`; sessions expire after one hour.
+- Parser: `server/lib/import/zip.ts` is a dependency-free ZIP reader (stored/deflate), `anki-package.ts` handles `collection.anki21b` (zstd), `.anki21`, `.anki2`, schema 11 and 18, and reads with `node:sqlite` because `better-sqlite3` lacks Anki's `unicase` collation. Notes are streamed in batches; the limits are 300MB decompressed SQLite and 100,000 notes.
+- Mapping: `server/lib/import/anki-mapper.ts` cleans HTML/cloze/`[sound:]`, auto-maps fields by name (单词/基本释义/英英释义/音标/图片/考纲/柯林斯英汉, plus Front/Back), extracts Collins example pairs, and infers word/phrase/sentence. Users can override the primary note type's mapping in the preview.
+- Images: only referenced raster images are extracted, hashed, and stored under `data/media/`; `/api/media/:name` serves them with immutable caching. SVG and audio are skipped. `images` on an entry is a JSON array of local URLs.
+- Commit dedupes by Anki GUID (`source = 'anki'`, `external_id`) first, then normalized English text. Modes are skip / update (content only, review state preserved) / new. `.colpkg` is always merged; existing entries are never deleted. `addToReview` off (default) leaves `learned_at = NULL` and `review_enabled = 0` so the words enter the Learn flow first.
+- Learn endpoints: `GET /api/learn/stats`, `GET /api/learn/queue?size=5..50&types=`, `POST /api/learn/complete { known, unknown }`. The queue draws random entries with `learned_at IS NULL`. Completing sets `learned_at`, enables review, and schedules known words one day later / unknown words immediately.
+- The Learn page (`/learn`, nav between Today and Chat) is a two-phase flow: recognize the whole batch (known/unknown), then study only the unknown entries with the full stored details (Chinese meaning, English definition, phonetics, examples, images). Details come entirely from the user's library; no AI generation.
+
 ### AI
 
 OpenAI-compatible providers only (OpenAI, DeepSeek, Qwen, Ollama, etc.). Config resolution in `server/ai/config.ts`: DB settings > `EASYENGLISH_BASE_URL` / `EASYENGLISH_API_KEY` / `EASYENGLISH_MODEL` > defaults. Deliberately do **not** read generic `OPENAI_*` env vars — they may belong to unrelated tools on the machine. Localhost URLs may run without an API key.
@@ -74,7 +87,7 @@ OpenAI-compatible providers only (OpenAI, DeepSeek, Qwen, Ollama, etc.). Config 
 - Recurring errors: `server/lib/errors.ts` + `server/routes/errors.ts`; top active errors are injected into chat and updated by summary generation.
 - Streaming: `POST /api/chat/stream` emits newline-delimited JSON (`meta` / `delta` / `done` / `error`), not SSE. Client parser is `streamChat()` in `src/lib/api.ts`.
 - Scene chat: `chat_sessions.scene_id` binds a session to a scene; scene entries are injected and the prompt switches to role-play. `POST /api/chat/sessions { sceneId }` creates one.
-- Daily summary: `POST /api/summary/today/generate` accepts an optional `{ locale: 'zh' | 'en' }` body and asks the model for `{ summary, entries[], errors[] }`, tolerates code fences, upserts `daily_summaries`, stores recurring errors, and returns candidate entries. It is not called when today has neither conversation messages nor entries added today (review-only activity returns `400 { code: 'no_study' }`), and the client shows an inline notice instead of the failure modal. Candidates include `duplicate` / `existingEntryId`, `sourceSessionId` / `sourceMessageId`, and validated `sceneSuggestion` (`existing` / `new` / `none`). Bulk add checks again and reports `skipped`.
+- Daily summary: `POST /api/summary/today/generate` accepts an optional `{ locale: 'zh' | 'en' }` body and asks the model for `{ summary, entries[], errors[] }`, tolerates code fences, upserts `daily_summaries`, stores recurring errors, and returns candidate entries. It is not called when today has neither conversation messages nor entries learned today (review-only activity returns `400 { code: 'no_study' }`), and the client shows an inline notice instead of the failure modal. Anki imports that have not gone through Learn (`learned_at IS NULL`) are excluded so a large deck cannot flood the prompt. Candidates include `duplicate` / `existingEntryId`, `sourceSessionId` / `sourceMessageId`, and validated `sceneSuggestion` (`existing` / `new` / `none`). Bulk add checks again and reports `skipped`.
 - Personalized examples: `POST /api/entries/:id/examples` generates 2–3 examples from the entry, its scenes, recurring errors and existing examples; appends deduped examples. In English-only mode no Chinese translation is appended.
 - Summary generation is a **background job** in `src/stores/summary.ts`. Triggering it from Chat or Today keeps it running across route changes; `SummaryJobHost.vue` (mounted in `AppShell`) shows the confirmation modal on any page, with a persistent pill while pending candidates remain.
 - The API key is stored in the local SQLite `settings` table in plaintext and masked in responses. This is a personal local app; keep it that way unless asked to add OS keychain support.
@@ -83,7 +96,7 @@ OpenAI-compatible providers only (OpenAI, DeepSeek, Qwen, Ollama, etc.). Config 
 
 - UI is bilingual: Chinese and English, switchable in Settings and persisted in `localStorage` under `easyenglish.locale`. All display strings live in `src/i18n/messages.ts` and are accessed through `t()`; never hard-code UI text in pages/components. `src/i18n/index.ts` owns `locale`, `setLocale`, label helpers and server-error localization. The inline `index.html` script restores `<html lang>` before paint.
 - Type labels use `entryTypeLabel()` / `errorCategoryLabel()` from `src/i18n`, not the Chinese constants in `shared/types.ts` (those remain for server prompts).
-- Pages: Today (`/today`), Chat (`/chat/:id?`), Review (`/review`), Library (`/library`), Import (`/import`), Settings (`/settings`).
+- Pages: Today (`/today`), Learn (`/learn`), Chat (`/chat/:id?`), Review (`/review`), Library (`/library`), Import (`/import`), Settings (`/settings`).
 - Library has three views: date (`DateView.vue`), type (`TypeView.vue`), scene (`SceneView.vue`). The page owns search debouncing and the shared `EntryForm`; views own their own data loads. `EntryCard.vue` is the shared row component.
 - Scene creation/editing uses `SceneFormModal.vue`; adding existing entries uses `SceneEntryPicker.vue`. New entries created from a scene default to `reviewEnabled: false`.
 - `ImportMarkdownPage.vue` owns the two-step import flow; `ImportItemRow.vue` renders each preview item and allows a per-item type override.
@@ -103,11 +116,11 @@ OpenAI-compatible providers only (OpenAI, DeepSeek, Qwen, Ollama, etc.). Config 
 
 ## Current state
 
-- Working: entries CRUD + text-only dedupe, configurable Ebbinghaus review with error-rate weighting, AI chat streaming with language/persona/scene/memory/error layers, daily summary with scene suggestions and traceability, personalized examples, pronunciation shadowing, settings (AI / persona / forgetting curve / explanation language / interface language / theme), Markdown import preview/commit, scenes, export, and three library views (date / type / scene).
+- Working: entries CRUD + text-only dedupe, configurable Ebbinghaus review with error-rate weighting, AI chat streaming with language/persona/scene/memory/error layers, daily summary with scene suggestions and traceability, personalized examples, pronunciation shadowing, settings (AI / persona / forgetting curve / explanation language / interface language / theme), Markdown import preview/commit, Anki `.apkg`/`.colpkg` import with rich fields and images, the two-phase Learn flow, scenes, export, and three library views (date / type / scene).
 - Daily summary generation is background-safe across route changes and confirms candidates in a global modal; bulk/summary adds are deduped by normalized English text.
 - Two themes: Neumorphism and Swiss International, with persistence and a sidebar toggle.
 - Speech uses the browser Web Speech API for TTS; `src/lib/pronunciation.ts` adds local shadowing feedback via `SpeechRecognition` (Chrome/Edge).
-- Schema version 5 adds `review_enabled`, `scenes`, `scene_entries`, `learner_errors`, `personas`, error-rate fields, dedupe text, source pointers, and `chat_sessions.scene_id`; existing databases migrate automatically.
-- `docs/LEARNING_SIGNALS.md` documents error rate, learner errors, dedupe, traceability, context budget, scenes/chat, scene suggestions, examples, pronunciation and the prompt layers.
+- Schema version 5 adds `review_enabled`, `scenes`, `scene_entries`, `learner_errors`, `personas`, error-rate fields, dedupe text, source pointers, and `chat_sessions.scene_id`; schema version 6 adds `phonetic`, `english_definition`, `images`, `external_id`, and `learned_at`. Existing databases migrate automatically.
+- `docs/LEARNING_SIGNALS.md` documents error rate, learner errors, dedupe, traceability, context budget, scenes/chat, scene suggestions, examples, pronunciation, prompt layers, Anki import and the Learn flow.
 - Verified by manual API smoke tests and Playwright screenshots; no automated tests yet.
 - `docs/ARCHITECTURE.md` has endpoint/data-model detail; `docs/SCENERY_IMPORT.md` documents the import/scene mapping; `docs/UI_STYLE.md` indexes the two binding visual contracts.
