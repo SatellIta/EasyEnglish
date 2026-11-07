@@ -26,7 +26,11 @@ interface WordView {
 }
 
 const selectedWord = ref<string | null>(null)
-const wordView = ref<WordView | null>(null)
+/** 单词预览的返回栈；返回上级时只弹出最后一层。 */
+const wordStack = ref<WordView[]>([])
+const wordView = computed<WordView | null>(
+  () => wordStack.value[wordStack.value.length - 1] ?? null,
+)
 const ai = ref<{
   loading: boolean
   error: string | null
@@ -42,12 +46,28 @@ const title = computed(() =>
   wordView.value ? t('lookup.title') : t('library.detail.title'),
 )
 
+const backLabel = computed(() =>
+  wordStack.value.length > 1 ? t('lookup.backLevel') : t('lookup.back'),
+)
+
+function resetAiState() {
+  ai.value = { loading: false, error: null, draft: null }
+  addError.value = null
+}
+
 function resetWordState() {
   lookupToken += 1
   selectedWord.value = null
-  wordView.value = null
-  ai.value = { loading: false, error: null, draft: null }
-  addError.value = null
+  wordStack.value = []
+  resetAiState()
+}
+
+function updateCurrentWord(patch: Partial<WordView>) {
+  const next = [...wordStack.value]
+  const index = next.length - 1
+  if (index < 0) return
+  next[index] = { ...next[index], ...patch }
+  wordStack.value = next
 }
 
 watch(
@@ -67,28 +87,35 @@ function onContentClick(event: MouseEvent) {
 
 async function openWord(word: string) {
   selectedWord.value = word
-  ai.value = { loading: false, error: null, draft: null }
-  addError.value = null
+  resetAiState()
   const token = (lookupToken += 1)
-  wordView.value = { text: word, entry: null, loading: true, error: null }
+  wordStack.value = [
+    ...wordStack.value,
+    { text: word, entry: null, loading: true, error: null },
+  ]
 
   try {
     const result = await api.entries.lookup(word)
     if (token !== lookupToken) return
-    wordView.value = { text: word, entry: result.entry, loading: false, error: null }
+    updateCurrentWord({ entry: result.entry, loading: false })
   } catch (error) {
     if (token !== lookupToken) return
-    wordView.value = {
-      text: word,
+    updateCurrentWord({
       entry: null,
       loading: false,
       error: localizeServerError(error instanceof Error ? error.message : String(error)),
-    }
+    })
   }
 }
 
+/** 只关闭当前这一层单词预览；没有上一层时回到原词条。 */
 function backToEntry() {
-  resetWordState()
+  if (!wordStack.value.length) return
+  lookupToken += 1
+  wordStack.value = wordStack.value.slice(0, -1)
+  const previous = wordStack.value[wordStack.value.length - 1]
+  selectedWord.value = previous?.text ?? null
+  resetAiState()
 }
 
 async function askAi() {
@@ -124,7 +151,7 @@ async function addToLibrary() {
       phonetic: draft.phonetic,
       source: 'ai-lookup',
     })
-    wordView.value = { text: word, entry: created, loading: false, error: null }
+    updateCurrentWord({ text: word, entry: created, loading: false, error: null })
     ai.value = { loading: false, error: null, draft: null }
     emit('created', created)
   } catch (error) {
@@ -132,8 +159,8 @@ async function addToLibrary() {
     // 409：这个词刚被别处加入，重新查一次并显示已有词条。
     if (error instanceof ApiError && error.status === 409) {
       const found = await api.entries.lookup(word).catch(() => null)
-      if (found?.entry && wordView.value) {
-        wordView.value = { ...wordView.value, entry: found.entry }
+      if (found?.entry) {
+        updateCurrentWord({ entry: found.entry })
         ai.value = { loading: false, error: null, draft: null }
       }
     }
@@ -154,7 +181,7 @@ async function addToLibrary() {
     <div v-if="wordView" class="entry-detail" @click="onContentClick">
       <button class="lookup-back" type="button" @click="backToEntry">
         <Icon name="chevron-left" :size="16" />
-        {{ t('lookup.back') }}
+        {{ backLabel }}
       </button>
 
       <div v-if="wordView.loading" class="lookup-state">{{ t('lookup.loading') }}</div>
