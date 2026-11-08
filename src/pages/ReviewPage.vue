@@ -480,6 +480,40 @@ onBeforeUnmount(() => {
                 />
               </div>
             </div>
+            <template v-if="current.senses.length >= 2">
+              <div class="reveal-block">
+                <div class="row between wrap example-head">
+                  <h3>{{ t('review.senses') }}</h3>
+                  <button
+                    class="btn btn-ghost btn-sm"
+                    :disabled="generatingExamples"
+                    @click="generateExamples"
+                  >
+                    <Icon :name="generatingExamples ? 'refresh' : 'sparkles'" :size="14" />
+                    {{ generatingExamples ? t('review.generatingExamples') : t('review.generateExamples') }}
+                  </button>
+                </div>
+                <ol class="review-senses">
+                  <li v-for="(sense, senseIndex) in current.senses" :key="senseIndex">
+                    <div class="sense-head">
+                      <span class="sense-index" aria-hidden="true">{{ senseIndex + 1 }}</span>
+                      <p v-if="sense.meaning" class="sense-meaning">{{ sense.meaning }}</p>
+                    </div>
+                    <p v-if="sense.englishDefinition" class="english-def">
+                      {{ sense.englishDefinition }}
+                    </p>
+                    <p v-if="sense.explanation" class="pre-wrap">{{ sense.explanation }}</p>
+                    <ul v-if="sense.examples.length">
+                      <li v-for="(example, exampleIndex) in sense.examples" :key="exampleIndex">
+                        {{ example }}
+                      </li>
+                    </ul>
+                  </li>
+                </ol>
+                <p v-if="exampleNotice" class="hint example-notice">{{ exampleNotice }}</p>
+              </div>
+            </template>
+            <template v-else>
             <div
               v-for="block in definitionBlocks"
               :key="block.kind"
@@ -512,6 +546,7 @@ onBeforeUnmount(() => {
               <p v-else class="hint">{{ t('review.noExamplesHint') }}</p>
               <p v-if="exampleNotice" class="hint example-notice">{{ exampleNotice }}</p>
             </div>
+            </template>
             <div v-if="current.notes" class="reveal-block">
               <h3>{{ t('review.notes') }}</h3>
               <p class="pre-wrap">{{ current.notes }}</p>
@@ -771,6 +806,53 @@ onBeforeUnmount(() => {
 }
 .reveal-block li + li {
   margin-top: 4px;
+}
+.review-senses {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.review-senses > li {
+  padding: 11px 13px;
+  border-radius: var(--radius);
+  background: var(--bg-soft);
+  box-shadow: var(--shadow-inset-sm);
+}
+.review-senses > li + li {
+  margin-top: 0;
+}
+.review-senses ul {
+  margin: 4px 0 0;
+  padding-left: 1.15em;
+}
+.sense-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.sense-index {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--type-word-ink);
+  font-size: 11.5px;
+  font-weight: 700;
+}
+.sense-meaning {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.review-senses p {
+  margin: 4px 0 0;
 }
 .reveal-tags {
   display: flex;

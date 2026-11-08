@@ -30,6 +30,7 @@
 | `meaning` | 中文含义 |
 | `explanation` | 用法、搭配、易混点等 |
 | `examples` | JSON 字符串数组 |
+| `senses` | 一词多义的义项 JSON 数组；每项含 `meaning` / `englishDefinition` / `explanation` / `examples`，只有两个及以上义项时才写入 |
 | `notes` | 个人笔记 |
 | `tags` | JSON 字符串数组 |
 | `phonetic` | 音标，来自 Anki 或手动填写 |
@@ -90,7 +91,7 @@
 
 ### entries_fts
 
-FTS5 虚拟表，`tokenize='trigram'`，内容来自 entries，通过 INSERT/UPDATE/DELETE 触发器同步。trigram 对中英文子串搜索都友好；少于 3 个字符的查询回退到 LIKE。
+FTS5 虚拟表，`tokenize='trigram'`，内容来自 entries 的 `text`、`meaning`、`explanation`、`notes` 和 `senses`，通过 INSERT/UPDATE/DELETE 触发器同步。trigram 对中英文子串搜索都友好；少于 3 个字符的查询回退到 LIKE。
 
 ## API
 
@@ -137,7 +138,7 @@ FTS5 虚拟表，`tokenize='trigram'`，内容来自 entries，通过 INSERT/UPD
 | POST | `/api/import/markdown/sync` | 读取设置中的本地 Markdown 文件并同步（等价于 `updateExisting: true`） |
 | GET/PUT | `/api/settings/markdown` | 读取/保存 `{ path }`，路径必须是 `.md` / `.markdown` / `.txt` |
 
-解析器在 `server/lib/markdown-import.ts`，只处理文本，不执行 Markdown 中的任何内容。HTML 注释会被整体忽略。预览会按规范化英文内容标记数据库中和本批次内的重复项；普通分组的重复项默认不勾选，场景分组的重复项默认勾选。提交逻辑在 `server/lib/markdown-commit.ts`：已存在文本会复用词条并加入场景；`updateExisting` 只更新 Markdown 实际提供的字段（标签取并集），并保留 `review_enabled`、`learned_at`、错误率和来源；裸词不会清空已有释义。
+解析器在 `server/lib/markdown-import.ts`，只处理文本，不执行 Markdown 中的任何内容。HTML 注释会被整体忽略。预览会按规范化英文内容标记数据库中的重复项，并按「文本 + 内容」标记本批次内的完全相同项；同一文本的不同释义会同时保留，提交时合并为义项。普通分组的重复项默认不勾选，场景分组的重复项默认勾选。提交逻辑在 `server/lib/markdown-commit.ts`：同一文本的多条记录聚合为一条词条，不同释义成为 `senses` 的不同义项，同一义项合并例句；已存在文本会复用词条并加入场景；`updateExisting` 只更新 Markdown 实际提供的字段（标签取并集），并保留 `review_enabled`、`learned_at`、错误率和来源；义项是累加的，不会删除已有义项。裸词不会清空已有释义。
 
 ### Anki 导入
 
@@ -314,7 +315,7 @@ Anki 包解析在 `server/lib/import/`：
 
 词库有四个视图：按日期、按类型、按标签、按场景。标签视图用 `/api/tags` 展示 Anki 标签分组，进入分组后可按最新 / 最早 / 字典升降序排列；点击词条标题会打开 `EntryDetailModal`，直接展示完整的中文释义、英英释义、音标、例句、图片和标签，并可跳转编辑。
 
-详情弹窗里的短语、句子、英英释义、补充说明和例句使用 `ClickableText`：第一次点击单词会框选高亮，再点同一个词会按规范化英文内容查词。已存在的词条直接在当前弹窗中打开；不存在的词会显示空状态，提供「问 AI」（`POST /api/entries/explain` 生成草稿）和「加入词库」按钮，并提示可以导入 Anki 词库补充资料。查词层级保存在返回栈里，「返回」只退回上一层，关闭按钮才关闭整个弹窗；点击空白区域会取消高亮。
+详情弹窗里的短语、句子、英英释义、补充说明和例句使用 `ClickableText`：第一次点击单词会框选高亮，再点同一个词会按规范化英文内容查词。已存在的词条直接在当前弹窗中打开；不存在的词会显示空状态，提供「问 AI」（`POST /api/entries/explain` 生成草稿）和「加入词库」按钮，并提示可以导入 Anki 词库补充资料。查词层级保存在返回栈里，「返回」只退回上一层，关闭按钮才关闭整个弹窗；点击空白区域会取消高亮。多义词的详情、复习揭晓和编辑表单都会按义项分组显示；编辑表单可以在扁平字段和义项编辑之间切换（第二个义项出现时自动切换到义项模式）。
 
 ## 扩展点
 

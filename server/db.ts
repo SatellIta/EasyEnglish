@@ -12,7 +12,7 @@ db.pragma('synchronous = NORMAL')
 db.pragma('foreign_keys = ON')
 db.pragma('busy_timeout = 5000')
 
-const SCHEMA_VERSION = 6
+const SCHEMA_VERSION = 7
 const schema = readFileSync(new URL('./schema.sql', import.meta.url), 'utf8')
 const migration2 = readFileSync(new URL('./migrations/002_scenes.sql', import.meta.url), 'utf8')
 const migration3 = readFileSync(
@@ -25,6 +25,7 @@ const migration6 = readFileSync(
   new URL('./migrations/006_rich_entries.sql', import.meta.url),
   'utf8',
 )
+const migration7 = readFileSync(new URL('./migrations/007_senses.sql', import.meta.url), 'utf8')
 
 let currentVersion = db.pragma('user_version', { simple: true }) as number
 
@@ -136,4 +137,22 @@ if (currentVersion < 6) {
     }
     db.pragma('user_version = 6')
   })()
+  currentVersion = 6
+}
+
+if (currentVersion < 7) {
+  db.transaction(() => {
+    const columns = db.pragma('table_info(entries)') as Array<{ name: string }>
+    if (!columns.some((column) => column.name === 'senses')) {
+      db.exec("ALTER TABLE entries ADD COLUMN senses TEXT NOT NULL DEFAULT '[]'")
+    }
+
+    // FTS5 的列不能原地增加：旧索引整体重建，把 senses 也纳入检索。
+    const ftsColumns = db.pragma('table_info(entries_fts)') as Array<{ name: string }>
+    if (!ftsColumns.some((column) => column.name === 'senses')) {
+      db.exec(migration7)
+    }
+    db.pragma('user_version = 7')
+  })()
+  currentVersion = 7
 }

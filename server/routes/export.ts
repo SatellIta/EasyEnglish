@@ -33,55 +33,98 @@ function escapeCell(value: string): string {
   return value.replace(/\r?\n/g, '<br>').replace(/\|/g, '\\|').trim()
 }
 
+interface ExportRow {
+  text: string
+  meaning: string | null
+  englishDefinition: string | null
+  examples: string[]
+  explanation: string | null
+  notes: string | null
+  phonetic: string | null
+  tags: string[]
+}
+
 interface ExportColumn {
   header: string
   /** 该列在整组里是否至少有一个值 */
-  has: (entry: Entry) => boolean
-  value: (entry: Entry) => string
+  has: (row: ExportRow) => boolean
+  value: (row: ExportRow) => string
   /** 总是输出 */
   always?: boolean
 }
 
 /** 具名列；导入端按表头识别，列顺序可以改变。 */
 const COLUMNS: ExportColumn[] = [
-  { header: 'English', has: () => true, value: (entry) => entry.text, always: true },
-  { header: '含义', has: (entry) => Boolean(entry.meaning), value: (entry) => entry.meaning ?? '' },
+  { header: 'English', has: () => true, value: (row) => row.text, always: true },
+  { header: '含义', has: (row) => Boolean(row.meaning), value: (row) => row.meaning ?? '' },
   {
     header: '英英释义',
-    has: (entry) => Boolean(entry.englishDefinition),
-    value: (entry) => entry.englishDefinition ?? '',
+    has: (row) => Boolean(row.englishDefinition),
+    value: (row) => row.englishDefinition ?? '',
   },
   {
     header: '例句',
-    has: (entry) => entry.examples.length > 0,
-    value: (entry) => entry.examples.join('<br>'),
+    has: (row) => row.examples.length > 0,
+    value: (row) => row.examples.join('<br>'),
   },
   {
     header: '补充',
-    has: (entry) => Boolean(entry.explanation),
-    value: (entry) => entry.explanation ?? '',
+    has: (row) => Boolean(row.explanation),
+    value: (row) => row.explanation ?? '',
   },
-  { header: '笔记', has: (entry) => Boolean(entry.notes), value: (entry) => entry.notes ?? '' },
+  { header: '笔记', has: (row) => Boolean(row.notes), value: (row) => row.notes ?? '' },
   {
     header: '音标',
-    has: (entry) => Boolean(entry.phonetic),
-    value: (entry) => entry.phonetic ?? '',
+    has: (row) => Boolean(row.phonetic),
+    value: (row) => row.phonetic ?? '',
   },
   {
     header: '标签',
-    has: (entry) => entry.tags.length > 0,
-    value: (entry) => entry.tags.join(', '),
+    has: (row) => row.tags.length > 0,
+    value: (row) => row.tags.join(', '),
   },
 ]
 
+/**
+ * 多义词导出成多行相同 English 的记录，每行一个义项；
+ * 再次导入时会被合并回同一个词条。笔记/音标/标签在这些行里重复。
+ */
+function exportRows(entry: Entry): ExportRow[] {
+  const base = {
+    text: entry.text,
+    notes: entry.notes,
+    phonetic: entry.phonetic,
+    tags: entry.tags,
+  }
+  if (entry.senses.length >= 2) {
+    return entry.senses.map((sense) => ({
+      ...base,
+      meaning: sense.meaning,
+      englishDefinition: sense.englishDefinition,
+      examples: sense.examples,
+      explanation: sense.explanation,
+    }))
+  }
+  return [
+    {
+      ...base,
+      meaning: entry.meaning,
+      englishDefinition: entry.englishDefinition,
+      examples: entry.examples,
+      explanation: entry.explanation,
+    },
+  ]
+}
+
 function tableFor(entries: Entry[]): string {
-  const columns = COLUMNS.filter((column) => column.always || entries.some(column.has))
+  const rows = entries.flatMap(exportRows)
+  const columns = COLUMNS.filter((column) => column.always || rows.some(column.has))
   const lines = [
     `| ${columns.map((column) => column.header).join(' | ')} |`,
     `| ${columns.map(() => '---').join(' | ')} |`,
-    ...entries.map(
-      (entry) =>
-        `| ${columns.map((column) => escapeCell(column.value(entry))).join(' | ')} |`,
+    ...rows.map(
+      (row) =>
+        `| ${columns.map((column) => escapeCell(column.value(row))).join(' | ')} |`,
     ),
   ]
   return lines.join('\n')

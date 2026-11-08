@@ -76,7 +76,21 @@ const filteredItems = computed<SceneEntry[]>(() => {
   const items = detail.items.filter((item) => {
     if (activeType.value !== 'all' && item.entry.type !== activeType.value) return false
     if (!q) return true
-    return [item.entry.text, item.entry.meaning, item.entry.explanation, item.entry.notes, item.section, item.subsection]
+    const senseText = item.entry.senses.flatMap((sense) => [
+      sense.meaning,
+      sense.englishDefinition,
+      sense.explanation,
+      ...sense.examples,
+    ])
+    return [
+      item.entry.text,
+      item.entry.meaning,
+      item.entry.explanation,
+      item.entry.notes,
+      ...senseText,
+      item.section,
+      item.subsection,
+    ]
       .filter(Boolean)
       .some((value) => String(value).toLowerCase().includes(q))
   })

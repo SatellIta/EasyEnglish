@@ -82,6 +82,32 @@ If only I had known.
 
 The entry above gets the tag `Expression`. This works in all three regular categories. Inside `# Scenery`, headings describe the scene structure and never become tags.
 
+### Multiple meanings
+
+The same English text may appear on several lines, one meaning per line. They are merged into **one entry** with several senses, and each line's examples stay with its sense:
+
+```md
+# collocations
+
+kick in = start to have an effect
+> My survival instinct kicked in
+
+kick in = contribute money
+> Everyone kicks in 10 for the supplement
+```
+
+After import the library has a single `kick in` entry with two senses and separate examples per sense.
+
+On a later import or sync:
+
+- new examples under an existing meaning are appended to that sense;
+- a new meaning becomes a new sense;
+- existing senses are never deleted (sync is additive).
+
+In the manual import preview, different meanings of the same text are selected by default; only rows with exactly the same content are left unchecked. Markdown sync from Settings applies the same merge rules directly.
+
+When exporting, a polysemous entry becomes several rows with the same `English` value, one per sense, so re-importing restores the same entry.
+
 ## 3. Scenery scenes
 
 The recommended structure is scene → segment → type:

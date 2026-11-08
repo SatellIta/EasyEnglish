@@ -31,11 +31,11 @@ export function insertEntry(input: EntryInput, options: InsertEntryOptions = {})
   const info = db
     .prepare(
       `INSERT INTO entries
-        (type, text, meaning, explanation, examples, notes, tags,
+        (type, text, meaning, explanation, examples, senses, notes, tags,
          phonetic, english_definition, images, external_id,
          source, review_enabled, learned_at,
          normalized_text, source_session_id, source_message_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       input.type,
@@ -43,6 +43,7 @@ export function insertEntry(input: EntryInput, options: InsertEntryOptions = {})
       input.meaning ?? null,
       input.explanation ?? null,
       JSON.stringify(input.examples ?? []),
+      JSON.stringify(input.senses ?? []),
       input.notes ?? null,
       JSON.stringify(input.tags ?? []),
       input.phonetic ?? null,
@@ -78,19 +79,14 @@ export function updateEntryContent(
   options: { externalId?: string | null; source?: string } = {},
 ): Entry | null {
   const now = nowIso()
+  // senses 未提供时：Anki 更新模式要把内容合并进第一个义项，而不是留下旧义项。
+  const existing = input.senses === undefined ? getEntryById(id) : null
   const fields = [
     'type = ?',
     'text = ?',
     'meaning = ?',
     'explanation = ?',
     'examples = ?',
-    'notes = ?',
-    'tags = ?',
-    'phonetic = ?',
-    'english_definition = ?',
-    'images = ?',
-    'normalized_text = ?',
-    'updated_at = ?',
   ]
   const params: unknown[] = [
     input.type,
@@ -98,6 +94,35 @@ export function updateEntryContent(
     input.meaning ?? null,
     input.explanation ?? null,
     JSON.stringify(input.examples ?? []),
+  ]
+  // senses 未提供时保留原义项（例如 Anki 更新模式）；Markdown 同步会显式传入合并结果。
+  if (input.senses !== undefined) {
+    fields.push('senses = ?')
+    params.push(JSON.stringify(input.senses))
+  } else if (existing?.senses.length) {
+    const senses = existing.senses.map((sense, index) =>
+      index === 0
+        ? {
+            meaning: input.meaning ?? sense.meaning,
+            englishDefinition: input.englishDefinition ?? sense.englishDefinition,
+            explanation: input.explanation ?? sense.explanation,
+            examples: input.examples?.length ? input.examples : sense.examples,
+          }
+        : sense,
+    )
+    fields.push('senses = ?')
+    params.push(JSON.stringify(senses))
+  }
+  fields.push(
+    'notes = ?',
+    'tags = ?',
+    'phonetic = ?',
+    'english_definition = ?',
+    'images = ?',
+    'normalized_text = ?',
+    'updated_at = ?',
+  )
+  params.push(
     input.notes ?? null,
     JSON.stringify(input.tags ?? []),
     input.phonetic ?? null,
@@ -105,7 +130,7 @@ export function updateEntryContent(
     JSON.stringify(input.images ?? []),
     normalizeEntryText(input.text),
     now,
-  ]
+  )
   if (options.source) {
     fields.push('source = ?')
     params.push(options.source)

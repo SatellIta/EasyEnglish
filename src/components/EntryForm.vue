@@ -12,6 +12,17 @@ const props = withDefaults(
 )
 const emit = defineEmits<{ close: []; saved: [entry: Entry] }>()
 
+interface SenseDraft {
+  meaning: string
+  englishDefinition: string
+  explanation: string
+  examplesText: string
+}
+
+function emptySense(): SenseDraft {
+  return { meaning: '', englishDefinition: '', explanation: '', examplesText: '' }
+}
+
 const form = reactive({
   type: 'word' as EntryType,
   text: '',
@@ -24,6 +35,7 @@ const form = reactive({
   tagsText: '',
   images: [] as string[],
   reviewEnabled: true,
+  senses: [] as SenseDraft[],
 })
 const saving = ref(false)
 const error = ref('')
@@ -54,6 +66,15 @@ function reset() {
   form.tagsText = (entry?.tags ?? []).join(', ')
   form.images = [...(entry?.images ?? [])]
   form.reviewEnabled = entry?.reviewEnabled ?? props.defaultReviewEnabled
+  form.senses =
+    entry && entry.senses.length >= 2
+      ? entry.senses.map((sense) => ({
+          meaning: sense.meaning ?? '',
+          englishDefinition: sense.englishDefinition ?? '',
+          explanation: sense.explanation ?? '',
+          examplesText: sense.examples.join('\n'),
+        }))
+      : []
   error.value = ''
 }
 
@@ -71,6 +92,35 @@ watch(
   },
 )
 
+function addSense() {
+  if (!form.senses.length) {
+    const seed: SenseDraft = {
+      meaning: form.meaning,
+      englishDefinition: form.englishDefinition,
+      explanation: form.explanation,
+      examplesText: form.examplesText,
+    }
+    const hasSeed = [seed.meaning, seed.englishDefinition, seed.explanation, seed.examplesText].some(
+      (value) => value.trim(),
+    )
+    form.senses = hasSeed ? [seed, emptySense()] : [emptySense(), emptySense()]
+    return
+  }
+  form.senses.push(emptySense())
+}
+
+/** 删到只剩一个义项时回到普通扁平字段，避免留下只有一个义项的数组。 */
+function removeSense(index: number) {
+  form.senses.splice(index, 1)
+  if (form.senses.length !== 1) return
+  const only = form.senses[0]
+  form.meaning = only.meaning
+  form.englishDefinition = only.englishDefinition
+  form.explanation = only.explanation
+  form.examplesText = only.examplesText
+  form.senses = []
+}
+
 async function submit() {
   if (!form.text.trim()) {
     error.value = t('entryForm.required')
@@ -80,17 +130,43 @@ async function submit() {
   saving.value = true
   error.value = ''
 
+  const normalizedSenses = form.senses
+    .map((sense) => ({
+      meaning: sense.meaning.trim() || null,
+      englishDefinition: sense.englishDefinition.trim() || null,
+      explanation: sense.explanation.trim() || null,
+      examples: sense.examplesText
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean),
+    }))
+    .filter(
+      (sense) =>
+        sense.meaning || sense.englishDefinition || sense.explanation || sense.examples.length,
+    )
+  const useSenses = normalizedSenses.length >= 2
+  const firstWith = (field: 'meaning' | 'englishDefinition' | 'explanation') =>
+    normalizedSenses.find((sense) => sense[field])?.[field] ?? null
+  const senseExamples = [
+    ...new Set(normalizedSenses.flatMap((sense) => sense.examples)),
+  ]
+
   const input: EntryInput = {
     type: form.type,
     text: form.text.trim(),
-    meaning: form.meaning.trim() || null,
+    meaning: useSenses ? firstWith('meaning') : form.meaning.trim() || null,
     phonetic: form.phonetic.trim() || null,
-    englishDefinition: form.englishDefinition.trim() || null,
-    explanation: form.explanation.trim() || null,
-    examples: form.examplesText
-      .split('\n')
-      .map((line) => line.trim())
-      .filter(Boolean),
+    englishDefinition: useSenses
+      ? firstWith('englishDefinition')
+      : form.englishDefinition.trim() || null,
+    explanation: useSenses ? firstWith('explanation') : form.explanation.trim() || null,
+    examples: useSenses
+      ? senseExamples
+      : form.examplesText
+          .split('\n')
+          .map((line) => line.trim())
+          .filter(Boolean),
+    senses: useSenses ? normalizedSenses : [],
     notes: form.notes.trim() || null,
     tags: form.tagsText
       .split(/[,，]/)
@@ -161,7 +237,54 @@ async function submit() {
         </span>
       </div>
 
-      <div class="field">
+      <div v-if="form.senses.length >= 2" class="field">
+        <label>{{ t('entryForm.senses') }}</label>
+        <span class="hint">{{ t('entryForm.senseHint') }}</span>
+        <div class="sense-editors">
+          <div v-for="(sense, index) in form.senses" :key="index" class="sense-editor">
+            <div class="sense-editor-head">
+              <strong>{{ t('entryForm.senseN', { n: index + 1 }) }}</strong>
+              <button
+                type="button"
+                class="icon-btn"
+                :title="t('entryForm.removeSense')"
+                :aria-label="t('entryForm.removeSense')"
+                @click="removeSense(index)"
+              >
+                <Icon name="x" :size="14" />
+              </button>
+            </div>
+            <input
+              v-model="sense.meaning"
+              class="input"
+              :placeholder="t('entryForm.meaningPlaceholder')"
+            />
+            <textarea
+              v-model="sense.englishDefinition"
+              class="textarea"
+              rows="2"
+              :placeholder="t('entryForm.englishDefinitionPlaceholder')"
+            />
+            <textarea
+              v-model="sense.explanation"
+              class="textarea"
+              rows="2"
+              :placeholder="t('entryForm.explanationPlaceholder')"
+            />
+            <textarea
+              v-model="sense.examplesText"
+              class="textarea"
+              rows="2"
+              placeholder="She stayed up late to make up for lost time."
+            />
+          </div>
+        </div>
+        <button type="button" class="btn btn-ghost btn-sm add-sense" @click="addSense">
+          <Icon name="plus" :size="14" /> {{ t('entryForm.addSense') }}
+        </button>
+      </div>
+
+      <div v-if="form.senses.length < 2" class="field">
         <label for="entry-meaning">{{ t('entryForm.meaning') }}</label>
         <input id="entry-meaning" v-model="form.meaning" class="input" :placeholder="t('entryForm.meaningPlaceholder')" />
       </div>
@@ -176,7 +299,7 @@ async function submit() {
         />
       </div>
 
-      <div class="field">
+      <div v-if="form.senses.length < 2" class="field">
         <label for="entry-explanation">{{ t('entryForm.explanation') }}</label>
         <textarea
           id="entry-explanation"
@@ -187,7 +310,7 @@ async function submit() {
         />
       </div>
 
-      <div class="field">
+      <div v-if="form.senses.length < 2" class="field">
         <label for="entry-english-definition">{{ t('entryForm.englishDefinition') }}</label>
         <textarea
           id="entry-english-definition"
@@ -198,7 +321,7 @@ async function submit() {
         />
       </div>
 
-      <div class="field">
+      <div v-if="form.senses.length < 2" class="field">
         <label for="entry-examples">{{ t('entryForm.examples') }}</label>
         <textarea
           id="entry-examples"
@@ -208,6 +331,15 @@ async function submit() {
           placeholder="She stayed up late to make up for lost time."
         />
       </div>
+
+      <button
+        v-if="form.senses.length < 2"
+        type="button"
+        class="btn btn-ghost btn-sm add-sense"
+        @click="addSense"
+      >
+        <Icon name="plus" :size="14" /> {{ t('entryForm.addSense') }}
+      </button>
 
       <div class="field">
         <label for="entry-notes">{{ t('entryForm.notes') }}</label>
@@ -271,6 +403,33 @@ async function submit() {
   display: flex;
   flex-direction: column;
   gap: 18px;
+}
+.sense-editors {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sense-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  background: var(--bg-soft);
+  box-shadow: var(--shadow-inset-sm);
+}
+.sense-editor-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.sense-editor-head strong {
+  font-size: 12.5px;
+  color: var(--accent-strong);
+}
+.add-sense {
+  align-self: flex-start;
 }
 .type-picker {
   display: grid;

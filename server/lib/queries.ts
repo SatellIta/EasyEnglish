@@ -4,7 +4,7 @@ import { mapEntry } from './mappers'
 import { normalizeEntryText } from './text'
 
 export const ENTRY_COLUMNS = `
-  e.id, e.type, e.text, e.meaning, e.explanation, e.examples, e.notes, e.tags,
+  e.id, e.type, e.text, e.meaning, e.explanation, e.examples, e.senses, e.notes, e.tags,
   e.phonetic, e.english_definition, e.images, e.learned_at,
   e.source, e.review_enabled, e.error_rate, e.error_samples,
   e.source_session_id, e.source_message_id, e.created_at, e.updated_at,
@@ -93,8 +93,8 @@ export function buildSearchFilter(query: string): SearchFilter {
 
   const like = `%${trimmed}%`
   return {
-    clause: '(e.text LIKE ? OR e.meaning LIKE ? OR e.explanation LIKE ? OR e.notes LIKE ?)',
-    params: [like, like, like, like],
+    clause: '(e.text LIKE ? OR e.meaning LIKE ? OR e.explanation LIKE ? OR e.notes LIKE ? OR e.senses LIKE ?)',
+    params: [like, like, like, like, like],
   }
 }
 

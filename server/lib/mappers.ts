@@ -4,6 +4,7 @@ import type {
   DailySummary,
   DraftEntry,
   Entry,
+  EntrySense,
   ReviewState,
   ReviewStatus,
   Scene,
@@ -55,6 +56,35 @@ export function mapReviewState(row: any): ReviewState | undefined {
   }
 }
 
+export function parseSenses(value: unknown): EntrySense[] {
+  if (typeof value !== 'string' || !value) return []
+  try {
+    const parsed = JSON.parse(value)
+    if (!Array.isArray(parsed)) return []
+    const senses: EntrySense[] = []
+    for (const item of parsed) {
+      if (!item || typeof item !== 'object') continue
+      const meaning = typeof item.meaning === 'string' ? item.meaning.trim() : ''
+      const englishDefinition =
+        typeof item.englishDefinition === 'string' ? item.englishDefinition.trim() : ''
+      const explanation = typeof item.explanation === 'string' ? item.explanation.trim() : ''
+      const examples = Array.isArray(item.examples)
+        ? item.examples.filter((example: unknown): example is string => typeof example === 'string')
+        : []
+      if (!meaning && !englishDefinition && !explanation && !examples.length) continue
+      senses.push({
+        meaning: meaning || null,
+        englishDefinition: englishDefinition || null,
+        explanation: explanation || null,
+        examples,
+      })
+    }
+    return senses
+  } catch {
+    return []
+  }
+}
+
 export function mapEntry(row: any): Entry {
   return {
     id: row.id,
@@ -63,6 +93,7 @@ export function mapEntry(row: any): Entry {
     meaning: row.meaning ?? null,
     explanation: row.explanation ?? null,
     examples: parseStringArray(row.examples),
+    senses: parseSenses(row.senses),
     notes: row.notes ?? null,
     tags: parseStringArray(row.tags),
     phonetic: row.phonetic ?? null,

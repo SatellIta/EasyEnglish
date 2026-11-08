@@ -50,8 +50,16 @@ app.post('/api/import/markdown/preview', async (c) => {
 
   const items: ImportItem[] = parsed.items.map((item, index) => {
     const key = entryKey(item.text)
-    const duplicate = existing.has(key) || seen.has(key)
-    seen.add(key)
+    // 同一文本的不同释义要保留下来合并成义项；只有内容完全相同的重复行才默认不勾选。
+    const signature = JSON.stringify([
+      key,
+      item.meaning ?? '',
+      item.englishDefinition ?? '',
+      item.explanation ?? '',
+      item.examples ?? [],
+    ])
+    const duplicate = existing.has(key) || seen.has(signature)
+    seen.add(signature)
     return {
       ...item,
       id: `item-${index}`,

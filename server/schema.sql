@@ -5,6 +5,8 @@ CREATE TABLE IF NOT EXISTS entries (
   meaning TEXT,
   explanation TEXT,
   examples TEXT NOT NULL DEFAULT '[]',
+  -- 一词多义的义项：JSON 数组，每项含 meaning / englishDefinition / explanation / examples
+  senses TEXT NOT NULL DEFAULT '[]',
   notes TEXT,
   tags TEXT NOT NULL DEFAULT '[]',
   -- Anki 导入的富字段
@@ -163,26 +165,27 @@ CREATE VIRTUAL TABLE IF NOT EXISTS entries_fts USING fts5(
   meaning,
   explanation,
   notes,
+  senses,
   content = 'entries',
   content_rowid = 'id',
   tokenize = 'trigram'
 );
 
 CREATE TRIGGER IF NOT EXISTS entries_fts_ai AFTER INSERT ON entries BEGIN
-  INSERT INTO entries_fts(rowid, text, meaning, explanation, notes)
-  VALUES (new.id, new.text, new.meaning, new.explanation, new.notes);
+  INSERT INTO entries_fts(rowid, text, meaning, explanation, notes, senses)
+  VALUES (new.id, new.text, new.meaning, new.explanation, new.notes, new.senses);
 END;
 
 CREATE TRIGGER IF NOT EXISTS entries_fts_ad AFTER DELETE ON entries BEGIN
-  INSERT INTO entries_fts(entries_fts, rowid, text, meaning, explanation, notes)
-  VALUES ('delete', old.id, old.text, old.meaning, old.explanation, old.notes);
+  INSERT INTO entries_fts(entries_fts, rowid, text, meaning, explanation, notes, senses)
+  VALUES ('delete', old.id, old.text, old.meaning, old.explanation, old.notes, old.senses);
 END;
 
 CREATE TRIGGER IF NOT EXISTS entries_fts_au AFTER UPDATE ON entries BEGIN
-  INSERT INTO entries_fts(entries_fts, rowid, text, meaning, explanation, notes)
-  VALUES ('delete', old.id, old.text, old.meaning, old.explanation, old.notes);
-  INSERT INTO entries_fts(rowid, text, meaning, explanation, notes)
-  VALUES (new.id, new.text, new.meaning, new.explanation, new.notes);
+  INSERT INTO entries_fts(entries_fts, rowid, text, meaning, explanation, notes, senses)
+  VALUES ('delete', old.id, old.text, old.meaning, old.explanation, old.notes, old.senses);
+  INSERT INTO entries_fts(rowid, text, meaning, explanation, notes, senses)
+  VALUES (new.id, new.text, new.meaning, new.explanation, new.notes, new.senses);
 END;
 
 INSERT INTO entries_fts(entries_fts) VALUES ('rebuild');

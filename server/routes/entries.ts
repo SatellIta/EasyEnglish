@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { ENTRY_TYPE_LABELS } from '../../shared/types'
-import type { BulkCreateResult, Entry } from '../../shared/types'
+import type { BulkCreateResult, Entry, EntrySense } from '../../shared/types'
 import { db } from '../db'
 import {
   entryKey,
@@ -16,12 +16,20 @@ import { nowIso } from '../lib/time'
 
 const app = new Hono()
 
+const senseInput = z.object({
+  meaning: z.string().trim().max(4000).nullish(),
+  englishDefinition: z.string().trim().max(8000).nullish(),
+  explanation: z.string().trim().max(8000).nullish(),
+  examples: z.array(z.string().trim().min(1).max(1000)).max(50).optional(),
+})
+
 const entryInput = z.object({
   type: z.enum(['word', 'phrase', 'sentence']),
   text: z.string().trim().min(1, '内容不能为空').max(2000),
   meaning: z.string().trim().max(4000).nullish(),
   explanation: z.string().trim().max(8000).nullish(),
   examples: z.array(z.string().trim().min(1).max(1000)).max(50).optional(),
+  senses: z.array(senseInput).max(20).optional(),
   notes: z.string().trim().max(8000).nullish(),
   tags: z.array(z.string().trim().min(1).max(50)).max(50).optional(),
   phonetic: z.string().trim().max(200).nullish(),
@@ -34,6 +42,28 @@ const entryInput = z.object({
 })
 
 const updateInput = entryInput.partial()
+
+/** 把 zod 的可选字段收敛为写库用的完整义项，并丢弃空义项。 */
+function normalizeSenses(
+  senses: Array<z.infer<typeof senseInput>> | undefined,
+): EntrySense[] | undefined {
+  if (!senses) return undefined
+  return senses
+    .map((sense) => ({
+      meaning: sense.meaning?.trim() || null,
+      englishDefinition: sense.englishDefinition?.trim() || null,
+      explanation: sense.explanation?.trim() || null,
+      examples: (sense.examples ?? []).map((example) => example.trim()).filter(Boolean),
+    }))
+    .filter(
+      (sense) =>
+        sense.meaning ||
+        sense.englishDefinition ||
+        sense.explanation ||
+        sense.examples.length,
+    )
+}
+
 const bulkInput = z.object({
   entries: z.array(entryInput).min(1).max(50),
   /** 默认 true：跳过词库中和本批次内主要英文内容相同的词条 */
@@ -260,7 +290,9 @@ app.post('/api/entries', async (c) => {
       409,
     )
   }
-  const entry = db.transaction(() => insertEntry(input))()
+  const entry = db.transaction(() =>
+    insertEntry({ ...input, senses: normalizeSenses(input.senses) }),
+  )()
   return c.json(entry, 201)
 })
 
@@ -279,7 +311,7 @@ app.post('/api/entries/bulk', async (c) => {
         duplicates.push({ type: input.type, text: input.text, existingEntryId: existingId })
         continue
       }
-      const entry = insertEntry(input)
+      const entry = insertEntry({ ...input, senses: normalizeSenses(input.senses) })
       seen.set(key, entry.id)
       created.push(entry)
     }
@@ -354,6 +386,7 @@ app.patch('/api/entries/:id', async (c) => {
   if (input.meaning !== undefined) set('meaning', input.meaning || null)
   if (input.explanation !== undefined) set('explanation', input.explanation || null)
   if (input.examples !== undefined) set('examples', JSON.stringify(input.examples))
+  if (input.senses !== undefined) set('senses', JSON.stringify(normalizeSenses(input.senses) ?? []))
   if (input.notes !== undefined) set('notes', input.notes || null)
   if (input.tags !== undefined) set('tags', JSON.stringify(input.tags))
   if (input.phonetic !== undefined) set('phonetic', input.phonetic || null)

@@ -55,6 +55,17 @@ export interface SceneRef {
   subsection: string | null
 }
 
+/**
+ * 一词多义时的一个义项。词条只有一个义项时仍使用顶层字段；
+ * 有两个及以上义项时写入 `senses`，顶层字段保留为第一个义项的摘要。
+ */
+export interface EntrySense {
+  meaning: string | null
+  englishDefinition: string | null
+  explanation: string | null
+  examples: string[]
+}
+
 export interface Entry {
   id: number
   type: EntryType
@@ -64,6 +75,8 @@ export interface Entry {
   examples: string[]
   notes: string | null
   tags: string[]
+  /** 一词多义的义项；没有多义时为空数组 */
+  senses: EntrySense[]
   /** 音标，例如 UK [ə; eɪ] US [ə; eɪ] */
   phonetic: string | null
   /** 英英释义，例如来自 Anki 词库的 WordNet 释义 */
@@ -130,6 +143,8 @@ export interface EntryInput {
   phonetic?: string | null
   englishDefinition?: string | null
   images?: string[]
+  /** 一词多义的义项；提供时每个义项单独保存释义和例句 */
+  senses?: EntrySense[]
   /** 是否进入每日复习，默认 true */
   reviewEnabled?: boolean
   /** 来源标记，默认 manual */

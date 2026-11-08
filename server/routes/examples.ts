@@ -227,11 +227,34 @@ app.post('/api/entries/:id/examples', async (c) => {
     }
 
     if (added.length) {
-      db.prepare('UPDATE entries SET examples = ?, updated_at = ? WHERE id = ?').run(
-        JSON.stringify(merged),
-        nowIso(),
-        id,
-      )
+      // 多义词的新例句归入第一个义项，并同步更新顶层例句摘要。
+      const newExamples = merged.slice(entry.examples.length)
+      const senses = entry.senses.length
+        ? entry.senses.map((sense, index) =>
+            index === 0
+              ? {
+                  ...sense,
+                  examples: [
+                    ...sense.examples,
+                    ...newExamples.filter(
+                      (example) => !sense.examples.includes(example),
+                    ),
+                  ],
+                }
+              : sense,
+          )
+        : entry.senses
+      if (entry.senses.length) {
+        db.prepare(
+          'UPDATE entries SET examples = ?, senses = ?, updated_at = ? WHERE id = ?',
+        ).run(JSON.stringify(merged), JSON.stringify(senses), nowIso(), id)
+      } else {
+        db.prepare('UPDATE entries SET examples = ?, updated_at = ? WHERE id = ?').run(
+          JSON.stringify(merged),
+          nowIso(),
+          id,
+        )
+      }
     }
 
     return c.json({

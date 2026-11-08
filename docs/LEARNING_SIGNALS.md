@@ -93,13 +93,14 @@ API 的 `Entry` DTO 同步增加 `errorRate`、`errorSamples`、`sourceSessionId
 
 ## 8. 迁移版本
 
-当前 `SCHEMA_VERSION = 6`，迁移按顺序执行：
+当前 `SCHEMA_VERSION = 7`，迁移按顺序执行：
 
 - 版本 2：`server/migrations/002_scenes.sql`（场景表与 `review_enabled`）
 - 版本 3：`server/migrations/003_learning_signals.sql`（错误档案、错误率、去重、溯源）
 - 版本 4：`server/migrations/004_scene_chat.sql`（对话绑定场景）
 - 版本 5：`server/migrations/005_personas.sql`（人格）
 - 版本 6：`server/migrations/006_rich_entries.sql`（音标、英英释义、图片、Anki GUID、学习状态）
+- 版本 7：`server/migrations/007_senses.sql`（一词多义的 `senses` 字段，重建 FTS 索引）
 
 全新数据库由 `server/schema.sql` 一次建好全部结构；旧库会依次执行缺少的迁移。场景导入、Markdown 导入和总结入库都走 `entry-store`，因此 `normalized_text`、`error_rate` 默认值会自动维护。
 
